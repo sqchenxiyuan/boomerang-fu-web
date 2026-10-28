@@ -1,10 +1,13 @@
 import type { Vec2 } from './math';
 import type { POWERUPS } from './config';
+import type { EnvironmentState } from './environment-types';
+export type * from './environment-types';
 
 export type PowerupKind = keyof typeof POWERUPS;
 export type Phase = 'menu' | 'countdown' | 'playing' | 'roundEnd' | 'matchEnd';
 export type Difficulty = 'easy' | 'normal' | 'hard';
-export type MapId = 'courtyard' | 'canal' | 'market' | 'switchback' | 'portals';
+export type LegacyMapId = 'courtyard' | 'canal' | 'market' | 'switchback' | 'portals';
+export type MapId = LegacyMapId | `original-${string}`;
 export type MapRotation = 'fixed' | 'cycle';
 export interface MatchOptions {
   mode: 'solo' | 'local';
@@ -36,7 +39,14 @@ export const idleCommand = (): Command => ({
   throwReleased: false,
 });
 
-export type DeathCause = 'weapon' | 'explosion' | 'fall' | 'boundary' | 'fire' | 'telefrag';
+export type DeathCause =
+  | 'weapon'
+  | 'explosion'
+  | 'fall'
+  | 'boundary'
+  | 'fire'
+  | 'telefrag'
+  | 'crush';
 export interface DeathState {
   cause: DeathCause;
   variant: 'slice' | 'squash' | 'water' | 'cliff' | 'burst';
@@ -47,6 +57,8 @@ export interface DeathState {
 }
 
 export interface BoundaryState {
+  angle?: number;
+  allowOutside?: boolean;
   /** Settled includes an early stop when fewer than two opponents remain. */
   phase: 'idle' | 'shrinking' | 'settled';
   center: Vec2;
@@ -96,6 +108,10 @@ export interface Actor {
   positivePickups?: number;
   iceExposure?: number;
   slowed?: boolean;
+  wetFloor?: boolean;
+  slideFactor?: number;
+  surfaceDrag?: number;
+  movingFloorId?: string;
   decoyCreated?: boolean;
   freezeChipCooldown?: number;
   charge: number;
@@ -153,7 +169,42 @@ export type Obstacle = {
   kind: 'stone' | 'crate' | 'fountain';
   half: Vec2;
   broken: boolean;
+  /** Local contours, relative to position and rotated by angle (radians). */
+  paths?: Vec2[][];
+  angle?: number;
+  radius?: number;
+  height?: number;
+  /** Visual lower face, including portions buried below the walkable plane. */
+  baseHeight?: number;
+  material?: string;
+  sourceName?: string;
+  sourceLayer?: number;
+  mechanismId?: string;
+  disabled?: boolean;
 };
+/** All original terrain uses the same geometry for rendering, footing and pathfinding. */
+export interface Floor {
+  id: string;
+  position: Vec2;
+  paths: Vec2[][];
+  /** Exact CircleCollider2D radius; paths remain the visual tessellation. */
+  radius?: number;
+  angle?: number;
+  kind: 'ground' | 'ice' | 'wood' | 'falling' | 'moving';
+  active: boolean;
+  height?: number;
+  mechanismId?: string;
+  fallProgress?: number;
+  warning?: number;
+}
+export interface Surface {
+  id: string;
+  position: Vec2;
+  paths: Vec2[][];
+  radius?: number;
+  angle?: number;
+  kind: 'ice' | 'water';
+}
 export interface Pit {
   position: Vec2;
   half: Vec2;
@@ -168,14 +219,29 @@ export interface Arena {
   spawns: Vec2[];
   pickupSpawns: Vec2[];
   portals?: Portal[];
+  /** When present, walkable terrain is the union of these shapes, not the bounds rectangle. */
+  floors?: Floor[];
+  surfaces?: Surface[];
+  environment?: EnvironmentState;
+  sourceScene?: string;
+  hazard?: 'water' | 'cliff';
+  boundary?: { center: Vec2; half: Vec2; angle: number; allowOutside: boolean };
 }
 export interface Portal {
+  height?: number;
+  baseHeight?: number;
   id: string;
   exitId: string;
   position: Vec2;
   direction: Vec2;
   radius: number;
   color: string;
+  /** Original gates use a rectangular trigger. Legacy pads omit these fields. */
+  half?: Vec2;
+  triggerOffset?: Vec2;
+  angle?: number;
+  thickness?: number;
+  safeForAI?: boolean;
 }
 export interface Pickup {
   id: number;
@@ -227,7 +293,9 @@ export interface GameEvent {
     | 'freeze'
     | 'burn'
     | 'disguise'
-    | 'decoy';
+    | 'decoy'
+    | 'environment';
+  mechanismId?: string;
   position: Vec2;
   actorId: number;
   value?: number;

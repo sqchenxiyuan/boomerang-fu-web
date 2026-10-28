@@ -40,6 +40,8 @@ async function hold(selector, duration) {
 }
 try {
   await page.goto(`${base}/sdk-demo.html`, { waitUntil: 'networkidle' });
+  await page.selectOption('#demo-map', 'courtyard');
+  await page.locator('#demo-start').click();
   await neutralOpponent();
   await ready();
   await page.evaluate(() => {

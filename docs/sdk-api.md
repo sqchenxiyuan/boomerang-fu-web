@@ -1,6 +1,6 @@
 # Boomerang Garden SDK API
 
-本文对应本地 ESM 包 **`@boomerang-garden/sdk` 0.4.1**。SDK 把固定步长模拟、人物控制来源和浏览器呈现分开；运行不需要 Boomerang Fu 的安装目录或原版素材。
+本文对应本地 ESM 包 **`@boomerang-garden/sdk` 0.5.0**。SDK 把固定步长模拟、人物控制来源和浏览器呈现分开；运行不需要 Boomerang Fu 的安装目录或原版素材。
 
 公开类型以 `src/sdk/types.ts`、`src/sdk/browser.ts` 及打包后的 `.d.ts` 为准。示例采用公开包入口，不依赖开发调试接口。
 
@@ -15,7 +15,7 @@ npm run build:sdk
 在使用 SDK 的项目里安装生成的 tarball，路径按实际位置调整：
 
 ```sh
-npm install /path/to/dist-sdk/boomerang-garden-sdk-0.4.1.tgz
+npm install /path/to/dist-sdk/boomerang-garden-sdk-0.5.0.tgz
 ```
 
 这不是 npm 在线发布。包提供以下入口：
@@ -95,13 +95,17 @@ node node_modules/@boomerang-garden/sdk/examples/node-bots.mjs
 | `difficulty`      | `'normal'`           | `'easy'`、`'normal'`、`'hard'`                                               |
 | `seed`            | `1261`               | 0–4,294,967,295 的整数                                                       |
 | `scoreGoal`       | `5`                  | 1–100 的整数                                                                 |
-| `mapId`           | `'courtyard'`        | `'courtyard'`、`'canal'`、`'market'`、`'switchback'`、`'portals'`            |
-| `mapRotation`     | `'fixed'`            | `'fixed'` 固定地图；`'cycle'` 从所选地图开始按上述顺序轮换                   |
+| `mapId`           | `'courtyard'`        | 从导出的 `MAPS` 选择；含 58 个 `original-*` 场地与原有 5 个 ID            |
+| `mapRotation`     | `'fixed'`            | `'fixed'` 固定；`'cycle'` 从所选地图开始，在原版或 Web 原创集合内轮换，跳过教程 |
 | `suddenDeathTime` | `180`                | 有限非负秒数；超过该时刻且仍有两名以上存活角色时开始缩圈，`0` 表示开场即触发 |
 | `powerupPool`     | 省略，使用全部 14 种 | 1–14 个不同的 `PowerupKind`，不允许空数组；限制场内配方书池                  |
 | `startingPowers`  | 省略，无开场强化     | 最多 3 项，允许空数组；按顺序走真实授予规则，用于本地练习                    |
 
 `PowerupKind` 的 14 个值为 `shield`、`haste`、`explosive`、`wallDash`、`reverse`、`multi`、`teleport`、`fire`、`extra`、`ice`、`disguise`、`controlled`、`shrink`、`decoy`。两个数组在构造和重开时都校验并复制；修改原数组或返回快照不会修改对局。重开不传值或传 `undefined` 会继承当前列表；`startingPowers: []` 清除开场配置，要恢复完整道具池可显式传入全部 14 项。
+
+`MAPS` 目录中的 `source` 区分 `original` 与 `custom`；`tutorial`、`requiredDLC`、`buildIndices` 等保留来源信息。原版集合含 57 张正式地图及 1 张教程练习场地；教程引导、GoldenDisc 等模式没有随场地目录自动实现。`createSession()` 继续默认 `courtyard` 以保持旧接口行为，试玩站点默认 `original-enclosed`。
+
+原版 `arena.floors` 表示实际可行走轮廓，包含孔洞、圆形平台和当前 `active` 状态；不能再用 `halfWidth/halfHeight` 矩形代替地面。`arena.environment.mechanisms`、`arena.surfaces` 和 `arena.portals` 的位姿随模拟 tick 更新。多个 Session 独立持有状态；暂停时机关和渲染插值不推进。`environment` 游戏事件附 `mechanismId`，具体数据结构以导出的 `Floor`、`Surface`、`EnvironmentMechanism` 等类型为准。
 
 开场强化在第一回合实际发镖时逐项授予，每名存活角色都会获得；不是创建时直接写入 `actor.powers`。`fire` / `ice` 互斥，按输入顺序后者生效；`reverse` / `shrink` 是即时效果，不占长期强化槽；重复的开场项仍逐次授予（池列表则必须唯一）。后续回合按普通强化保留规则处理，不重新授予临时开场效果。`extra` 会让发镖库存变为 2。开场尚未发镖时 `armed=false`、`heldDiscs=0`，宿主应读取 `weaponsGranted`，不能仅凭 `phase='playing'` 假定已可投掷。
 

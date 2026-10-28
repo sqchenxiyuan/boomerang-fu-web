@@ -10,6 +10,7 @@ export function eliminationLabel(actor: Actor): string {
       : '';
   if (actor.death?.cause === 'fire') return '火焰出局';
   if (actor.death?.cause === 'telefrag') return '被传送撞击';
+  if (actor.death?.cause === 'crush') return '被机关挤压';
   switch (actor.death?.variant) {
     case 'slice':
       return '被切片';

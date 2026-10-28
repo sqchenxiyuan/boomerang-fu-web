@@ -1,5 +1,5 @@
 import { RULES } from '../core/config';
-import { clamp, lerpV, normalize, sub, v } from '../core/math';
+import { add, clamp, lerpV, normalize, rotate, sub, v } from '../core/math';
 import type { Random, Vec2 } from '../core/math';
 import type { Actor, Arena, BoundaryState, GameState } from '../core/types';
 import { damageActor } from './combat';
@@ -33,14 +33,19 @@ export function boundaryCurve(progress: number): number {
 }
 
 export function createBoundary(arena: Arena): BoundaryState {
-  const halfSize = v(arena.halfWidth, arena.halfHeight);
+  const halfSize = arena.boundary
+    ? { ...arena.boundary.half }
+    : v(arena.halfWidth, arena.halfHeight);
+  const center = arena.boundary ? { ...arena.boundary.center } : v();
   return {
+    angle: arena.boundary?.angle,
+    allowOutside: arena.boundary?.allowOutside,
     phase: 'idle',
-    center: v(),
+    center,
     halfSize,
-    startCenter: v(),
+    startCenter: { ...center },
     startHalfSize: { ...halfSize },
-    targetCenter: v(),
+    targetCenter: { ...center },
     targetHalfSize: v(RULES.boundaryFinalWidth / 2, RULES.boundaryFinalWidth / 2),
     elapsed: 0,
     duration: 0,
@@ -52,18 +57,21 @@ export function createBoundary(arena: Arena): BoundaryState {
 
 /** Original checks the actor origin, with strict rectangle edges, not body overlap. */
 export function isInBoundary(boundary: BoundaryState, point: Vec2, inset = 0): boolean {
+  if (boundary.allowOutside) return true;
+  const local = rotate(sub(point, boundary.center), -(boundary.angle ?? 0));
   return (
-    Math.abs(point.x - boundary.center.x) < boundary.halfSize.x - inset &&
-    Math.abs(point.y - boundary.center.y) < boundary.halfSize.y - inset
+    Math.abs(local.x) < boundary.halfSize.x - inset &&
+    Math.abs(local.y) < boundary.halfSize.y - inset
   );
 }
 
 export function clampToBoundary(boundary: BoundaryState, point: Vec2, inset = 0): Vec2 {
   const x = Math.max(0, boundary.halfSize.x - inset),
     y = Math.max(0, boundary.halfSize.y - inset);
-  return v(
-    clamp(point.x, boundary.center.x - x, boundary.center.x + x),
-    clamp(point.y, boundary.center.y - y, boundary.center.y + y),
+  const local = rotate(sub(point, boundary.center), -(boundary.angle ?? 0));
+  return add(
+    boundary.center,
+    rotate(v(clamp(local.x, -x, x), clamp(local.y, -y, y)), boundary.angle ?? 0),
   );
 }
 
@@ -75,14 +83,12 @@ export function startShrinkingBoundary(
   const b = state.boundary,
     half = RULES.boundaryFinalWidth / 2;
   b.phase = 'shrinking';
+  b.allowOutside = false;
   b.startCenter = { ...b.center };
   b.startHalfSize = { ...b.halfSize };
   b.targetHalfSize = v(half, half);
   // Clamp to the original map box. No obstacle/water filtering exists in the source.
-  b.targetCenter = v(
-    clamp(target.x, -state.arena.halfWidth + half, state.arena.halfWidth - half),
-    clamp(target.y, -state.arena.halfHeight + half, state.arena.halfHeight - half),
-  );
+  b.targetCenter = clampToBoundary(createBoundary(state.arena), target, half);
   b.elapsed = 0;
   b.duration = (b.startHalfSize.x * 2) / RULES.boundaryShrinkSpeed;
   b.startedAt = state.time;
@@ -108,9 +114,12 @@ export function tickBoundary(state: GameState, random: Random, dt: number): void
     state.suddenDeathStarted = true;
     startShrinkingBoundary(
       state,
-      v(
-        random.range(b.center.x - b.halfSize.x, b.center.x + b.halfSize.x),
-        random.range(b.center.y - b.halfSize.y, b.center.y + b.halfSize.y),
+      add(
+        b.center,
+        rotate(
+          v(random.range(-b.halfSize.x, b.halfSize.x), random.range(-b.halfSize.y, b.halfSize.y)),
+          b.angle ?? 0,
+        ),
       ),
     );
   }

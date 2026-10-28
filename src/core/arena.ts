@@ -1,7 +1,10 @@
 import { v } from './math';
 import type { Arena, MapId, MapRotation, Obstacle, Portal } from './types';
+import { createOriginalArena, ORIGINAL_MAPS } from './original-maps';
+import type { MapInfo } from './original-maps';
+export { ORIGINAL_MAPS } from './original-maps';
 
-export const MAPS = [
+export const CUSTOM_MAPS = [
   {
     id: 'courtyard',
     name: '山间庭院',
@@ -39,6 +42,11 @@ export const MAPS = [
   },
 ] as const;
 
+export const MAPS: readonly MapInfo[] = [
+  ...ORIGINAL_MAPS,
+  ...CUSTOM_MAPS.map((map) => ({ ...map, source: 'custom' as const })),
+];
+
 export function mapInfo(id: MapId = 'courtyard') {
   const map = MAPS.find((entry) => entry.id === id);
   if (!map) throw new RangeError(`Unknown map: ${String(id)}`);
@@ -52,10 +60,12 @@ export function selectRoundMap(
   round = 1,
 ): MapId {
   mapInfo(first);
-  const index = MAPS.findIndex((map) => map.id === first);
-  return MAPS[
-    (index + (rotation === 'cycle' ? Math.max(0, Math.floor(round) - 1) : 0)) % MAPS.length
-  ].id;
+  if (rotation === 'fixed' || first === 'original-tutorial') return first;
+  const collection = first.startsWith('original-')
+    ? ORIGINAL_MAPS.filter((map) => !map.tutorial)
+    : CUSTOM_MAPS;
+  const index = collection.findIndex((map) => map.id === first);
+  return collection[(index + Math.max(0, Math.floor(round) - 1)) % collection.length].id;
 }
 
 const stone = (id: string, x: number, y: number, hx: number, hy: number): Obstacle => ({
@@ -75,6 +85,7 @@ const crate = (id: string, x: number, y: number): Obstacle => ({
 
 export function createArena(id: MapId = 'courtyard'): Arena {
   mapInfo(id);
+  if (id.startsWith('original-')) return createOriginalArena(id);
   if (id !== 'courtyard') return createAdditionalArena(id);
   const obstacles: Obstacle[] = [
     { id: 'fountain', kind: 'fountain', position: v(0, 0), half: v(1.25, 1.25), broken: false },

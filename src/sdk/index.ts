@@ -2,3 +2,5 @@ export { GameSession, createSession } from './session';
 export type * from './types';
 export type * from '../core/types';
 export type { Vec2 } from '../core/math';
+export { MAPS, ORIGINAL_MAPS, CUSTOM_MAPS } from '../core/arena';
+export type { MapInfo } from '../core/original-maps';

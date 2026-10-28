@@ -1,6 +1,6 @@
 # 回旋花园 · Boomerang Garden
 
-基于 Boomerang Fu 本地静态研究的 Web 玩法复刻。使用 TypeScript、Three.js 和 Vite，自建模型与合成音效；运行不需要原版文件、Unity 或账户。当前包含五张地图、完整存活计分对局，以及可独立安装的 SDK。
+基于 Boomerang Fu 本地静态研究的 Web 玩法复刻。使用 TypeScript、Three.js 和 Vite，自建模型与合成音效；运行不需要原版文件、Unity 或账户。当前包含原安装包的 57 张正式地图、1 张教程练习场地和 5 张 Web 原创地图，以及存活计分对局与可独立安装的 SDK。
 
 ## 启动与试玩
 
@@ -20,7 +20,8 @@ npm run dev
 
 ## 已实现
 
-- 山间庭院、双桥水道、货箱集市、折返回廊、跃迁花园；支持固定地图或逐回合轮换。
+- 完整原版地图目录：地面轮廓、孔洞、出生点、旋转墙体、成对传送门及关卡边界；支持固定地图或同一地图集内逐回合轮换。教程场地不参与轮换，暂不包含原版引导任务。
+- 移动墙与夹击、往返/旋转浮筏、开关与升降门、永久坍塌和踩踏陷阱、湿滑地面、植被与可破坏物。保留山间庭院等 5 张 Web 原创布局。
 - 单人对机器人、本地双人、最多四人混合对战、三档机器人难度。
 - 移动与惯性、转向、冲刺、近战/空手击退、正面反弹、蓄力投掷、弧线与追踪、回返/接取/召回。
 - 墙体、可破坏箱子、水坑、矩形决胜缩圈；人物和飞镖均可穿过传送门。
@@ -51,10 +52,10 @@ npm run dev
 npm run build:sdk
 npm run verify:sdk
 # 在另一个项目安装；也可以使用绝对路径
-npm install ./dist-sdk/boomerang-garden-sdk-0.4.1.tgz
+npm install ./dist-sdk/boomerang-garden-sdk-0.5.0.tgz
 ```
 
-交付的是本地 ESM 包 `@boomerang-garden/sdk@0.4.1`，未发布 npm。
+交付的是本地 ESM 包 `@boomerang-garden/sdk@0.5.0`，未发布 npm。`MAPS`、`ORIGINAL_MAPS`、`CUSTOM_MAPS` 提供可选目录；原版地图 ID 以 `original-` 开头。
 
 ```js
 import { createBrowserGame } from '@boomerang-garden/sdk/browser';
@@ -92,6 +93,7 @@ npm run build
 npm run preview
 # 以下浏览器测试需对应服务器运行，使用本机 Chrome
 npm run test:browser        # 5173：五图、输入、装备、暂停、换图
+node scripts/original-maps-browser-verify.mjs # 5173：58 场地逐图截图、暂停与状态检查
 npm run test:sdk-browser    # 5173：注入、接管、多实例、销毁
 npm run test:v3-browser     # 5173：缩圈/死亡实际流程与独立呈现样本
 node scripts/v4-browser-verify.mjs # 5173：发镖、配方、键盘道具操作、真实拾取
@@ -103,6 +105,8 @@ npm run verify:sdk          # 独立目录安装 tarball，Node + 浏览器消�
 `dist/` 可部署到普通静态站点。GitHub Pages 通过 Actions 中的 **Deploy game to GitHub Pages → Run workflow** 手动发布，提交不会自动部署。流程先运行测试，再按仓库子路径构建并部署游戏与 SDK 演示。线上冒烟测试可设置 `GARDEN_TEST_URL`、`GARDEN_TEST_DIST` 和 `GARDEN_TEST_OUTPUT` 后运行 `scripts/production-smoke.mjs`。第四阶段见 [道具研究](docs/v4-powerups-analysis.md)、[性能基线](docs/v4-performance-baseline.md)和[验收记录](docs/v4-validation.md)。[第三阶段验收](docs/v3-validation.md)及更早报告保留为历史记录。
 
 SDK 0.4.1 同步更新普通攻击表现，改动和验证见 [普通攻击动画](docs/melee-animation.md)。
+
+SDK 0.5.0 加入完整原版地图集与环境机制。参见[地图清单](docs/original-map-inventory.md)、[机关证据](docs/original-environment-analysis.md)、[验证记录](docs/original-maps-validation.md)。布局与机制依据安装包静态数据重建，模型、纹理、植被外观和音效为独立简化表现；尚未与原版运行画面逐帧比对，不代表像素级或全部模式复刻。
 
 ## 分层
 
@@ -131,6 +135,6 @@ src/sdk-demo.ts  使用相同公开 API 的接管演示
 
 研究对象：`F:\SteamLibrary\steamapps\common\Boomerang Fu`。本轮未启动原版；结论来自安装文件、反编译 CIL 和 Unity 序列化资源。报告区分代码默认值、资源值和 Web 设计选择，不能据此声称逐帧还原或实机手感一致。
 
-Web 保留简化的飞镖动力学、回收、下落惯性与 AI；边界仅支持轴对齐矩形，地图为原创布局，并非导入原版全部地图。14 种正式道具已进入模拟规则，但爆炸伤害窗口、武器补发等待、诱饵决策等仍有 Web 适配差异，详见第四阶段报告。隐藏的 TimeImmune、全部角色美术、组队/黄金回旋镖/躲猫猫或联网尚未实现。原版资源及分析工具不进入站点或 SDK。
+Web 保留简化的飞镖动力学、回收、下落惯性与 AI；完整原版地图目录、轮廓与旋转矩形边界已重建，视觉仍使用程序化模型。14 种正式道具已进入模拟规则，但爆炸伤害窗口、武器补发等待、诱饵决策等仍有 Web 适配差异，详见第四阶段报告。隐藏的 TimeImmune、全部角色美术、组队/黄金回旋镖/躲猫猫或联网尚未实现。原版模型、贴图、程序及分析工具不进入站点或 SDK。
 
 `tools/`、`analysis/evidence/`、`analysis/derived/`、`test-results/` 和构建产物默认忽略 Git。原版离线分析使用 ILSpy / UnityPy，它们不是 Web 游戏运行或构建依赖。

@@ -12,9 +12,17 @@ import type {
 } from '../core/types';
 import { heldDiscs, setHeldDiscs } from './inventory';
 import { addZone, freezeActor, hitDecoy } from './status-effects';
+import { damageEnvironmentObstacle, strikeEnvironment } from './environment';
+import { obstacleDistance } from '../core/geometry';
 
-export function breakCrate(state: GameState, obstacle: Obstacle, actorId: number): void {
+export function breakCrate(
+  state: GameState,
+  obstacle: Obstacle,
+  actorId: number,
+  hitSerial?: number,
+): void {
   if (obstacle.kind !== 'crate' || obstacle.broken) return;
+  if (damageEnvironmentObstacle(state, obstacle, actorId, hitSerial)) return;
   obstacle.broken = true;
   state.events.push({ type: 'crate', position: { ...obstacle.position }, actorId });
 }
@@ -28,7 +36,11 @@ export function damageActor(
 ): 'ignored' | 'shield' | 'killed' {
   if (!actor.alive) return 'ignored';
   const environmental =
-    cause === 'fall' || cause === 'boundary' || cause === 'fire' || cause === 'telefrag';
+    cause === 'fall' ||
+    cause === 'boundary' ||
+    cause === 'fire' ||
+    cause === 'telefrag' ||
+    cause === 'crush';
   if (!environmental && (actor.dashTime > 0 || actor.invulnerable > 0)) return 'ignored';
   if (!environmental && actor.shield) {
     actor.shield = false;
@@ -44,7 +56,7 @@ export function damageActor(
   const variant: DeathState['variant'] =
     cause === 'weapon'
       ? 'slice'
-      : cause === 'explosion' || cause === 'telefrag'
+      : cause === 'explosion' || cause === 'telefrag' || cause === 'crush'
         ? 'squash'
         : cause === 'boundary' || cause === 'fire'
           ? 'burst'
@@ -108,6 +120,14 @@ export function resolveMelee(state: GameState): void {
   const hits: Array<{ attacker: Actor; target: Actor; armed: boolean }> = [];
   for (const actor of state.actors) {
     if (!actor.alive || actor.attackTime <= 0) continue;
+    strikeEnvironment(state, {
+      kind: 'melee',
+      position: actor.position,
+      direction: actor.facing,
+      radius: RULES.attackRange,
+      actorId: actor.id,
+      serial: actor.attackSerial,
+    });
     for (const decoy of state.decoys ?? []) {
       if (
         decoy.alive &&
@@ -122,10 +142,10 @@ export function resolveMelee(state: GameState): void {
       if (
         !obstacle.broken &&
         obstacle.kind === 'crate' &&
-        distance(actor.position, obstacle.position) < RULES.attackRange + 0.5 &&
+        obstacleDistance(obstacle, actor.position) < RULES.attackRange &&
         facingTarget(actor, obstacle.position, 0.2)
       )
-        breakCrate(state, obstacle, actor.id);
+        breakCrate(state, obstacle, actor.id, actor.attackSerial);
     }
     for (const target of state.actors) {
       if (!target.alive || target.id === actor.id || actor.hitTargets.includes(target.id)) continue;
@@ -203,6 +223,15 @@ export function explode(
   const ice = powers.includes('ice'),
     fire = powers.includes('fire');
   const radius = (ice ? 17 * RULES.worldScale : RULES.explosionRadius) * scale;
+  strikeEnvironment(state, {
+    kind: 'explosion',
+    position,
+    direction: v(),
+    radius,
+    actorId: sourceId,
+    fire,
+    ice,
+  });
   state.events.push({
     type: 'explosion',
     position: { ...position },

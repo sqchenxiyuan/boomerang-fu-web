@@ -4,6 +4,8 @@ import type { Arena, GameEvent, GameState } from '../core/types';
 import { Random } from '../core/math';
 import { sampleDeathParticles, sampleDeathRings, sampleDeathSplats } from './death-visuals';
 import { InstanceBatch } from './batches';
+import { onGround } from '../core/collision';
+import { obstacleDistance } from '../core/geometry';
 
 interface Particle {
   x: number;
@@ -29,17 +31,8 @@ interface Wave {
 const PARTICLE_LIMIT = 384;
 function onFloor(arena: Arena, x: number, y: number): boolean {
   return (
-    Math.abs(x) < arena.halfWidth &&
-    Math.abs(y) < arena.halfHeight &&
-    !arena.pits.some(
-      (p) => Math.abs(x - p.position.x) <= p.half.x && Math.abs(y - p.position.y) <= p.half.y,
-    ) &&
-    !arena.obstacles.some(
-      (o) =>
-        !o.broken &&
-        Math.abs(x - o.position.x) <= o.half.x &&
-        Math.abs(y - o.position.y) <= o.half.y,
-    )
+    onGround(arena, { x, y }) &&
+    !arena.obstacles.some((o) => !o.broken && !o.disabled && obstacleDistance(o, { x, y }) <= 1e-7)
   );
 }
 

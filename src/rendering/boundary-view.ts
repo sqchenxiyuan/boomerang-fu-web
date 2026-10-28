@@ -97,31 +97,36 @@ export class BoundaryView {
   }
 
   update(state: GameState, menu: boolean): void {
-    this.root.visible = !menu && state.phase !== 'countdown';
+    this.root.visible = !menu && state.phase !== 'countdown' && !state.boundary.allowOutside;
     if (!this.root.visible) return;
     const bounds = state.boundary;
+    const angle = bounds.angle ?? 0;
     const { x: hx, y: hy } = bounds.halfSize;
     this.line.position.set(bounds.center.x, 0.07, bounds.center.y);
+    this.line.rotation.set(-Math.PI / 2, -angle, 0, 'YXZ');
     this.line.scale.set(hx + 0.3, hy + 0.3, 1);
     this.line.material.uniforms.extent.value.set(hx + 0.3, hy + 0.3);
     this.line.material.uniforms.halfSize.value.set(hx, hy);
     this.line.material.uniforms.time.value = state.time;
     this.line.material.uniforms.scroll.value = bounds.phase === 'shrinking' ? 0.25 : -0.5;
     const outside = state.actors.some((a) => a.alive && a.outOfBounds);
-    const near = state.actors.some(
-      (a) =>
-        a.alive &&
-        Math.min(
-          hx - Math.abs(a.position.x - bounds.center.x),
-          hy - Math.abs(a.position.y - bounds.center.y),
-        ) < 1.2,
-    );
+    const cos = Math.cos(angle),
+      sin = Math.sin(angle);
+    const near = state.actors.some((actor) => {
+      if (!actor.alive) return false;
+      const dx = actor.position.x - bounds.center.x,
+        dy = actor.position.y - bounds.center.y;
+      return (
+        Math.min(hx - Math.abs(dx * cos + dy * sin), hy - Math.abs(-dx * sin + dy * cos)) < 1.2
+      );
+    });
     this.line.material.uniforms.opacity.value =
       bounds.phase === 'shrinking' || outside ? 0.8 : near ? 0.298 : 0.102;
     this.line.material.uniforms.flash.value =
       bounds.phase !== 'idle' ? Math.max(0, 1 - (state.time - bounds.startedAt) / 0.5) : 0;
     this.glow.visible = bounds.phase !== 'idle';
     this.glow.position.set(bounds.center.x, 0, bounds.center.y);
+    this.glow.rotation.y = -angle;
     for (let i = 0; i < 4; i++) {
       const horizontal = i < 2,
         sign = i % 2 ? -1 : 1;
@@ -132,6 +137,7 @@ export class BoundaryView {
     }
     this.marker.visible = bounds.phase === 'shrinking' && state.phase === 'playing';
     this.marker.position.set(bounds.targetCenter.x, 0.12, bounds.targetCenter.y);
+    this.marker.rotation.y = -angle;
     const beat = ((state.time - bounds.startedAt) * 0.85) % 1;
     this.arrows.forEach((item, i) => {
       const angle = (i * Math.PI) / 2;

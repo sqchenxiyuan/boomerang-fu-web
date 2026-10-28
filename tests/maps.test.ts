@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createArena, MAPS, selectRoundMap } from '../src/core/arena';
+import { createArena, CUSTOM_MAPS as MAPS, selectRoundMap } from '../src/core/arena';
 import { lineOfSight, safePosition } from '../src/core/collision';
 import { RULES } from '../src/core/config';
 import { add, distance, v } from '../src/core/math';

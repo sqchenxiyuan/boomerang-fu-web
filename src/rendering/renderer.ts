@@ -5,6 +5,14 @@ import { lerpV } from '../core/math';
 import type { GameEvent, GameState, Pickup } from '../core/types';
 import { createArenaView } from './arena-view';
 import type { ArenaView } from './arena-view';
+import { flashOriginalGate, mergeOriginalStatics, updateOriginalArena } from './original-arena';
+import {
+  arenaCameraDistance,
+  arenaCameraFrame,
+  ORIGINAL_CAMERA_UP,
+  ORIGINAL_CAMERA_BACK,
+} from './arena-camera';
+import type { ArenaCameraFrame } from './arena-camera';
 import { createCharacter, updateCharacter } from './characters';
 import type { CharacterView } from './characters';
 import { Effects } from './effects';
@@ -52,11 +60,17 @@ function cloneCharacter(source: CharacterView): CharacterView {
 
 function buildArena(state: GameState): ArenaView {
   const arena = createArenaView(state.arena);
+  if (state.arena.floors) {
+    mergeOriginalStatics(arena, state.arena);
+    return arena;
+  }
   const animated = new Set<THREE.Object3D>([
     arena.water,
     ...arena.flags,
     ...arena.portals.values(),
     ...arena.obstacles.values(),
+    ...arena.floors.values(),
+    ...arena.mechanisms.values(),
   ]);
   mergeStaticMeshes(arena.root, animated);
   for (const obstacle of arena.obstacles.values()) mergeStaticMeshes(obstacle);
@@ -69,6 +83,7 @@ function disposeVisual(root: THREE.Object3D): void {
       object.geometry.dispose();
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       for (const mat of materials) if (!mat.userData.shared) mat.dispose();
+      if (object instanceof THREE.InstancedMesh) object.dispose();
     }
     if (object instanceof THREE.Sprite) {
       object.material.map?.dispose();
@@ -134,6 +149,8 @@ export class GameRenderer {
   private width = 1;
   private height = 1;
   private cameraTarget = new THREE.Vector3(0, 0, 0);
+  private cameraFrame: ArenaCameraFrame;
+  private sun: THREE.DirectionalLight;
   private arenaSource: string;
   private previousTime = 0;
 
@@ -157,7 +174,7 @@ export class GameRenderer {
     this.scene.background = new THREE.Color('#a7c8bb');
     this.scene.fog = new THREE.Fog('#a7c8bb', 60, 105);
     this.scene.add(new THREE.HemisphereLight('#fff8df', '#769f96', 1.9));
-    const sun = new THREE.DirectionalLight('#fff0ca', 2.7);
+    const sun = (this.sun = new THREE.DirectionalLight('#fff0ca', 2.7));
     sun.position.set(-12, 22, 8);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -172,8 +189,11 @@ export class GameRenderer {
     sun.shadow.normalBias = 0.04;
     sun.shadow.bias = -0.0003;
     sun.shadow.radius = 3;
-    this.scene.add(sun);
+    this.scene.add(sun, sun.target);
     this.arena = buildArena(state);
+    this.cameraFrame = arenaCameraFrame(state.arena);
+    if (state.arena.floors)
+      this.cameraTarget.set(this.cameraFrame.center.x, 0, this.cameraFrame.center.y);
     this.arenaSource = '';
     this.scene.add(
       this.arena.root,
@@ -232,6 +252,10 @@ export class GameRenderer {
     for (const event of events) {
       this.effects.emit(event);
       this.weapons.observe(event);
+      if (event.type === 'teleport') {
+        flashOriginalGate(this.arena, event.position, this.previousTime);
+        if (event.destination) flashOriginalGate(this.arena, event.destination, this.previousTime);
+      }
     }
   }
 
@@ -251,6 +275,8 @@ export class GameRenderer {
       this.scene.remove(this.arena.root);
       disposeVisual(this.arena.root);
       this.arena = buildArena(state);
+      this.cameraFrame = arenaCameraFrame(state.arena);
+      this.cameraTarget.set(this.cameraFrame.center.x, 0, this.cameraFrame.center.y);
       this.scene.add(this.arena.root);
       this.arenaSource = arenaKey;
       this.effects.clear();
@@ -259,6 +285,7 @@ export class GameRenderer {
       this.boundary.reset();
     }
     const presentation = transitionPresentation(state);
+    if (state.arena.floors) updateOriginalArena(this.arena, state.arena, simulationTime, alpha);
     const entranceOrder = [...state.actors].sort((a, b) => b.score - a.score || a.id - b.id);
     for (const actor of state.actors) {
       const view = this.characters.get(actor.id);
@@ -343,7 +370,7 @@ export class GameRenderer {
       }
     for (const obstacle of state.arena.obstacles) {
       const object = this.arena.obstacles.get(obstacle.id);
-      if (object) object.visible = !obstacle.broken;
+      if (object && !state.arena.floors) object.visible = !obstacle.broken && !obstacle.disabled;
     }
     for (const disc of state.discs) {
       let object = this.discs.get(disc.id);
@@ -400,11 +427,13 @@ export class GameRenderer {
     for (let i = 0; i < this.arena.flags.length; i++)
       this.arena.flags[i].rotation.y = Math.sin(simulationTime * 1.5 + i) * 0.15;
     for (const [id, group] of this.arena.portals) {
+      if (group.userData.gate) continue;
       group.children[0].rotation.z = simulationTime * 0.7 + id.length;
       group.children[0].scale.setScalar(1 + Math.sin(simulationTime * 3) * 0.045);
     }
-    (this.arena.water.material as THREE.MeshStandardMaterial).roughness =
-      0.28 + Math.sin(simulationTime * 0.5) * 0.04;
+    if (state.arena.hazard !== 'cliff')
+      (this.arena.water.material as THREE.MeshStandardMaterial).roughness =
+        0.28 + Math.sin(simulationTime * 0.5) * 0.04;
     this.boundary.update(state, menu);
     this.effects.update(
       menu ? dt : Math.max(0, Math.min(0.1, state.time - this.previousTime)),
@@ -416,15 +445,56 @@ export class GameRenderer {
 
     // A narrow perspective lens keeps the tabletop look while preserving depth.
     const aspect = this.width / this.height;
-    const scale = Math.max(1, 1.65 / aspect) * (menu ? 1 : presentation.cameraScale);
+    const original = state.arena.floors !== undefined;
+    const distance = original
+      ? arenaCameraDistance(this.cameraFrame, aspect)
+      : Math.hypot(26, 27) * Math.max(1, 1.65 / aspect);
+    const cameraUp = state.arena.floors ? ORIGINAL_CAMERA_UP : 26,
+      cameraBack = state.arena.floors ? ORIGINAL_CAMERA_BACK : 27;
+    const scale =
+      (distance / Math.hypot(cameraUp, cameraBack)) * (menu ? 1 : presentation.cameraScale);
+    const fog = this.scene.fog as THREE.Fog;
+    fog.near = original ? distance + 20 : 60;
+    fog.far = original ? distance + 80 : 105;
     const menuOffset = menu && aspect > 1.4 ? -2.1 : 0;
-    this.cameraTarget.x += (menuOffset - this.cameraTarget.x) * Math.min(1, dt * 3);
-    this.camera.position.set(this.cameraTarget.x, 26 * scale, 27 * scale);
+    const center = original ? this.cameraFrame.center : { x: 0, y: 0 };
+    this.cameraTarget.x += (center.x + menuOffset - this.cameraTarget.x) * Math.min(1, dt * 3);
+    this.cameraTarget.z += (center.y - this.cameraTarget.z) * Math.min(1, dt * 3);
+    this.camera.position.set(
+      this.cameraTarget.x,
+      cameraUp * scale,
+      this.cameraTarget.z + cameraBack * scale,
+    );
+    const far = Math.max(180, distance * 2);
+    if (this.camera.far !== far) {
+      this.camera.far = far;
+      this.camera.updateProjectionMatrix();
+    }
+    const shadowSpan = original
+      ? Math.max(this.cameraFrame.half.x, this.cameraFrame.half.y) * 1.5 + 4
+      : 21;
+    const shadowTop = original ? shadowSpan : 17;
+    if (this.sun.shadow.camera.right !== shadowSpan || this.sun.shadow.camera.top !== shadowTop) {
+      Object.assign(this.sun.shadow.camera, {
+        left: -shadowSpan,
+        right: shadowSpan,
+        top: shadowTop,
+        bottom: -shadowTop,
+        far: original ? Math.max(70, shadowSpan * 4) : 70,
+      });
+      this.sun.shadow.camera.updateProjectionMatrix();
+    }
+    this.sun.position.set(
+      center.x - 12,
+      original ? Math.max(22, shadowSpan * 1.2) : 22,
+      center.y + 8,
+    );
+    this.sun.target.position.set(center.x, 0, center.y);
     if (this.effects.shake > 0) {
       this.camera.position.x += Math.sin(simulationTime * 87) * this.effects.shake;
       this.camera.position.z += Math.cos(simulationTime * 71) * this.effects.shake;
     }
-    this.camera.lookAt(this.cameraTarget.x, 0, 0);
+    this.camera.lookAt(this.cameraTarget.x, 0, this.cameraTarget.z);
     this.renderer.render(this.scene, this.camera);
   }
 

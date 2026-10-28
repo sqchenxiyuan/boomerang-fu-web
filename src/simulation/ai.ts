@@ -4,7 +4,7 @@ import { add, distance, dot, length, mul, normalize, rotate, sub, v } from '../c
 import type { Random, Vec2 } from '../core/math';
 import { idleCommand } from '../core/types';
 import type { Actor, Command, GameState } from '../core/types';
-import { advancePath, findPath } from './navigation';
+import { advancePath, findFloorEscape, findPath, threatenedFloor } from './navigation';
 import type { NavigationWaypoint } from './navigation';
 import { clampToBoundary, isInBoundary } from './boundary';
 
@@ -18,6 +18,9 @@ interface Brain {
   pathAge: number;
   strafe: number;
   portalEscapeIn: number;
+  floorEscapeIn: number;
+  floorEscape?: Vec2 | null;
+  escapingFloor: boolean;
 }
 
 export class BotController {
@@ -42,6 +45,8 @@ export class BotController {
         pathAge: 0,
         strafe: random.next() > 0.5 ? 1 : -1,
         portalEscapeIn: (actor.portalCooldown ?? 0) > 0 ? 0.65 : 0,
+        floorEscapeIn: 0,
+        escapingFloor: false,
       };
       this.brains.set(actor.id, brain);
     }
@@ -51,6 +56,25 @@ export class BotController {
       command.attack = (actor.freezeChipCooldown ?? 0) <= dt;
       return command;
     }
+    if (threatenedFloor(state.arena, actor.position)) {
+      brain.floorEscapeIn -= dt;
+      if (!brain.escapingFloor || brain.floorEscapeIn <= 0) {
+        brain.floorEscape = findFloorEscape(
+          state.arena,
+          actor.position,
+          length(actor.velocity) > 0.1 ? actor.velocity : actor.facing,
+        );
+        // Failed searches also have a finite reaction interval; a corner must
+        // not trigger an exhaustive new escape search on all 60 ticks.
+        brain.floorEscapeIn = 0.2;
+      }
+      brain.escapingFloor = true;
+      if (brain.floorEscape) {
+        command.move = normalize(sub(brain.floorEscape, actor.position));
+        brain.chargeFor = -1;
+        return command;
+      }
+    } else brain.escapingFloor = false;
     if (brain.portalEscapeIn > 0) {
       brain.portalEscapeIn -= dt;
       const exit = [...(state.arena.portals ?? [])].sort(

@@ -3,6 +3,7 @@ import { RULES } from '../core/config';
 import { normalize, sub, v } from '../core/math';
 import type { Actor, GameState, MatchOptions } from '../core/types';
 import { createBoundary } from './boundary';
+import { depenetrate } from '../core/collision';
 
 export const defaultOptions = (): MatchOptions => ({
   mode: 'solo',
@@ -24,6 +25,10 @@ export function makeActor(id: number, controller: Actor['controller'], humanInde
     position: v(),
     previous: v(),
     velocity: v(),
+    movingFloorId: undefined,
+    wetFloor: false,
+    slideFactor: 1,
+    surfaceDrag: RULES.damping,
     facing: v(0, -1),
     facingHistory: [],
     alive: true,
@@ -140,7 +145,10 @@ export function resetRound(state: GameState): void {
   state.pickupTimer = 2.5;
   for (const actor of state.actors) {
     const fresh = makeActor(actor.id, actor.controller, actor.humanIndex);
-    const position = state.arena.spawns[actor.id];
+    const sourcePosition = state.arena.spawns[actor.id % state.arena.spawns.length];
+    const position = state.arena.floors
+      ? depenetrate(state.arena, sourcePosition, RULES.playerRadius)
+      : sourcePosition;
     Object.assign(actor, fresh, {
       score: actor.score,
       kills: actor.kills,

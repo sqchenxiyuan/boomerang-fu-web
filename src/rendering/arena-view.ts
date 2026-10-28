@@ -4,6 +4,8 @@ import { mapInfo } from '../core/arena';
 import { onGround } from '../core/collision';
 import type { Arena, Obstacle } from '../core/types';
 import { box, cylinder, material, mesh, place, sphere } from './palette';
+import { createOriginalArenaView } from './original-arena';
+import type { OriginalPlantsView } from './original-plants';
 
 export interface ArenaView {
   root: THREE.Group;
@@ -11,6 +13,9 @@ export interface ArenaView {
   water: THREE.Mesh;
   flags: THREE.Object3D[];
   portals: Map<string, THREE.Group>;
+  floors: Map<string, THREE.Group>;
+  mechanisms: Map<string, THREE.Group>;
+  plants?: OriginalPlantsView;
 }
 
 const THEMES = {
@@ -153,6 +158,7 @@ function makeObstacle(obstacle: Obstacle, colors: { stone: string; cap: string }
 }
 
 export function createArenaView(arena: Arena): ArenaView {
+  if (arena.floors !== undefined) return createOriginalArenaView(arena);
   const colors = THEMES[mapInfo(arena.id).theme];
   const root = new THREE.Group(),
     random = new Random(97531),
@@ -343,5 +349,5 @@ export function createArenaView(arena: Arena): ArenaView {
     root.add(group);
     portals.set(portal.id, group);
   }
-  return { root, obstacles, water, flags, portals };
+  return { root, obstacles, water, flags, portals, floors: new Map(), mechanisms: new Map() };
 }

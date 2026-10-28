@@ -51,6 +51,7 @@ export function igniteActor(state: GameState, actor: Actor, sourceId: number): v
   if (
     !actor.alive ||
     actor.fall ||
+    actor.wetFloor ||
     actor.dashTime > 0 ||
     actor.invulnerable > 0 ||
     (actor.iceExposure ?? 0) > 0 ||
@@ -238,7 +239,7 @@ export function tickStatusEffects(state: GameState, dt: number): void {
     } else actor.iceExposure = Math.max(0, (actor.iceExposure ?? 0) - dt * 0.5);
     actor.slowed = (actor.iceExposure ?? 0) > 0.1;
     if (fire) {
-      if (actor.dashTime > 0 || actor.invulnerable > 0) fire.remaining = 0;
+      if (actor.dashTime > 0 || actor.invulnerable > 0 || actor.wetFloor) fire.remaining = 0;
       else {
         igniteActor(state, actor, fire.ownerId);
         if (actor.invulnerable > 0) fire.remaining = 0;
@@ -247,7 +248,12 @@ export function tickStatusEffects(state: GameState, dt: number): void {
     if ((actor.burnTime ?? 0) > 0) {
       actor.burnTime = Math.max(0, actor.burnTime! - dt);
       actor.burnDistance = (actor.burnDistance ?? 0) + distance(actor.previous, actor.position);
-      if (actor.fall || actor.shield || actor.burnDistance >= (11.06 * RULES.worldScale) / 0.24) {
+      if (
+        actor.fall ||
+        actor.shield ||
+        actor.wetFloor ||
+        actor.burnDistance >= (11.06 * RULES.worldScale) / 0.24
+      ) {
         actor.burnTime = 0;
         actor.burnDistance = 0;
       } else if (actor.burnTime <= 0) {

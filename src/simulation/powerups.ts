@@ -4,6 +4,7 @@ import type { Random } from '../core/math';
 import type { Actor, GameState, PowerupKind } from '../core/types';
 import { startShrinkingBoundary } from './boundary';
 import { heldDiscs, setHeldDiscs } from './inventory';
+import { safePosition } from '../core/collision';
 
 export const ALL_POWERUPS = Object.keys(POWERUPS) as PowerupKind[];
 
@@ -74,7 +75,9 @@ export function tickPowerups(state: GameState, random: Random, dt: number): void
   state.pickupTimer -= dt;
   if (state.pickupTimer <= 0 && state.pickups.length < 3) {
     const candidates = state.arena.pickupSpawns.filter(
-      (p) => !state.pickups.some((pickup) => distance(p, pickup.position) < 1),
+      (p) =>
+        (!state.arena.floors || safePosition(state.arena, p, 0.2)) &&
+        !state.pickups.some((pickup) => distance(p, pickup.position) < 1),
     );
     if (candidates.length && available.length) {
       // Original pickups choose on collection. Web pickups display a specific effect.

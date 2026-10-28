@@ -8,11 +8,16 @@ import type {
   ScriptController,
 } from './sdk/types';
 import type { MapId } from './core/types';
+import { MAPS } from './core/arena';
 // The sample is deliberately plain JavaScript so an external caller can use it unchanged.
 // @ts-expect-error plain JS example consumed as a typed controller factory
 import { createDuelController } from '../examples/duel-controller.js';
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id)! as T;
+get<HTMLSelectElement>('demo-map').innerHTML = MAPS.map(
+  (map) => `<option value="${map.id}">${map.name}</option>`,
+).join('');
+get<HTMLSelectElement>('demo-map').value = 'original-enclosed';
 function setText(id: string, value: string): void {
   const element = get(id);
   if (element.textContent !== value) element.textContent = value;
@@ -32,7 +37,7 @@ function showControl(source: ControlInfo): void {
   setText('control-status', `${labels[source.kind]} · ${source.label}`);
 }
 const runtime = createBrowserGame(get('sdk-stage'), {
-  match: { mode: 'local', bots: 0, seed: 295 },
+  match: { mode: 'local', bots: 0, seed: 295, mapId: 'original-enclosed' },
   inputTarget: get('sdk-demo'),
   autoStart: false,
   onFrame: ({ state, status }) => {

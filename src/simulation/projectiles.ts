@@ -20,6 +20,7 @@ import { breakCrate, damageActor, explode, facingTarget } from './combat';
 import { tracePortal, teleportDisc } from './portals';
 import { heldDiscs, setHeldDiscs, recoverDisc } from './inventory';
 import { addZone, hitDecoy } from './status-effects';
+import { strikeEnvironment } from './environment';
 
 export function throwDisc(state: GameState, actor: Actor): boolean {
   if (
@@ -187,6 +188,18 @@ function moveDisc(state: GameState, disc: Disc, dt: number): void {
         target = null;
       }
     }
+    // Only the actual swept segment hits switches; a teleport never strikes across the map.
+    const travel = Math.min(1, closest, portal?.t ?? 2);
+    strikeEnvironment(state, {
+      kind: 'disc',
+      from: disc.position,
+      position: add(disc.position, mul(delta, travel)),
+      direction: normalize(disc.velocity),
+      radius: RULES.discRadius,
+      actorId: disc.damageOwnerId,
+      fire: has(disc, 'fire'),
+      ice: has(disc, 'ice'),
+    });
     if (portal && portal.t < closest) {
       remaining *= 1 - portal.t;
       teleportDisc(state, disc, portal);

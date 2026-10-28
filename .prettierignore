@@ -1,0 +1,3 @@
+# Deterministic generated data; scripts/research/convert-original-maps.py --check
+# verifies its canonical bytes and provenance hash.
+src/core/original-map-data.json

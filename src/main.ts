@@ -10,7 +10,7 @@ class Application {
   private readonly view: View;
   private readonly runtime: BrowserGame;
   private screen: 'menu' | 'playing' | 'paused' = 'menu';
-  private options: MatchOptions = defaultOptions();
+  private options: MatchOptions = { ...defaultOptions(), mapId: 'original-enclosed' };
 
   constructor(root: HTMLElement) {
     this.view = new View(root);

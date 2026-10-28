@@ -157,8 +157,12 @@ try {
     .getByLabel('地图', { exact: true })
     .locator('option')
     .evaluateAll((items) => items.map((item) => item.value));
-  assert.deepEqual(options, MAPS);
-  record('five selectable map IDs', options);
+  assert.deepEqual(
+    options.filter((id) => !id.startsWith('original-')),
+    MAPS,
+  );
+  assert.equal(options.filter((id) => id.startsWith('original-')).length, 58);
+  record('58 original scenes and five custom map IDs', options);
   await screenshot('menu');
 
   for (const map of MAPS) {

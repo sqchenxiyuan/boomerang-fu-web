@@ -12,6 +12,7 @@ import { tickActorPortals } from './portals';
 import { stopShrinkingBoundary, tickBoundary } from './boundary';
 import { discCapacity, setHeldDiscs } from './inventory';
 import { tickStatusEffects } from './status-effects';
+import { tickEnvironment, tickEnvironmentContacts } from './environment';
 
 /** Sole authoritative owner of gameplay state. No rendering or DOM dependencies. */
 export class Game {
@@ -82,8 +83,9 @@ export class Game {
         }
       state.weaponsGranted = true;
     }
-    tickBoundary(state, this.random, dt);
     const eventStart = state.events.length;
+    tickBoundary(state, this.random, dt);
+    tickEnvironment(state, this.random, dt);
     for (const actor of state.actors)
       tickActor(state, actor, commands.get(actor.id) ?? idleCommand(), dt);
     tickActorPortals(state, dt);
@@ -91,6 +93,7 @@ export class Game {
     resolveMelee(state);
     tickDiscs(state, dt);
     tickStatusEffects(state, dt);
+    tickEnvironmentContacts(state, dt);
     tickPowerups(state, this.random, dt);
     const survivors = state.actors.filter((a) => a.alive);
     const newEvents = state.events.slice(eventStart);

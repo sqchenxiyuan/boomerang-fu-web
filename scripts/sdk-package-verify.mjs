@@ -77,7 +77,7 @@ assert.equal(
 );
 const installed = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'));
 assert.equal(installed.name, '@boomerang-garden/sdk');
-assert.equal(installed.version, '0.4.1');
+assert.equal(installed.version, '0.5.0');
 assert.ok(
   installed.exports['.'].types &&
     installed.exports['./browser'].types &&
@@ -103,9 +103,18 @@ import assert from 'node:assert/strict';
 const names = ['window', 'document', 'navigator'];
 const descriptors = new Map(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
 for (const name of names) Object.defineProperty(globalThis, name, { configurable: true, get() { throw new Error('Core touched DOM global: ' + name); } });
-const { createSession, GameSession } = await import('@boomerang-garden/sdk');
+const { createSession, GameSession, ORIGINAL_MAPS, CUSTOM_MAPS, MAPS } = await import('@boomerang-garden/sdk');
 assert.equal(typeof createSession, 'function');
 assert.equal(typeof GameSession, 'function');
+assert.equal(ORIGINAL_MAPS.length, 58);
+assert.equal(CUSTOM_MAPS.length, 5);
+assert.equal(MAPS.length, 63);
+const original = createSession({ mapId: 'original-turn-teleportals', seed: 41, mode: 'local', bots: 0 });
+original.step(240);
+assert.equal(original.getState().arena.id, 'original-turn-teleportals');
+assert(original.getState().arena.portals.length > 0);
+assert(original.getState().arena.environment.mechanisms.some(m => m.kind === 'movingObstacle'));
+original.destroy();
 await import('@boomerang-garden/sdk/types');
 
 function ready(session) {

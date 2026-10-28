@@ -25,6 +25,7 @@ import { canRescueFall, rescueFall, tickFall } from './hazards';
 import { recoverDisc } from './inventory';
 import { damageActor } from './combat';
 import { breakDisguise, spawnDecoy } from './status-effects';
+import { shapeContains } from '../core/geometry';
 
 /** Dash checks teleport before the ordinary dash cooldown, as Player.Dash does. */
 export function tryTeleport(state: GameState, actor: Actor): boolean {
@@ -78,6 +79,23 @@ export function tryTeleport(state: GameState, actor: Actor): boolean {
 export function tickActor(state: GameState, actor: Actor, command: Command, dt: number): void {
   actor.previous = { ...actor.position };
   if (!actor.alive) return;
+  actor.wetFloor =
+    state.arena.surfaces?.some(
+      (surface) => surface.kind === 'ice' && shapeContains(surface, actor.position),
+    ) ?? false;
+  if (actor.wetFloor && (actor.dashTime <= 0 || actor.dashTime < RULES.dashDuration * 0.2)) {
+    actor.slideFactor = 0.25;
+    actor.surfaceDrag = 1;
+  } else if (1 - (actor.slideFactor ?? 1) < 0.1) {
+    actor.slideFactor = 1;
+    actor.surfaceDrag = RULES.damping;
+  } else {
+    actor.slideFactor =
+      (actor.slideFactor ?? 1) + (1 - (actor.slideFactor ?? 1)) * Math.min(1, dt * 7);
+    actor.surfaceDrag =
+      (actor.surfaceDrag ?? RULES.damping) +
+      (RULES.damping - (actor.surfaceDrag ?? RULES.damping)) * Math.min(1, dt * 7);
+  }
   const hasted = actor.powers.includes('haste');
   const decrease = (remaining: number): number => Math.max(0, remaining - dt - 1e-12);
   actor.dashCooldown = decrease(actor.dashCooldown);
@@ -257,6 +275,7 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
       force *= 1 - Math.sin((Math.PI / 2) * actor.aimMoveLag);
     }
     if (actor.slowed) force *= 0.33;
+    force *= (actor.slideFactor ?? 1) ** 2;
     actor.velocity = add(actor.velocity, mul(movement, force * dt));
   }
   if (actor.charge > RULES.aimStart * 0.5) {
@@ -269,14 +288,17 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
       RULES.dashForce *
       (hasted ? 1.25 : 1) *
       Math.cos((Math.PI / 2) * (elapsed / RULES.dashDuration));
-    actor.velocity = add(actor.velocity, mul(actor.dashDirection, force * dt));
+    actor.velocity = add(
+      actor.velocity,
+      mul(actor.dashDirection, force * dt * (actor.slideFactor ?? 1)),
+    );
   }
   if (actor.lungeTime > 0) {
     const force = RULES.lungeForce * (actor.lungeTime / RULES.lungeDuration) ** 3;
-    actor.velocity = add(actor.velocity, mul(actor.facing, force * dt));
+    actor.velocity = add(actor.velocity, mul(actor.facing, force * dt * (actor.slideFactor ?? 1)));
   }
   actor.velocity = clampLength(
-    mul(actor.velocity, Math.max(0, 1 - RULES.damping * dt)),
+    mul(actor.velocity, Math.max(0, 1 - (actor.surfaceDrag ?? RULES.damping) * dt)),
     RULES.speedLimit * (isDashing ? 2 : 1),
   );
   const phasing = actor.phaseOrigin !== undefined && isDashing;

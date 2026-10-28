@@ -1,6 +1,13 @@
-import { safePosition, segmentCircle, traceObstacles } from '../core/collision';
+import {
+  pointInBox,
+  safePosition,
+  segmentCircle,
+  sweepBox,
+  traceObstacles,
+} from '../core/collision';
+import { localPoint } from '../core/geometry';
 import { RULES } from '../core/config';
-import { add, distance, mul, sub } from '../core/math';
+import { add, distance, mul, rotate, sub, v } from '../core/math';
 import type { Vec2 } from '../core/math';
 import type { Arena, Disc, GameState, Portal } from '../core/types';
 
@@ -15,7 +22,11 @@ export interface PortalHit {
 export function portalDestination(arena: Arena, portal: Portal, radius: number): Vec2 | null {
   const exit = arena.portals?.find((p) => p.id === portal.exitId);
   if (!exit) return null;
-  const destination = add(exit.position, mul(exit.direction, exit.radius + radius + 0.08));
+  const destination = add(
+    exit.position,
+    mul(exit.direction, (exit.thickness ?? exit.radius + 0.08) + radius),
+  );
+  if (exit.half) return destination;
   return safePosition(arena, destination, radius) ? destination : null;
 }
 
@@ -30,8 +41,16 @@ export function tracePortal(
   if (cooldown > 0) return null;
   let closest: PortalHit | null = null;
   for (const portal of arena.portals ?? []) {
-    if (distance(start, portal.position) < portal.radius + radius - 0.0001) continue;
-    const hit = segmentCircle(start, delta, portal.position, portal.radius + radius);
+    const p = sub(localPoint(start, portal), portal.triggerOffset ?? v());
+    if (
+      portal.half
+        ? pointInBox(p, v(), portal.half, radius - 0.0001)
+        : distance(start, portal.position) < portal.radius + radius - 0.0001
+    )
+      continue;
+    const hit = portal.half
+      ? sweepBox(p, rotate(delta, -(portal.angle ?? 0)), radius, v(), portal.half)
+      : segmentCircle(start, delta, portal.position, portal.radius + radius);
     if (!hit || (closest && hit.t >= closest.t)) continue;
     const destination = portalDestination(arena, portal, radius);
     if (destination) closest = { t: hit.t, portal, destination };

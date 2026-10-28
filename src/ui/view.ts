@@ -1,5 +1,5 @@
 import { POWERUPS, ROSTER, RULES } from '../core/config';
-import { MAPS, mapInfo } from '../core/arena';
+import { MAPS, ORIGINAL_MAPS, mapInfo } from '../core/arena';
 import { PRESENTATION, transitionPresentation } from '../core/presentation';
 import { boundaryNotice, eliminationLabel } from '../core/feedback';
 import { clamp } from '../core/math';
@@ -20,6 +20,24 @@ const soundIcon =
 const fullIcon =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const key = (text: string) => `<kbd>${text}</kbd>`;
+const mapOptions = () =>
+  [
+    [
+      '原版地图',
+      MAPS.filter((map) => map.source === 'original' && !map.tutorial && !map.requiredDLC),
+    ],
+    [
+      '原版扩展地图',
+      MAPS.filter((map) => map.source === 'original' && !map.tutorial && map.requiredDLC),
+    ],
+    ['教程场地', MAPS.filter((map) => map.tutorial)],
+    ['Web 原创地图', MAPS.filter((map) => map.source === 'custom')],
+  ]
+    .map(
+      ([label, maps]) =>
+        `<optgroup label="${label}">${(maps as typeof MAPS).map((map) => `<option value="${map.id}"${map.id === 'original-enclosed' ? ' selected' : ''}>${map.name}</option>`).join('')}</optgroup>`,
+    )
+    .join('');
 
 export class View {
   readonly stage: HTMLElement;
@@ -61,11 +79,11 @@ export class View {
         <p class="intro">扔出去，接回来。<br>和食物伙伴过上几招，最后站着的人赢。</p>
         <div class="mode-selector" role="group" aria-label="游戏模式"><button class="mode selected" data-mode="solo" aria-pressed="true">单人挑战 <span>VS 机器人</span></button><button class="mode" data-mode="local" aria-pressed="false">同屏双人 <span>和朋友一起</span></button></div>
         <div class="settings-row"><label>机器人<select id="bots" aria-label="机器人数量"><option value="1">1 位对手</option><option value="3">3 位对手</option></select></label><label>难度<select id="difficulty" aria-label="机器人难度"><option value="easy">轻松</option><option value="normal" selected>标准</option><option value="hard">挑战</option></select></label></div>
-        <div class="settings-row map-settings"><label>地图<select id="map" aria-label="地图">${MAPS.map((map) => `<option value="${map.id}">${map.name}</option>`).join('')}</select></label><label>回合换图<select id="rotation" aria-label="回合换图"><option value="fixed">固定地图</option><option value="cycle">依次轮换</option></select></label></div>
-        <p class="map-description" id="map-description">${MAPS[0].description}</p>
+        <div class="settings-row map-settings"><label>地图<select id="map" aria-label="地图">${mapOptions()}</select></label><label>回合换图<select id="rotation" aria-label="回合换图"><option value="fixed">固定地图</option><option value="cycle">依次轮换</option></select></label></div>
+        <p class="map-description" id="map-description">${mapInfo('original-enclosed').description}</p>
         <div class="settings-row"><label>决胜缩圈<select id="sudden-death" aria-label="决胜缩圈时间"><option value="180">180 秒 · 原版节奏</option><option value="60">60 秒</option><option value="30">30 秒 · 快速体验</option></select></label></div>
         <button class="primary-button" id="start">进入花园 <span>↗</span></button>
-        <div class="match-meta"><span>先得 5 分</span><span>五张地图</span><span>支持手柄</span></div>
+        <div class="match-meta"><span>先得 5 分</span><span>${ORIGINAL_MAPS.filter((map) => !map.tutorial).length} 张原版地图</span><span>支持手柄</span></div>
         <details class="instructions"><summary>第一次玩？看看操作 <span>＋</span></summary><div class="instruction-content">
           <p><b>1P</b> ${key('W A S D')} 移动 · ${key('J')} 近战 · ${key('K')} 投掷 · ${key('L / 空格')} 冲刺</p>
           <p><b>2P</b> ${key('↑ ↓ ← →')} 移动 · ${key(',')} 近战 · ${key('.')} 投掷 · ${key('/')} 冲刺；也支持小键盘 1 / 2 / 3。</p>

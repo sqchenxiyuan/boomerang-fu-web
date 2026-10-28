@@ -2,7 +2,16 @@ import { lineOfSight, moveAndSlide } from '../core/collision';
 import { RULES } from '../core/config';
 import { add, distance, dot, mul, normalize, sub, v } from '../core/math';
 import type { Vec2 } from '../core/math';
-import type { Actor, DeathCause, DeathState, GameState, Obstacle } from '../core/types';
+import type {
+  Actor,
+  DeathCause,
+  DeathState,
+  GameState,
+  Obstacle,
+  PowerupKind,
+} from '../core/types';
+import { heldDiscs, setHeldDiscs } from './inventory';
+import { addZone, freezeActor, hitDecoy } from './status-effects';
 
 export function breakCrate(state: GameState, obstacle: Obstacle, actorId: number): void {
   if (obstacle.kind !== 'crate' || obstacle.broken) return;
@@ -18,7 +27,8 @@ export function damageActor(
   cause: DeathCause = 'weapon',
 ): 'ignored' | 'shield' | 'killed' {
   if (!actor.alive) return 'ignored';
-  const environmental = cause === 'fall' || cause === 'boundary';
+  const environmental =
+    cause === 'fall' || cause === 'boundary' || cause === 'fire' || cause === 'telefrag';
   if (!environmental && (actor.dashTime > 0 || actor.invulnerable > 0)) return 'ignored';
   if (!environmental && actor.shield) {
     actor.shield = false;
@@ -34,9 +44,9 @@ export function damageActor(
   const variant: DeathState['variant'] =
     cause === 'weapon'
       ? 'slice'
-      : cause === 'explosion'
+      : cause === 'explosion' || cause === 'telefrag'
         ? 'squash'
-        : cause === 'boundary'
+        : cause === 'boundary' || cause === 'fire'
           ? 'burst'
           : (actor.fall?.kind ??
             (Math.abs(actor.position.x) > state.arena.halfWidth ||
@@ -60,6 +70,14 @@ export function damageActor(
   actor.shield = false;
   state.roundFinishTimer = RULES.roundResolveDelay;
   actor.armed = false;
+  actor.heldDiscs = 0;
+  actor.disguised = false;
+  actor.controlling = false;
+  actor.burnTime = 0;
+  actor.frozenTime = 0;
+  actor.reverseTime = 0;
+  actor.phaseOrigin = undefined;
+  for (const decoy of state.decoys ?? []) if (decoy.ownerId === actor.id) decoy.alive = false;
   actor.charge = 0;
   actor.recalling = false;
   actor.attackTime = 0;
@@ -90,6 +108,16 @@ export function resolveMelee(state: GameState): void {
   const hits: Array<{ attacker: Actor; target: Actor; armed: boolean }> = [];
   for (const actor of state.actors) {
     if (!actor.alive || actor.attackTime <= 0) continue;
+    for (const decoy of state.decoys ?? []) {
+      if (
+        decoy.alive &&
+        decoy.ownerId !== actor.id &&
+        distance(actor.position, decoy.position) < RULES.attackRange + RULES.playerRadius &&
+        facingTarget(actor, decoy.position, Math.cos(RULES.attackArc / 2)) &&
+        lineOfSight(state.arena, actor.position, decoy.position)
+      )
+        hitDecoy(state, decoy, actor.id);
+    }
     for (const obstacle of state.arena.obstacles) {
       if (
         !obstacle.broken &&
@@ -134,7 +162,7 @@ export function resolveMelee(state: GameState): void {
       target.lungeTime = 0;
       target.velocity = mul(direction, 10);
       if (target.armed) {
-        target.armed = false;
+        setHeldDiscs(target, heldDiscs(target) - 1);
         state.discs.push({
           id: state.nextId++,
           ownerId: target.id,
@@ -165,23 +193,52 @@ export function resolveMelee(state: GameState): void {
   }
 }
 
-export function explode(state: GameState, position: Vec2, sourceId: number): void {
+export function explode(
+  state: GameState,
+  position: Vec2,
+  sourceId: number,
+  powers: readonly PowerupKind[] = [],
+  scale = 1,
+): void {
+  const ice = powers.includes('ice'),
+    fire = powers.includes('fire');
+  const radius = (ice ? 17 * RULES.worldScale : RULES.explosionRadius) * scale;
   state.events.push({
     type: 'explosion',
     position: { ...position },
     actorId: sourceId,
-    value: RULES.explosionRadius,
+    value: radius,
+    power: ice ? 'ice' : fire ? 'fire' : 'explosive',
   });
   // Obstacles block blast rays; crates touched by this blast break after damage.
   for (const actor of state.actors) {
     if (
-      distance(actor.position, position) < RULES.explosionRadius + RULES.playerRadius &&
+      actor.alive &&
+      distance(actor.position, position) < radius + RULES.playerRadius &&
       lineOfSight(state.arena, position, actor.position)
-    )
-      damageActor(state, actor, sourceId, sub(actor.position, position), 'explosion');
+    ) {
+      if (ice) freezeActor(state, actor, sourceId);
+      else damageActor(state, actor, sourceId, sub(actor.position, position), 'explosion');
+    }
   }
+  for (const decoy of state.decoys ?? [])
+    if (
+      decoy.alive &&
+      distance(decoy.position, position) < radius &&
+      lineOfSight(state.arena, position, decoy.position)
+    )
+      hitDecoy(state, decoy, sourceId);
+  // Ground patches also honor cover; avoid one large circle leaking through walls.
+  if (ice || fire)
+    for (let x = -radius; x <= radius; x += 0.65)
+      for (let y = -radius; y <= radius; y += 0.65) {
+        if (x * x + y * y > radius * radius) continue;
+        const point = add(position, v(x, y));
+        if (lineOfSight(state.arena, position, point))
+          addZone(state, ice ? 'ice' : 'fire', point, sourceId);
+      }
   for (const obstacle of state.arena.obstacles)
-    if (distance(position, obstacle.position) < RULES.explosionRadius + 0.4)
+    if (!ice && distance(position, obstacle.position) < radius + 0.4)
       breakCrate(state, obstacle, sourceId);
 }
 
@@ -191,6 +248,7 @@ export function separateActors(state: GameState): void {
       const a = state.actors[i],
         b = state.actors[j];
       if (!a.alive || !b.alive) continue;
+      if ((a.phaseOrigin && a.dashTime > 0) || (b.phaseOrigin && b.dashTime > 0)) continue;
       const diff = sub(b.position, a.position),
         d = distance(a.position, b.position);
       if (d < RULES.playerRadius * 2) {

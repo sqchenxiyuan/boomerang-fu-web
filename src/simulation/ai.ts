@@ -47,6 +47,10 @@ export class BotController {
     }
     const command = idleCommand();
     if (!actor.alive) return command;
+    if ((actor.frozenTime ?? 0) > 0) {
+      command.attack = (actor.freezeChipCooldown ?? 0) <= dt;
+      return command;
+    }
     if (brain.portalEscapeIn > 0) {
       brain.portalEscapeIn -= dt;
       const exit = [...(state.arena.portals ?? [])].sort(
@@ -57,8 +61,24 @@ export class BotController {
         return command;
       }
     }
-    const enemy = state.actors
-      .filter((a) => a.alive && a.id !== actor.id)
+    const decoyTargets = state.decoys
+      .filter((decoy) => decoy.alive && decoy.ownerId !== actor.id)
+      .map((decoy) => ({
+        ...state.actors.find((candidate) => candidate.id === decoy.ownerId)!,
+        position: decoy.position,
+        previous: decoy.previous,
+        velocity: decoy.velocity,
+        id: -decoy.id - 1,
+        disguised: false,
+        attackTime: 0,
+      }));
+    const enemy = [...state.actors, ...decoyTargets]
+      .filter(
+        (a) =>
+          a.alive &&
+          a.id !== actor.id &&
+          (!a.disguised || distance(a.position, actor.position) < 1.4),
+      )
       .sort(
         (a, b) => distance(actor.position, a.position) - distance(actor.position, b.position),
       )[0];
@@ -66,6 +86,16 @@ export class BotController {
       if (!isInBoundary(state.boundary, actor.position, RULES.playerRadius)) {
         const path = findPath(state.arena, actor.position, state.boundary.center);
         if (path.length) command.move = normalize(sub(path[0], actor.position));
+      } else {
+        // A concealed opponent does not remain a perfect-information target.
+        brain.pathAge += dt;
+        if (brain.path.length === 0 || brain.pathAge > 2) {
+          const goal = random.pick([...state.arena.pickupSpawns, v()]);
+          brain.path = findPath(state.arena, actor.position, goal);
+          brain.pathAge = 0;
+        }
+        advancePath(brain.path, actor.position);
+        if (brain.path.length) command.move = normalize(sub(brain.path[0], actor.position));
       }
       return command;
     }
@@ -86,7 +116,10 @@ export class BotController {
       let goal = { ...enemy.position };
       const pickup = [...state.pickups]
         .filter(
-          (p) => !actor.powers.includes(p.kind) && distance(actor.position, p.position) < d + 2,
+          (p) =>
+            p.kind !== 'reverse' &&
+            !actor.powers.includes(p.kind) &&
+            distance(actor.position, p.position) < d + 2,
         )
         .sort(
           (a, b) => distance(actor.position, a.position) - distance(actor.position, b.position),
@@ -187,6 +220,28 @@ export class BotController {
           command.attack = true;
         }
       }
+      const hazard = state.zones.find(
+        (zone) => distance(zone.position, actor.position) < zone.radius + 1.2,
+      );
+      if (hazard || (actor.burnTime ?? 0) > 0) {
+        const away = hazard ? normalize(sub(actor.position, hazard.position)) : brain.move;
+        const directions = [away, rotate(away, Math.PI / 2), rotate(away, -Math.PI / 2)];
+        const escape = directions.find(
+          (direction) =>
+            length(direction) > 0.1 &&
+            safePosition(state.arena, add(actor.position, mul(direction, 4)), RULES.playerRadius) &&
+            isInBoundary(
+              state.boundary,
+              add(actor.position, mul(direction, 4)),
+              RULES.playerRadius,
+            ),
+        );
+        if (escape) {
+          brain.move = escape;
+          brain.chargeFor = -1;
+          command.dash = actor.dashCooldown <= 0;
+        }
+      }
       if (
         state.roundTime > 6 &&
         d > 9 &&
@@ -215,10 +270,32 @@ export class BotController {
       brain.chargeFor = -1;
       const disc = state.discs.find((p) => p.ownerId === actor.id);
       command.throwHeld = !!disc && !disc.explosive && (disc.state === 'dropped' || disc.age > 0.9);
+      if (disc?.powers?.includes('controlled') && disc.age > 0.2 && sight) {
+        command.throwHeld = true;
+        command.move = normalize(sub(enemy.position, disc.position));
+      }
+      if (
+        actor.powers.includes('teleport') &&
+        disc &&
+        d < 3 &&
+        distance(actor.position, disc.position) > 4 &&
+        safePosition(state.arena, disc.position, RULES.playerRadius) &&
+        isInBoundary(state.boundary, disc.position, RULES.playerRadius)
+      )
+        command.dash = true;
     }
     // Do not keep dashing toward a stale target around a corner.
     if (
       command.dash &&
+      !(
+        actor.powers.includes('teleport') &&
+        state.discs.some(
+          (disc) =>
+            disc.ownerId === actor.id &&
+            !disc.dead &&
+            safePosition(state.arena, disc.position, RULES.playerRadius),
+        )
+      ) &&
       (dot(command.move, command.move) < 0.1 ||
         !isInBoundary(
           state.boundary,

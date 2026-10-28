@@ -2,32 +2,31 @@ import * as THREE from 'three';
 import { POWERUPS, ROSTER } from '../core/config';
 import type { Arena, GameEvent, GameState } from '../core/types';
 import { Random } from '../core/math';
-import { sphere } from './palette';
 import { sampleDeathParticles, sampleDeathRings, sampleDeathSplats } from './death-visuals';
+import { InstanceBatch } from './batches';
 
 interface Particle {
-  mesh: THREE.Mesh;
-  velocity: THREE.Vector3;
-  life: number;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  born: number;
   duration: number;
-  baseScale: number;
+  size: number;
+  color: string;
+  pickup: boolean;
 }
 interface Wave {
-  mesh: THREE.Mesh;
-  life: number;
+  x: number;
+  z: number;
+  born: number;
   duration: number;
   radius: number;
+  color: string;
 }
-interface DeathEffectView {
-  root: THREE.Group;
-  particleRoot: THREE.Group;
-  ringRoot: THREE.Group;
-  splatRoot: THREE.Group;
-  particles: THREE.Mesh<THREE.IcosahedronGeometry, THREE.MeshStandardMaterial>[];
-  rings: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>[];
-  splats: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>[];
-}
-
+const PARTICLE_LIMIT = 384;
 function onFloor(arena: Arena, x: number, y: number): boolean {
   return (
     Math.abs(x) < arena.halfWidth &&
@@ -44,264 +43,269 @@ function onFloor(arena: Arena, x: number, y: number): boolean {
   );
 }
 
-function disposeDeathView(view: DeathEffectView): void {
-  for (const mesh of [...view.particles, ...view.rings, ...view.splats]) {
-    mesh.geometry.dispose();
-    mesh.material.dispose();
-  }
-  view.root.clear();
-  view.root.removeFromParent();
-}
-
+/** Three fixed GPU batches cover transient and snapshot-driven death effects. */
 export class Effects {
   readonly root = new THREE.Group();
   private particles: Particle[] = [];
   private waves: Wave[] = [];
   private random = new Random(123);
-  private deaths = new Map<string, DeathEffectView>();
+  private clock = 0;
+  private state?: GameState;
   private transientShake = 0;
-  private deathShake = 0;
+  private particlesBatch = new InstanceBatch(new THREE.IcosahedronGeometry(1, 0), 576);
+  private ringsBatch = new InstanceBatch(new THREE.RingGeometry(0.89, 1, 32), 64);
+  private splatsBatch = new InstanceBatch(new THREE.CircleGeometry(1, 12), 32);
+  private disposed = false;
   shake = 0;
 
+  constructor() {
+    this.particlesBatch.mesh.name = 'effect-particles';
+    this.ringsBatch.mesh.name = 'effect-rings';
+    this.splatsBatch.mesh.name = 'effect-splats';
+    this.root.add(this.particlesBatch.mesh, this.ringsBatch.mesh, this.splatsBatch.mesh);
+  }
+
   emit(event: GameEvent): void {
-    // Death effects are reconstructed from state; event replay must not duplicate them.
-    if (event.type === 'death') return;
+    if (this.disposed || ['death', 'round', 'countdown', 'boundary', 'win'].includes(event.type))
+      return;
     if (event.type === 'teleport' && event.destination)
       this.emit({ ...event, position: event.destination, destination: undefined });
     const color =
-      event.type === 'teleport'
-        ? '#b4e3ff'
-        : event.type === 'explosion'
-          ? '#fbc579'
-          : event.type === 'shield'
-            ? '#9ceee4'
-            : event.type === 'crate'
-              ? '#d2ac75'
-              : event.power
-                ? POWERUPS[event.power].color
-                : '#fff4cf';
+      event.type === 'freeze'
+        ? '#a7ecff'
+        : event.type === 'burn'
+          ? '#ffb36b'
+          : event.type === 'decoy' || event.type === 'disguise'
+            ? '#b4dfb4'
+            : event.type === 'equip'
+              ? '#fff1ae'
+              : event.type === 'split'
+                ? '#f4e6a1'
+                : event.type === 'teleport'
+                  ? '#b4e3ff'
+                  : event.type === 'explosion'
+                    ? '#fbc579'
+                    : event.type === 'shield'
+                      ? '#9ceee4'
+                      : event.type === 'crate'
+                        ? '#d2ac75'
+                        : event.power
+                          ? POWERUPS[event.power].color
+                          : event.type === 'deflect'
+                            ? '#fff8d8'
+                            : '#fff4cf';
     const count =
       event.type === 'explosion'
         ? 30
         : event.type === 'crate'
           ? 14
-          : event.type === 'dash'
-            ? 9
-            : event.type === 'deflect'
-              ? 14
-              : 6;
-    if (['round', 'countdown'].includes(event.type)) return;
-    if (this.particles.length > 260) return;
-    for (let i = 0; i < count; i++) {
-      const size = this.random.range(0.05, event.type === 'explosion' ? 0.18 : 0.1);
-      const object = sphere(size, color, 0);
-      object.position.set(event.position.x, event.type === 'dash' ? 0.1 : 0.6, event.position.y);
-      object.castShadow = false;
-      this.root.add(object);
-      const intensity = event.type === 'explosion' ? 6 : 2;
-      const velocity = new THREE.Vector3(
-        this.random.range(-1, 1) * intensity,
-        this.random.range(1, 4),
-        this.random.range(-1, 1) * intensity,
-      );
-      const duration = this.random.range(0.25, 0.75);
-      this.particles.push({ mesh: object, velocity, life: duration, duration, baseScale: 1 });
-    }
-    if (['explosion', 'deflect', 'shield', 'pickup', 'teleport'].includes(event.type)) {
-      const object = new THREE.Mesh(
-        new THREE.RingGeometry(0.86, 1, 40),
-        new THREE.MeshBasicMaterial({
-          color,
-          transparent: true,
-          opacity: 0.75,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-        }),
-      );
-      object.rotation.x = -Math.PI / 2;
-      object.position.set(event.position.x, 0.08, event.position.y);
-      this.root.add(object);
-      this.waves.push({
-        mesh: object,
-        life: 0.4,
-        duration: 0.4,
-        radius: event.type === 'explosion' ? (event.value ?? 2.5) : 1.6,
+          : event.type === 'deflect' || event.type === 'shield' || event.type === 'split'
+            ? 16
+            : event.type === 'pickup'
+              ? 18
+              : event.type === 'dash'
+                ? 9
+                : 5;
+    const intensity = event.type === 'explosion' ? 6 : event.type === 'deflect' ? 4 : 2;
+    for (let i = 0; i < count && this.particles.length < PARTICLE_LIMIT; i++) {
+      const angle = this.random.range(0, Math.PI * 2),
+        speed = this.random.range(0.4, 1) * intensity;
+      this.particles.push({
+        x: event.position.x,
+        y: event.type === 'dash' ? 0.12 : 0.65,
+        z: event.position.y,
+        vx: Math.cos(angle) * speed + (event.direction?.x ?? 0) * 0.7,
+        vy: this.random.range(1, 4),
+        vz: Math.sin(angle) * speed + (event.direction?.y ?? 0) * 0.7,
+        born: this.clock,
+        duration: this.random.range(0.3, event.type === 'pickup' ? 0.8 : 0.65),
+        size: this.random.range(0.035, event.type === 'explosion' ? 0.17 : 0.085),
+        color,
+        pickup: event.type === 'pickup',
       });
     }
+    if (
+      [
+        'explosion',
+        'deflect',
+        'shield',
+        'pickup',
+        'catch',
+        'teleport',
+        'equip',
+        'freeze',
+        'split',
+        'decoy',
+      ].includes(event.type) &&
+      this.waves.length < 32
+    )
+      this.waves.push({
+        x: event.position.x,
+        z: event.position.y,
+        born: this.clock,
+        duration: event.type === 'pickup' ? 0.65 : 0.36,
+        radius: event.type === 'explosion' ? (event.value ?? 2.5) : 1.3,
+        color,
+      });
     if (event.type === 'explosion') this.transientShake = 0.15;
     else if (event.type === 'deflect') this.transientShake = 0.06;
-    this.shake = Math.max(this.transientShake, this.deathShake);
   }
 
-  /** Rebuildable, pause-safe death presentation. Call once for each rendered snapshot. */
   syncDeaths(state: GameState): void {
-    const active = new Set<string>();
-    this.deathShake = 0;
-    for (const actor of state.actors) {
-      const death = actor.death;
-      if (actor.alive || !death) continue;
-      const key = `${state.round}:${actor.id}:${death.time}:${death.seed}`;
-      active.add(key);
-      let view = this.deaths.get(key);
-      if (!view) {
-        view = {
-          root: new THREE.Group(),
-          particleRoot: new THREE.Group(),
-          ringRoot: new THREE.Group(),
-          splatRoot: new THREE.Group(),
-          particles: [],
-          rings: [],
-          splats: [],
-        };
-        view.root.add(view.particleRoot, view.ringRoot, view.splatRoot);
-        this.deaths.set(key, view);
-        this.root.add(view.root);
-      }
-      view.root.position.set(death.position.x, 0, death.position.y);
-      const age = Math.max(0, state.time - death.time);
-      this.deathShake = Math.max(this.deathShake, 0.12 * Math.exp(-age * 7) * (age < 1.2 ? 1 : 0));
-      const profile = ROSTER[actor.id] ?? ROSTER[0];
-      const juiceColor =
-        profile.kind === 'milk' ? '#fffbea' : profile.kind === 'melon' ? '#ed8179' : profile.color;
-      const particles = sampleDeathParticles(death, state.time);
-      while (view.particles.length < particles.length) {
-        const mesh = new THREE.Mesh(
-          new THREE.IcosahedronGeometry(1, 1),
-          new THREE.MeshStandardMaterial({
-            color: juiceColor,
-            roughness: 0.6,
-            transparent: true,
-            depthWrite: false,
-            flatShading: true,
-          }),
-        );
-        mesh.castShadow = false;
-        view.particles.push(mesh);
-        view.particleRoot.add(mesh);
-      }
-      view.particles.forEach((mesh, index) => {
-        const particle = particles[index];
-        mesh.visible = !!particle;
-        if (!particle) return;
-        const color =
-          particle.kind === 'water'
-            ? '#b8e3ee'
-            : particle.kind === 'bubble'
-              ? '#e7fcff'
-              : particle.kind === 'cloud' || particle.kind === 'dust'
-                ? '#eef0dc'
-                : juiceColor;
-        mesh.material.color.set(color);
-        mesh.material.opacity = particle.opacity;
-        mesh.position.set(particle.x, particle.y, particle.z);
-        mesh.scale.setScalar(particle.radius);
-      });
-      const rings = sampleDeathRings(death, state.time);
-      while (view.rings.length < rings.length) {
-        const mesh = new THREE.Mesh(
-          new THREE.RingGeometry(0.87, 1, 36),
-          new THREE.MeshBasicMaterial({
-            color: death.variant === 'water' ? '#d8f5f5' : juiceColor,
-            transparent: true,
-            side: THREE.DoubleSide,
-            depthWrite: false,
-          }),
-        );
-        mesh.rotation.x = -Math.PI / 2;
-        mesh.position.y = 0.055;
-        view.rings.push(mesh);
-        view.ringRoot.add(mesh);
-      }
-      view.rings.forEach((mesh, index) => {
-        const ring = rings[index];
-        mesh.visible = !!ring;
-        if (!ring) return;
-        mesh.scale.setScalar(ring.radius);
-        mesh.material.opacity = ring.opacity;
-      });
-      const splats = sampleDeathSplats(death, state.time);
-      while (view.splats.length < splats.length) {
-        const mesh = new THREE.Mesh(
-          new THREE.CircleGeometry(1, 12),
-          new THREE.MeshBasicMaterial({
-            color: juiceColor,
-            transparent: true,
-            opacity: 0.7,
-            depthWrite: false,
-            polygonOffset: true,
-            polygonOffsetFactor: -1,
-            polygonOffsetUnits: -1,
-          }),
-        );
-        mesh.rotation.x = -Math.PI / 2;
-        view.splats.push(mesh);
-        view.splatRoot.add(mesh);
-      }
-      view.splats.forEach((mesh, index) => {
-        const splat = splats[index];
-        mesh.visible =
-          !!splat && onFloor(state.arena, death.position.x + splat.x, death.position.y + splat.z);
-        if (!splat) return;
-        mesh.position.set(splat.x, 0.032, splat.z);
-        mesh.rotation.z = splat.angle;
-        mesh.scale.set(splat.radius * 1.3, splat.radius, 1);
-        mesh.material.opacity = splat.opacity;
-      });
-    }
-    for (const [key, view] of this.deaths)
-      if (!active.has(key)) {
-        disposeDeathView(view);
-        this.deaths.delete(key);
-      }
-    this.shake = Math.max(this.transientShake, this.deathShake);
+    this.state = state;
+    this.rebuild();
   }
 
-  update(dt: number): void {
-    this.transientShake = Math.max(0, this.transientShake - dt);
-    this.shake = Math.max(this.transientShake, this.deathShake);
+  update(dt: number, state?: GameState): void {
+    if (this.disposed) return;
+    this.clock += Math.max(0, dt);
+    this.transientShake = Math.max(0, this.transientShake - Math.max(0, dt));
+    if (state) this.state = state;
+    // Compact in place; particle records are allocated only when an event arrives.
+    let used = 0;
+    for (const p of this.particles)
+      if (this.clock - p.born < p.duration) this.particles[used++] = p;
+    this.particles.length = used;
+    used = 0;
+    for (const w of this.waves) if (this.clock - w.born < w.duration) this.waves[used++] = w;
+    this.waves.length = used;
+    this.rebuild();
+  }
+
+  private rebuild(): void {
+    if (this.disposed) return;
+    this.particlesBatch.begin();
+    this.ringsBatch.begin();
+    this.splatsBatch.begin();
+    this.shake = this.transientShake;
     for (const p of this.particles) {
-      p.life -= dt;
-      p.velocity.y -= dt * 10;
-      p.mesh.position.addScaledVector(p.velocity, dt);
-      p.mesh.rotation.x += dt * 4;
-      p.mesh.rotation.z += dt * 3;
-      p.mesh.scale.setScalar(Math.max(0, p.life / p.duration) * p.baseScale);
-      if (p.life <= 0) {
-        this.root.remove(p.mesh);
-        p.mesh.geometry.dispose();
-      }
+      const t = Math.max(0, this.clock - p.born),
+        progress = t / p.duration,
+        fade = Math.max(0, 1 - progress);
+      const size = p.size * Math.sqrt(fade);
+      const travel = p.pickup ? Math.sin(progress * Math.PI) * 0.35 : t;
+      this.particlesBatch.add(
+        p.x + p.vx * travel,
+        p.pickup ? p.y + progress * 1.3 : Math.max(0.04, p.y + p.vy * t - 5 * t * t),
+        p.z + p.vz * travel,
+        size,
+        size,
+        size,
+        p.color,
+        fade,
+        0,
+        t * 4,
+        t * 3,
+      );
     }
-    this.particles = this.particles.filter((p) => p.life > 0);
     for (const wave of this.waves) {
-      wave.life -= dt;
-      wave.mesh.scale.setScalar((1 - wave.life / wave.duration) * wave.radius);
-      (wave.mesh.material as THREE.MeshBasicMaterial).opacity =
-        Math.max(0, wave.life / wave.duration) * 0.7;
-      if (wave.life <= 0) {
-        this.root.remove(wave.mesh);
-        wave.mesh.geometry.dispose();
-        (wave.mesh.material as THREE.Material).dispose();
-      }
+      const progress = Math.min(1, (this.clock - wave.born) / wave.duration),
+        radius = (0.12 + progress * 0.88) * wave.radius;
+      this.ringsBatch.add(
+        wave.x,
+        0.06,
+        wave.z,
+        radius,
+        radius,
+        1,
+        wave.color,
+        (1 - progress) * 0.75,
+        -Math.PI / 2,
+      );
     }
-    this.waves = this.waves.filter((w) => w.life > 0);
+    const state = this.state;
+    if (state)
+      for (const actor of state.actors) {
+        const death = actor.death;
+        if (actor.alive || !death) continue;
+        const age = Math.max(0, state.time - death.time),
+          profile = ROSTER[actor.id] ?? ROSTER[0];
+        this.shake = Math.max(this.shake, 0.12 * Math.exp(-age * 7) * (age < 1.2 ? 1 : 0));
+        const juice =
+          profile.kind === 'milk'
+            ? '#fffbea'
+            : profile.kind === 'melon'
+              ? '#ed8179'
+              : profile.color;
+        for (const p of sampleDeathParticles(death, state.time)) {
+          const color =
+            p.kind === 'water'
+              ? '#b8e3ee'
+              : p.kind === 'bubble'
+                ? '#e7fcff'
+                : p.kind === 'cloud' || p.kind === 'dust'
+                  ? '#eef0dc'
+                  : juice;
+          this.particlesBatch.add(
+            death.position.x + p.x,
+            p.y,
+            death.position.y + p.z,
+            p.radius,
+            p.radius,
+            p.radius,
+            color,
+            p.opacity,
+          );
+        }
+        for (const ring of sampleDeathRings(death, state.time))
+          this.ringsBatch.add(
+            death.position.x,
+            0.055,
+            death.position.y,
+            ring.radius,
+            ring.radius,
+            1,
+            death.variant === 'water' ? '#d8f5f5' : juice,
+            ring.opacity,
+            -Math.PI / 2,
+          );
+        for (const splat of sampleDeathSplats(death, state.time))
+          if (onFloor(state.arena, death.position.x + splat.x, death.position.y + splat.z))
+            this.splatsBatch.add(
+              death.position.x + splat.x,
+              0.032,
+              death.position.y + splat.z,
+              splat.radius * 1.3,
+              splat.radius,
+              1,
+              juice,
+              splat.opacity,
+              -Math.PI / 2,
+              0,
+              splat.angle,
+            );
+      }
+    this.particlesBatch.end();
+    this.ringsBatch.end();
+    this.splatsBatch.end();
   }
 
+  stats(): { particles: number; rings: number; splats: number; dropped: number; batches: number } {
+    return {
+      particles: this.particlesBatch.count,
+      rings: this.ringsBatch.count,
+      splats: this.splatsBatch.count,
+      dropped: this.particlesBatch.dropped + this.ringsBatch.dropped + this.splatsBatch.dropped,
+      batches: 3,
+    };
+  }
   clear(): void {
-    for (const view of this.deaths.values()) disposeDeathView(view);
-    this.deaths.clear();
-    for (const p of this.particles) {
-      this.root.remove(p.mesh);
-      p.mesh.geometry.dispose();
-    }
-    for (const w of this.waves) {
-      this.root.remove(w.mesh);
-      w.mesh.geometry.dispose();
-      (w.mesh.material as THREE.Material).dispose();
-    }
-    this.particles = [];
-    this.waves = [];
+    this.particles.length = 0;
+    this.waves.length = 0;
+    this.clock = 0;
+    this.state = undefined;
     this.shake = 0;
     this.transientShake = 0;
-    this.deathShake = 0;
+    this.particlesBatch.clear();
+    this.ringsBatch.clear();
+    this.splatsBatch.clear();
+  }
+  dispose(): void {
+    if (this.disposed) return;
+    this.clear();
+    this.disposed = true;
+    this.particlesBatch.dispose();
+    this.ringsBatch.dispose();
+    this.splatsBatch.dispose();
   }
 }

@@ -85,6 +85,7 @@ export class AudioEngine {
           this.tone(330, 160, 0.07, 'triangle', 0, 0.17);
           break;
         case 'catch':
+        case 'equip':
           this.tone(520, 760, 0.07, 'sine', 0, 0.15);
           break;
         case 'shield':

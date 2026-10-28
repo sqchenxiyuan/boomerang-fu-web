@@ -16,6 +16,10 @@ export interface MatchOptions {
   mapRotation?: MapRotation;
   /** Seconds of active play before sudden death; packaged default is 180. */
   suddenDeathTime?: number;
+  /** Normal pickup pool; omitted means all fourteen formal effects. */
+  powerupPool?: PowerupKind[];
+  /** Local practice loadout, granted through the normal rules at match start. */
+  startingPowers?: PowerupKind[];
 }
 export interface Command {
   move: Vec2;
@@ -32,7 +36,7 @@ export const idleCommand = (): Command => ({
   throwReleased: false,
 });
 
-export type DeathCause = 'weapon' | 'explosion' | 'fall' | 'boundary';
+export type DeathCause = 'weapon' | 'explosion' | 'fall' | 'boundary' | 'fire' | 'telefrag';
 export interface DeathState {
   cause: DeathCause;
   variant: 'slice' | 'squash' | 'water' | 'cliff' | 'burst';
@@ -77,6 +81,23 @@ export interface Actor {
   score: number;
   kills: number;
   armed: boolean;
+  heldDiscs?: number;
+  reverseTime?: number;
+  frozenTime?: number;
+  burnTime?: number;
+  burnSourceId?: number;
+  burnDistance?: number;
+  disguised?: boolean;
+  disguiseTime?: number;
+  controlling?: boolean;
+  controlDirection?: Vec2;
+  abilityCooldown?: number;
+  phaseOrigin?: Vec2;
+  positivePickups?: number;
+  iceExposure?: number;
+  slowed?: boolean;
+  decoyCreated?: boolean;
+  freezeChipCooldown?: number;
   charge: number;
   aimMoveLag: number;
   lungeTime: number;
@@ -114,6 +135,11 @@ export interface Disc {
   curve: number;
   bounces: number;
   explosive: boolean;
+  /** Power snapshot at launch; old SDK fixtures may omit it. */
+  powers?: PowerupKind[];
+  mini?: boolean;
+  groupId?: number;
+  trailTime?: number;
   fuse: number;
   grace: number;
   lastDeflector: number;
@@ -157,6 +183,27 @@ export interface Pickup {
   kind: PowerupKind;
   age: number;
 }
+export interface HazardZone {
+  id: number;
+  kind: 'fire' | 'ice';
+  position: Vec2;
+  ownerId: number;
+  radius: number;
+  remaining: number;
+  duration: number;
+}
+export interface DecoyState {
+  id: number;
+  ownerId: number;
+  position: Vec2;
+  previous: Vec2;
+  velocity: Vec2;
+  facing: Vec2;
+  powers: PowerupKind[];
+  alive: boolean;
+  age: number;
+  dashTime: number;
+}
 export interface GameEvent {
   type:
     | 'throw'
@@ -174,7 +221,13 @@ export interface GameEvent {
     | 'win'
     | 'countdown'
     | 'teleport'
-    | 'boundary';
+    | 'boundary'
+    | 'equip'
+    | 'split'
+    | 'freeze'
+    | 'burn'
+    | 'disguise'
+    | 'decoy';
   position: Vec2;
   actorId: number;
   value?: number;
@@ -198,6 +251,8 @@ export interface GameState {
   actors: Actor[];
   discs: Disc[];
   pickups: Pickup[];
+  zones: HazardZone[];
+  decoys: DecoyState[];
   arena: Arena;
   events: GameEvent[];
   nextId: number;

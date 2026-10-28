@@ -32,8 +32,8 @@ export const RULES = {
   discSpeed: 18,
   discOutbound: 0.45,
   discReturnSpeed: 15,
-  explosionRadius: 2.5,
-  explosionFuse: 1.5,
+  explosionRadius: 12 * WORLD_SCALE,
+  explosionFuse: 1.33,
   countdown: 2.8,
   roundEndDelay: 2.6,
   suddenDeathStart: 180,
@@ -45,6 +45,7 @@ export const RULES = {
   scoreGoal: 5,
   powerupInterval: 7,
   powerupLimit: 3,
+  maxHazardZones: 4096,
 } as const;
 
 export const ROSTER = [
@@ -57,4 +58,70 @@ export const POWERUPS = {
   shield: { name: '护盾', short: '盾', color: '#7ddedb', description: '挡住一次伤害' },
   haste: { name: '加速', short: '速', color: '#c6e573', description: '移动更快，冲刺恢复更快' },
   explosive: { name: '爆炸镖', short: '爆', color: '#ffac67', description: '飞镖落点产生范围爆炸' },
+  wallDash: {
+    name: '穿墙冲刺',
+    short: '穿',
+    color: '#c5a6ef',
+    description: '冲刺穿过障碍，落点需有安全空间',
+  },
+  reverse: {
+    name: '头昏眼花',
+    short: '乱',
+    color: '#eb83be',
+    description: '移动方向反转 6 秒，不占强化槽',
+  },
+  multi: {
+    name: '分裂镖',
+    short: '裂',
+    color: '#e8dd83',
+    description: '飞行中分裂成小镖，集齐后恢复一把武器',
+  },
+  teleport: {
+    name: '传送镖',
+    short: '传',
+    color: '#8fafff',
+    description: '有飞镖在场时按冲刺，传送到自己的安全飞镖落点',
+  },
+  fire: {
+    name: '火焰镖',
+    short: '火',
+    color: '#ff7d57',
+    description: '留下火焰；点燃对手，也要留意自己的火',
+  },
+  extra: {
+    name: '双回旋镖',
+    short: '双',
+    color: '#ffd173',
+    description: '多一把武器，可连续投出两镖',
+  },
+  ice: {
+    name: '冰冻镖',
+    short: '冰',
+    color: '#91e4fa',
+    description: '留下冰面减速，冰爆可冻结对手；与火互斥',
+  },
+  disguise: {
+    name: '伪装',
+    short: '隐',
+    color: '#adc991',
+    description: '静止片刻自动伪装；移动或攻击解除',
+  },
+  controlled: {
+    name: '遥控镖',
+    short: '控',
+    color: '#c3a8ff',
+    description: '投出后按住投掷，用方向键控制飞镖',
+  },
+  shrink: {
+    name: '缩小战场',
+    short: '圈',
+    color: '#ef9fb0',
+    description: '立即向拾取位置缩圈，不占强化槽',
+  },
+  decoy: {
+    name: '诱饵',
+    short: '饵',
+    color: '#9bdcc3',
+    description: '每回合首次冲刺或传送释放替身，吸引对手攻击',
+  },
 } as const;

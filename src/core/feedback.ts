@@ -8,6 +8,8 @@ export function eliminationLabel(actor: Actor): string {
         ? '下落中 · 冲刺自救'
         : '正在下落'
       : '';
+  if (actor.death?.cause === 'fire') return '火焰出局';
+  if (actor.death?.cause === 'telefrag') return '被传送撞击';
   switch (actor.death?.variant) {
     case 'slice':
       return '被切片';

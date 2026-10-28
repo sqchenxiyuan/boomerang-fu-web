@@ -1,12 +1,22 @@
 import './sdk-demo.css';
 import { createBrowserGame } from './sdk/browser';
-import type { Action, ControlHandle, ExternalController, ScriptController } from './sdk/types';
+import type {
+  Action,
+  ControlHandle,
+  ControlInfo,
+  ExternalController,
+  ScriptController,
+} from './sdk/types';
 import type { MapId } from './core/types';
 // The sample is deliberately plain JavaScript so an external caller can use it unchanged.
 // @ts-expect-error plain JS example consumed as a typed controller factory
 import { createDuelController } from '../examples/duel-controller.js';
 
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id)! as T;
+function setText(id: string, value: string): void {
+  const element = get(id);
+  if (element.textContent !== value) element.textContent = value;
+}
 let takeover: ControlHandle | undefined;
 let external: ExternalController | undefined;
 let sample: Action = {};
@@ -18,20 +28,26 @@ const labels = {
   external: '外部动作',
   idle: '等待控制',
 };
+function showControl(source: ControlInfo): void {
+  setText('control-status', `${labels[source.kind]} · ${source.label}`);
+}
 const runtime = createBrowserGame(get('sdk-stage'), {
   match: { mode: 'local', bots: 0, seed: 295 },
   inputTarget: get('sdk-demo'),
   autoStart: false,
-  onFrame: ({ state }) => {
-    const snapshot = runtime.session.snapshot();
-    const source = snapshot.controls.find((item) => item.actorId === 0)!;
-    get('control-status').textContent = `${labels[source.kind]} · ${source.label}`;
-    get('session-status').textContent =
-      `tick ${snapshot.tick} · ${snapshot.status}\n${state.arena.id} · round ${state.round}\n${state.phase} · ${state.roundTime.toFixed(2)}s`;
-    get('demo-pause').textContent = snapshot.status === 'paused' ? '继续' : '暂停';
+  onFrame: ({ state, status }) => {
+    setText(
+      'session-status',
+      `tick ${runtime.session.tick} · ${status}\n${state.arena.id} · round ${state.round}\n${state.phase} · ${state.roundTime.toFixed(2)}s`,
+    );
+    setText('demo-pause', status === 'paused' ? '继续' : '暂停');
   },
 });
+showControl(runtime.session.snapshot().controls.find((item) => item.actorId === 0)!);
 runtime.session.onEvent((event) => {
+  if (event.type === 'control' && event.control.actorId === 0) showControl(event.control);
+  if (event.type === 'lifecycle' && event.action === 'start')
+    showControl(runtime.session.snapshot().controls.find((item) => item.actorId === 0)!);
   if (event.type === 'control' || event.type === 'lifecycle' || event.type === 'error') {
     sample = {};
     logs.unshift(
@@ -59,7 +75,7 @@ function start(): void {
 }
 get('demo-start').addEventListener('click', start);
 get('demo-pause').addEventListener('click', () =>
-  runtime.session.snapshot().status === 'paused' ? runtime.resume() : runtime.pause(),
+  runtime.session.status === 'paused' ? runtime.resume() : runtime.pause(),
 );
 get('demo-script').addEventListener('click', () => {
   takeover = undefined;
@@ -101,15 +117,13 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-move], 
     button.classList.remove('active');
     if (button.dataset.move) sample.move = { x: 0, y: 0 };
     else sample[button.dataset.action as 'attack' | 'throw' | 'dash'] = false;
-    if (external?.active && runtime.session.snapshot().status === 'running')
-      external.submit(sample, 6);
+    if (external?.active && runtime.session.status === 'running') external.submit(sample, 6);
   };
   button.addEventListener('pointerup', release);
   button.addEventListener('pointercancel', release);
 }
 const sendTimer = window.setInterval(() => {
-  if (external?.active && runtime.session.snapshot().status === 'running')
-    external.submit(sample, 6);
+  if (external?.active && runtime.session.status === 'running') external.submit(sample, 6);
 }, 50);
 window.addEventListener(
   'pagehide',

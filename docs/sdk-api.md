@@ -1,6 +1,6 @@
 # Boomerang Garden SDK API
 
-本文对应本地 ESM 包 **`@boomerang-garden/sdk` 0.3.0**。SDK 把固定步长模拟、人物控制来源和浏览器呈现分开；运行不需要 Boomerang Fu 的安装目录或原版素材。
+本文对应本地 ESM 包 **`@boomerang-garden/sdk` 0.4.0**。SDK 把固定步长模拟、人物控制来源和浏览器呈现分开；运行不需要 Boomerang Fu 的安装目录或原版素材。
 
 公开类型以 `src/sdk/types.ts`、`src/sdk/browser.ts` 及打包后的 `.d.ts` 为准。示例采用公开包入口，不依赖开发调试接口。
 
@@ -15,7 +15,7 @@ npm run build:sdk
 在使用 SDK 的项目里安装生成的 tarball，路径按实际位置调整：
 
 ```sh
-npm install /path/to/dist-sdk/boomerang-garden-sdk-0.3.0.tgz
+npm install /path/to/dist-sdk/boomerang-garden-sdk-0.4.0.tgz
 ```
 
 这不是 npm 在线发布。包提供以下入口：
@@ -27,6 +27,25 @@ npm install /path/to/dist-sdk/boomerang-garden-sdk-0.3.0.tgz
 | `@boomerang-garden/sdk/types`   | `Action`、`ScriptController`、`SessionAPI` 等类型入口                |
 
 核心入口不加载 DOM、Three.js 或渲染器，可在 Node.js 20+ 直接运行。构建本仓库仍应遵循项目的 Node 版本要求。浏览器入口需要现代浏览器、WebGL 2，并由 Vite 等打包器或 import map 解析包名和 `three` 依赖。包为 ESM；TypeScript 消费端可使用 Bundler 或 NodeNext 模块解析。
+
+不使用打包器、从安装目录直接加载浏览器 ESM 时，import map 必须同时映射 Three 根入口和 addons 前缀；当前几何合批使用 `BufferGeometryUtils`。以下路径假设服务器公开项目的 `node_modules`，实际部署应按静态资源地址调整：
+
+```html
+<script type="importmap">
+  {
+    "imports": {
+      "three": "/node_modules/three/build/three.module.js",
+      "three/addons/": "/node_modules/three/examples/jsm/"
+    }
+  }
+</script>
+<script type="module">
+  import { createBrowserGame } from '/node_modules/@boomerang-garden/sdk/lib/browser.js';
+  const game = createBrowserGame(document.querySelector('#arena'));
+</script>
+```
+
+Vite 等正常打包流程会按 Three 的 package exports 解析这些子路径，不需要这段 import map。
 
 ## Node：手动推进完整比赛
 
@@ -69,16 +88,22 @@ node node_modules/@boomerang-garden/sdk/examples/node-bots.mjs
 
 构造函数将传入的部分选项与默认值合并；`start(options)` 则与当前比赛选项合并。显式 `undefined` 不覆盖当前值。
 
-| 字段          | 默认值        | 有效值                                                            |
-| ------------- | ------------- | ----------------------------------------------------------------- |
-| `mode`        | `'solo'`      | `'solo'` 初始 1 个人工角色；`'local'` 初始 2 个人工角色           |
-| `bots`        | `1`           | 整数；solo 为 1–3，local 为 0–2；总人数最多 4                     |
-| `difficulty`  | `'normal'`    | `'easy'`、`'normal'`、`'hard'`                                    |
-| `seed`        | `1261`        | 0–4,294,967,295 的整数                                            |
-| `scoreGoal`   | `5`           | 1–100 的整数                                                      |
-| `mapId`       | `'courtyard'` | `'courtyard'`、`'canal'`、`'market'`、`'switchback'`、`'portals'` |
-| `mapRotation` | `'fixed'`     | `'fixed'` 固定地图；`'cycle'` 从所选地图开始按上述顺序轮换        |
-| `suddenDeathTime` | `180` | 有限非负秒数；超过该时刻且仍有两名以上存活角色时开始缩圈，`0` 表示开场即触发 |
+| 字段              | 默认值               | 有效值                                                                       |
+| ----------------- | -------------------- | ---------------------------------------------------------------------------- |
+| `mode`            | `'solo'`             | `'solo'` 初始 1 个人工角色；`'local'` 初始 2 个人工角色                      |
+| `bots`            | `1`                  | 整数；solo 为 1–3，local 为 0–2；总人数最多 4                                |
+| `difficulty`      | `'normal'`           | `'easy'`、`'normal'`、`'hard'`                                               |
+| `seed`            | `1261`               | 0–4,294,967,295 的整数                                                       |
+| `scoreGoal`       | `5`                  | 1–100 的整数                                                                 |
+| `mapId`           | `'courtyard'`        | `'courtyard'`、`'canal'`、`'market'`、`'switchback'`、`'portals'`            |
+| `mapRotation`     | `'fixed'`            | `'fixed'` 固定地图；`'cycle'` 从所选地图开始按上述顺序轮换                   |
+| `suddenDeathTime` | `180`                | 有限非负秒数；超过该时刻且仍有两名以上存活角色时开始缩圈，`0` 表示开场即触发 |
+| `powerupPool`     | 省略，使用全部 14 种 | 1–14 个不同的 `PowerupKind`，不允许空数组；限制场内配方书池                  |
+| `startingPowers`  | 省略，无开场强化     | 最多 3 项，允许空数组；按顺序走真实授予规则，用于本地练习                    |
+
+`PowerupKind` 的 14 个值为 `shield`、`haste`、`explosive`、`wallDash`、`reverse`、`multi`、`teleport`、`fire`、`extra`、`ice`、`disguise`、`controlled`、`shrink`、`decoy`。两个数组在构造和重开时都校验并复制；修改原数组或返回快照不会修改对局。重开不传值或传 `undefined` 会继承当前列表；`startingPowers: []` 清除开场配置，要恢复完整道具池可显式传入全部 14 项。
+
+开场强化在第一回合实际发镖时逐项授予，每名存活角色都会获得；不是创建时直接写入 `actor.powers`。`fire` / `ice` 互斥，按输入顺序后者生效；`reverse` / `shrink` 是即时效果，不占长期强化槽；重复的开场项仍逐次授予（池列表则必须唯一）。后续回合按普通强化保留规则处理，不重新授予临时开场效果。`extra` 会让发镖库存变为 2。开场尚未发镖时 `armed=false`、`heldDiscs=0`，宿主应读取 `weaponsGranted`，不能仅凭 `phase='playing'` 假定已可投掷。
 
 角色 ID 从 0 开始，当前存在的 ID 通过 `getState().actors` 查询。`mode` 决定初始人数和来源；之后 `useBot`、`useScript`、`acquire` 等可以控制任意存在的角色，不受其初始人工/机器人身份限制。
 
@@ -289,7 +314,7 @@ takeover.release();
 
 ## 状态、事件与来源信息
 
-`getState()` 返回独立的 `GameState` 副本；`snapshot()` 返回：
+`session.status` 和 `session.tick` 是只读、无需复制世界的轻量属性，可用于逐帧状态检查，在销毁后仍可读取。需要完整观察时，`getState()` 返回独立的 `GameState` 副本；`snapshot()` 返回：
 
 ```ts
 {
@@ -321,7 +346,7 @@ takeover.release();
 
 `actor.fall` 包含 `kind: 'water' | 'cliff'`、`elapsed`、`duration`；水/崖分别延迟 0.66/0.74 秒死亡，期间角色仍 `alive`。前 0.33 秒内、冲刺冷却允许时可救回一次，`fallsSaved` 在安全着地后清零。下落时普通移动、近战、投掷不执行，但仍能提交救回冲刺。
 
-`actor.death` 保留 `cause`（`weapon | explosion | fall | boundary`）、`variant`（`slice | squash | water | cliff | burst`）、固定的 `position` / `direction`、`time` 与确定性 `seed`。渲染可从状态重建死亡表现，不依赖收到历史事件；新回合清除记录。`death` 事件也附带 `cause`、`direction`、`variant`。`boundary` 事件在开始收缩时发出一次，`position` 是目标中心，自动决胜的 `actorId` 为 -1。
+`actor.death` 保留 `cause`（`weapon | explosion | fall | boundary | fire | telefrag`）、`variant`（`slice | squash | water | cliff | burst`）、固定的 `position` / `direction`、`time` 与确定性 `seed`。渲染可从状态重建死亡表现，不依赖收到历史事件；新回合清除记录。`death` 事件也附带 `cause`、`direction`、`variant`。`boundary` 事件在开始收缩时发出一次，`position` 是目标中心，自动决胜的 `actorId` 为 -1。
 
 `state.roundFinishTimer` 是延迟结算剩余秒数或 `null`。淘汰后继续模拟 1.45 秒再核对存活者；后续死亡重启计时，正在下落的最后一人也不会提前得分。宿主应以 `phase` / `winnerId` 判断回合结果，不要仅凭当前人数提前结算。
 
@@ -348,20 +373,20 @@ const unsubscribe = session.onEvent((entry) => {
 
 ## 生命周期与错误边界
 
-| 方法 / 情况                          | 行为                                                                                                                  |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `start(options?)`                    | 合并当前选项，重建比赛，tick/比分归零，重建默认人工/机器人来源，撤销全部旧 handle，进入 running/countdown             |
-| `pause()`                            | 暂停时清输入和蓄力，之后 step 不推进；控制来源和当前外部凭据保留                                                      |
-| `resume()`                           | 从暂停恢复前再清输入；需提供新样本。已 running 时不重开比赛                                                           |
-| 回合/阶段变化                        | 保留控制来源，清样本、蓄力和输入缓存；机器人清决策状态                                                                |
-| `destroy()`                          | 清输入、标记 disposed、撤销有效性并移除订阅；重复调用安全                                                             |
-| disposed 后                          | 仅 `snapshot()` 继续返回最终观察值；普通方法调用抛错。旧 handle 的 active 为 false，release 和 unsubscribe 可重复调用 |
-| 非法 start 参数                      | 在替换比赛前拒绝；原状态和凭据不被改动                                                                                |
-| 非法动作 / TTL / actorId / tick 数量 | 同步抛 TypeError 或 RangeError，不作为合法输入执行                                                                    |
-| 已失效外部 handle.submit             | 同步抛错，不能抢回控制；release 不影响当前控制者                                                                      |
-| 人工槽占用冲突                       | 同步抛错，原控制分配保留                                                                                              |
-| 标签                                 | 若提供，须为去除空白后非空、原长度不超过 128 的字符串                                                                 |
+| 方法 / 情况                          | 行为                                                                                                                                    |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `start(options?)`                    | 合并当前选项，重建比赛，tick/比分归零，重建默认人工/机器人来源，撤销全部旧 handle，进入 running/countdown                               |
+| `pause()`                            | 暂停时清输入和蓄力，之后 step 不推进；控制来源和当前外部凭据保留                                                                        |
+| `resume()`                           | 从暂停恢复前再清输入；需提供新样本。已 running 时不重开比赛                                                                             |
+| 回合/阶段变化                        | 保留控制来源，清样本、蓄力和输入缓存；机器人清决策状态                                                                                  |
+| `destroy()`                          | 清输入、标记 disposed、撤销有效性并移除订阅；重复调用安全                                                                               |
+| disposed 后                          | `status` / `tick` 和 `snapshot()` 继续返回最终观察值；普通方法调用抛错。旧 handle 的 active 为 false，release 和 unsubscribe 可重复调用 |
+| 非法 start 参数                      | 在替换比赛前拒绝；原状态和凭据不被改动                                                                                                  |
+| 非法动作 / TTL / actorId / tick 数量 | 同步抛 TypeError 或 RangeError，不作为合法输入执行                                                                                      |
+| 已失效外部 handle.submit             | 同步抛错，不能抢回控制；release 不影响当前控制者                                                                                        |
+| 人工槽占用冲突                       | 同步抛错，原控制分配保留                                                                                                                |
+| 标签                                 | 若提供，须为去除空白后非空、原长度不超过 128 的字符串                                                                                   |
 
 浏览器宿主卸载时调用 `game.destroy()`，纯核心宿主结束时调用 `session.destroy()`。不要用更改状态副本、重新使用旧 handle 或创建第二个时钟来绕过生命周期。
 
-当前验证由 `tests/sdk.test.ts`、地图/整场测试和 `scripts/sdk-package-verify.mjs` 覆盖；安装包检验使用隔离目录和公开入口，另有浏览器实际操作验收。机制相似度与未实现的原版特性见项目仓库的 `docs/mechanics-and-feel.md`，该研究报告不随 SDK 包分发，与 SDK 接口保证分开理解。
+验证入口包括 `tests/sdk.test.ts`、`tests/sdk-v4.test.ts`、地图/整场测试和 `scripts/sdk-package-verify.mjs`；安装包检验使用隔离目录和公开入口，另有浏览器实际操作验收。源码测试通过不等于本次安装包已经验收，最终产物以对应 build manifest 和 package report 为准。机制相似度与未实现的原版特性见项目仓库的 `docs/mechanics-and-feel.md`，该研究报告不随 SDK 包分发，与 SDK 接口保证分开理解。

@@ -72,6 +72,14 @@ export class GameSession implements SessionAPI {
     this.#defaults();
   }
 
+  get status(): SessionSnapshot['status'] {
+    return this.#status;
+  }
+
+  get tick(): number {
+    return this.#tick;
+  }
+
   start(options: Partial<MatchOptions> = {}): void {
     this.#mutable();
     const resolved = matchOptions(this.#game.state.options, options);
@@ -118,7 +126,13 @@ export class GameSession implements SessionAPI {
         const commands = new Map<number, Command>();
         const deferred: SessionEvent[] = [];
         if (phase === 'playing' && state.hitStop <= 0) {
-          const observations = structuredClone(state);
+          // Built-in controllers are trusted readers. Script callbacks still
+          // share an immutable pre-routing baseline, each through its own copy:
+          // an earlier callback failure/TTL cleanup must not change a peer's view.
+          const hasScript = state.actors.some(
+            (actor) => actor.alive && this.#controls.get(actor.id)?.source.kind === 'script',
+          );
+          const observations = hasScript ? structuredClone(state) : state;
           this.#routing = true;
           try {
             // Every controller reads the same pre-physics state; scripts get individual copies.
@@ -394,6 +408,8 @@ export class GameSession implements SessionAPI {
     if (!actor) return;
     actor.charge = 0;
     actor.recalling = false;
+    actor.controlling = false;
+    actor.controlDirection = { x: 0, y: 0 };
     actor.throwBlocked = false;
     actor.facingHistory = [];
     actor.aimMoveLag = 0;

@@ -21,6 +21,9 @@ export interface CharacterView {
   label: THREE.Sprite;
   shadow: THREE.Mesh;
   death: DeathModel;
+  leftWeapon?: THREE.Group;
+  disguise?: THREE.Group;
+  iceBlock?: THREE.Mesh;
   lastAttack: number;
 }
 
@@ -196,6 +199,32 @@ export function createCharacter(actor: Actor): CharacterView {
   weapon.scale.setScalar(0.62);
   weapon.rotation.z = 0.4;
   place(weapon, 0.18, -0.05, 0.13, arms[1]);
+  const leftWeapon = makeBoomerang();
+  leftWeapon.scale.setScalar(0.62);
+  leftWeapon.rotation.z = -0.4;
+  place(leftWeapon, -0.18, -0.05, 0.13, arms[0]);
+  leftWeapon.visible = false;
+  const disguise = new THREE.Group();
+  place(box(1.1, 0.95, 0.95, '#b58a52'), 0, 0.48, 0, disguise);
+  for (const x of [-0.38, 0.38]) place(box(0.1, 1, 1.02, '#d9b273'), x, 0.48, 0, disguise);
+  place(box(1.15, 0.12, 1.02, '#dfba7a'), 0, 0.93, 0, disguise);
+  disguise.visible = false;
+  root.add(disguise);
+  const iceBlock = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1.04, 0),
+    new THREE.MeshStandardMaterial({
+      color: '#b8efff',
+      transparent: true,
+      opacity: 0.38,
+      roughness: 0.24,
+      metalness: 0.05,
+      depthWrite: false,
+    }),
+  );
+  iceBlock.position.y = 0.78;
+  iceBlock.scale.set(0.85, 1.1, 0.85);
+  iceBlock.visible = false;
+  root.add(iceBlock);
   const shield = new THREE.Mesh(
     new THREE.IcosahedronGeometry(1.05, 2),
     new THREE.MeshPhysicalMaterial({
@@ -267,6 +296,9 @@ export function createCharacter(actor: Actor): CharacterView {
     label,
     shadow: groundShadow,
     death,
+    leftWeapon,
+    disguise,
+    iceBlock,
     lastAttack: 0,
   };
 }
@@ -300,6 +332,8 @@ export function updateCharacter(
         : Math.sin(cycle) * Math.min(speed * 0.05, 0.2);
   view.leftArm.rotation.x = -view.rightArm.rotation.x * 0.45;
   view.weapon.visible = actor.armed && actor.alive;
+  if (view.leftWeapon)
+    view.leftWeapon.visible = actor.alive && (actor.heldDiscs ?? (actor.armed ? 1 : 0)) > 1;
   view.shield.visible = actor.shield && actor.alive;
   view.shield.scale.setScalar(1 + Math.sin(time * 4) * 0.025);
   view.slash.visible = actor.attackTime > 0 && actor.attackArmed && actor.alive;
@@ -352,4 +386,16 @@ export function updateCharacter(
   if (actor.alive && actor.invulnerable > 0) view.body.visible = Math.floor(time * 24) % 2 === 0;
   const warning = boundaryWarning(actor);
   if (actor.alive && warning.visible) view.body.visible &&= warning.pulse < 0.88;
+  if (view.iceBlock) view.iceBlock.visible = actor.alive && (actor.frozenTime ?? 0) > 0;
+  if (view.disguise) view.disguise.visible = actor.alive && !!actor.disguised;
+  if (actor.alive && actor.disguised) {
+    view.body.visible = false;
+    view.feet.forEach((foot) => {
+      foot.visible = false;
+    });
+    view.weapon.visible = false;
+    if (view.leftWeapon) view.leftWeapon.visible = false;
+    view.label.visible = false;
+    view.aim.visible = false;
+  }
 }

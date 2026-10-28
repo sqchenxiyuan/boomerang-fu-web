@@ -42,6 +42,11 @@ async function npmCli() {
 }
 
 await mkdir(WORK, { recursive: true });
+// Invalidate an older success before this run starts, including early failures.
+await writeFile(
+  resolve(WORK, 'verification.json'),
+  `${JSON.stringify({ ok: false, status: 'running', startedAt: new Date().toISOString(), tarball: BUILD.tarball, sha256: BUILD.sha256 }, null, 2)}\n`,
+);
 if (
   dirname(INSTALL) !== WORK ||
   basename(INSTALL) !== 'consumer' ||
@@ -72,7 +77,7 @@ assert.equal(
 );
 const installed = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'));
 assert.equal(installed.name, '@boomerang-garden/sdk');
-assert.equal(installed.version, '0.3.0');
+assert.equal(installed.version, '0.4.0');
 assert.ok(
   installed.exports['.'].types &&
     installed.exports['./browser'].types &&
@@ -112,6 +117,8 @@ function ready(session) {
   throw new Error('Session did not reach playable armed state.');
 }
 const session = createSession({ mapId: 'canal', seed: 41, bots: 1 });
+assert.equal(session.status, 'running');
+assert.equal(session.tick, 0);
 assert.equal(session.getState().options.suddenDeathTime, 180);
 session.acquire(1, 'idle opponent');
 const external = session.acquire(0, 'node external controller');
@@ -147,6 +154,29 @@ assert.equal(session.getState().time, paused.state.time);
 session.resume();
 off();
 session.destroy();
+assert.equal(session.status, 'disposed');
+assert.equal(session.tick, session.snapshot().tick);
+
+const allPowers = ['shield','haste','explosive','wallDash','reverse','multi','teleport','fire','extra','ice','disguise','controlled','shrink','decoy'];
+const pool = [...allPowers];
+const starting = ['shield','extra','reverse'];
+const configured = createSession({ mode: 'local', bots: 0, powerupPool: pool, startingPowers: starting });
+pool.splice(0); starting.splice(0);
+assert.deepEqual(configured.getState().options.powerupPool, allPowers);
+assert.deepEqual(configured.getState().options.startingPowers, ['shield','extra','reverse']);
+assert.ok(configured.getState().actors.every((actor) => !actor.armed && actor.powers.length === 0));
+ready(configured);
+assert.ok(configured.getState().actors.every((actor) => actor.shield && actor.heldDiscs === 2 && actor.reverseTime > 5));
+const beforeBadOptions = configured.snapshot();
+for (const bad of [{powerupPool:[]}, {powerupPool:['shield','shield']}, {powerupPool:['missing']}, {startingPowers:['shield','haste','extra','fire']}]) {
+  assert.throws(() => configured.start(bad));
+  assert.deepEqual(configured.snapshot(), beforeBadOptions);
+}
+configured.start({powerupPool:['shield'], startingPowers:[]});
+ready(configured); configured.step(300);
+assert.ok(configured.getState().pickups.length > 0);
+assert.ok(configured.getState().pickups.every((pickup) => pickup.kind === 'shield'));
+configured.destroy();
 
 const handoff = createSession({ mapId: 'courtyard', seed: 98, bots: 1 });
 handoff.acquire(1, 'idle opponent');
@@ -203,22 +233,27 @@ for (const name of names) {
 }
 const browser = await import('@boomerang-garden/sdk/browser');
 assert.equal(typeof browser.createBrowserGame, 'function');
-console.log(JSON.stringify({ ok: true, imports: ['core', 'types', 'browser'], coreWithoutDOM: true, externalMovement: true, chargeRelease: true, ttlCancelsCharge: true, detachedSnapshots: true, pause: true, script: true, humanTakeover: true, staleHandleRejected: true, rectangularBoundary: true, persistentDeath: true }));
+console.log(JSON.stringify({ ok: true, imports: ['core', 'types', 'browser'], coreWithoutDOM: true, externalMovement: true, chargeRelease: true, ttlCancelsCharge: true, detachedSnapshots: true, pause: true, script: true, humanTakeover: true, staleHandleRejected: true, rectangularBoundary: true, persistentDeath: true, statusAndTick: true, powerupOptionsCopiedAndValidated: true, startingGrants: true, restrictedPickupPool: true }));
 `;
 await writeFile(resolve(INSTALL, 'controls.mjs'), probe);
 const controls = JSON.parse(runNode([resolve(INSTALL, 'controls.mjs')]).trim());
 const match = JSON.parse(runNode([resolve(packageRoot, 'examples/node-bots.mjs')]).trim());
 
 const coreTypes = `import { createSession, GameSession } from '@boomerang-garden/sdk';
+import type { PowerupKind, DeathCause } from '@boomerang-garden/sdk';
 import type { Action, ScriptContext, SessionSnapshot } from '@boomerang-garden/sdk/types';
-const session: GameSession = createSession({ mapId: 'canal', seed: 41, suddenDeathTime: 30 });
+const powers: PowerupKind[] = ['shield','haste','explosive','wallDash','reverse','multi','teleport','fire','extra','ice','disguise','controlled','shrink','decoy'];
+const session: GameSession = createSession({ mapId: 'canal', seed: 41, suddenDeathTime: 30, powerupPool: powers, startingPowers: ['extra','controlled'] });
+const status: SessionSnapshot['status'] = session.status;
+const tick: number = session.tick;
 const action: Action = { move: { x: 1, y: 0 }, throw: true };
 session.acquire(0).submit(action, 6);
 session.useScript(0, (context: ScriptContext): Action => ({ attack: context.tick % 60 === 0 }));
 const snapshot: SessionSnapshot = session.snapshot();
 const phase: 'idle' | 'shrinking' | 'settled' = snapshot.state.boundary.phase;
 const deathVariant: 'slice' | 'squash' | 'water' | 'cliff' | 'burst' | undefined = snapshot.state.actors[0].death?.variant;
-void phase; void deathVariant;
+const deathCauses: DeathCause[] = ['weapon','explosion','fall','boundary','fire','telefrag'];
+void phase; void deathVariant; void deathCauses; void status; void tick;
 void snapshot;
 session.destroy();
 `;
@@ -255,7 +290,7 @@ for (const kind of ['core', 'browser']) {
 // Load the installed browser entry with an ordinary import map, without Vite/source imports.
 await writeFile(
   resolve(INSTALL, 'browser.html'),
-  `<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Installed SDK smoke test</title><style>body{margin:0;background:#203e32}#arena{width:960px;height:640px;margin:auto}</style><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script></head><body><div id="arena"></div><script type="module">import {createBrowserGame} from '/node_modules/@boomerang-garden/sdk/lib/browser.js'; window.packageGame=createBrowserGame(document.querySelector('#arena'),{match:{mapId:'portals',seed:41},keyboard:true,pauseOnBlur:false});window.packageGame.session.acquire(1,'idle opponent');</script></body></html>`,
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Installed SDK smoke test</title><style>body{margin:0;background:#203e32}#arena{width:960px;height:640px;margin:auto}</style><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script></head><body><div id="arena"></div><script type="module">import {createBrowserGame} from '/node_modules/@boomerang-garden/sdk/lib/browser.js'; window.packageGame=createBrowserGame(document.querySelector('#arena'),{match:{mapId:'portals',seed:41,powerupPool:['shield'],startingPowers:['extra','shield']},keyboard:true,pauseOnBlur:false});window.packageGame.session.acquire(1,'idle opponent');</script></body></html>`,
 );
 const server = createServer(async (request, response) => {
   try {
@@ -305,9 +340,25 @@ try {
     x: window.packageGame.session.getState().actors[0].position.x,
     stats: window.packageGame.stats(),
     map: window.packageGame.session.getState().arena.id,
+    actor: window.packageGame.session.getState().actors[0],
   }));
   assert.ok(initial.stats.render.calls > 0 && initial.stats.render.triangles > 0);
   assert.equal(initial.map, 'portals');
+  assert.equal(initial.actor.heldDiscs, 2);
+  assert.equal(initial.actor.shield, true);
+  await page.evaluate(async () => {
+    const game = window.packageGame;
+    const original = game.onFrame;
+    game.onFrame = ({ state }) => {
+      state.actors[0].score = 999;
+      state.options.powerupPool.push('reverse');
+    };
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    game.onFrame = original;
+  });
+  const detachedFrame = await page.evaluate(() => window.packageGame.session.getState());
+  assert.equal(detachedFrame.actors[0].score, 0);
+  assert.deepEqual(detachedFrame.options.powerupPool, ['shield']);
   await page.evaluate(() => {
     window.packageExternal = window.packageGame.session.acquire(0, 'browser external controller');
     window.packageExternal.submit({ move: { x: 1, y: 0 } }, 60);
@@ -401,6 +452,8 @@ try {
   browserResult = {
     ok: true,
     installedBundle: true,
+    detachedOnFrame: true,
+    startingGrants: true,
     map: initial.map,
     renderCalls: initial.stats.render.calls,
     externalMovement: true,
@@ -419,6 +472,21 @@ try {
     errors: browserErrors,
     failedRequests,
   };
+} catch (error) {
+  const failed = {
+    ok: false,
+    stage: 'installed-browser',
+    verifiedAt: new Date().toISOString(),
+    tarball: BUILD.tarball,
+    sha256: BUILD.sha256,
+    error: error.message,
+    controls,
+    completeMatch: match,
+    browser: { errors: browserErrors, failedRequests },
+  };
+  await writeFile(resolve(WORK, 'verification.json'), `${JSON.stringify(failed, null, 2)}\n`);
+  console.error(JSON.stringify(failed, null, 2));
+  throw error;
 } finally {
   await browser?.close();
   await new Promise((done) => server.close(done));

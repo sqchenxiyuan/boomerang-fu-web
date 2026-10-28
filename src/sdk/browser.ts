@@ -10,6 +10,14 @@ import { boundaryNotice, eliminationLabel } from '../core/feedback';
 import { mapInfo } from '../core/arena';
 import { ROSTER } from '../core/config';
 
+function setText(element: HTMLElement, text: string): void {
+  if (element.textContent !== text) element.textContent = text;
+}
+
+function setHidden(element: HTMLElement, hidden: boolean): void {
+  if (element.hidden !== hidden) element.hidden = hidden;
+}
+
 export interface BrowserFrame {
   state: GameState;
   status: SessionSnapshot['status'];
@@ -140,7 +148,7 @@ export class BrowserGame {
     container.append(this.overlay);
     this.input.onPause = () => {
       if (options.keyboard !== false)
-        this.session.snapshot().status === 'paused' ? this.resume() : this.pause();
+        this.session.status === 'paused' ? this.resume() : this.pause();
     };
     this.input.onSound = () => {
       if (options.keyboard !== false) this.toggleSound();
@@ -173,8 +181,7 @@ export class BrowserGame {
     });
     this.loop.onStep = () => {
       if (this.disposed || this.preview) return;
-      const snapshot = this.session.snapshot();
-      if (snapshot.status !== 'running') return;
+      if (this.session.status !== 'running') return;
       if (options.keyboard !== false) {
         for (const [index, command] of this.input.read(2)) this.session.submitHuman(index, command);
       }
@@ -183,49 +190,57 @@ export class BrowserGame {
     this.loop.onFrame = (alpha, elapsed, dt) => {
       if (this.disposed) return;
       if (options.keyboard !== false) this.input.pollSystemButtons();
-      const snapshot = this.session.snapshot();
-      const paused = snapshot.status !== 'running';
+      // The public frame gets its own detached world, without allocating the
+      // controls metadata needed only by an explicit Session.snapshot() caller.
+      const state = this.session.getState();
+      const status = this.session.status;
+      const paused = status !== 'running';
       this.loop.paused = paused && !this.preview;
       this.input.setEnabled(
-        !paused &&
-          !this.preview &&
-          snapshot.state.phase !== 'matchEnd' &&
-          options.keyboard !== false,
+        !paused && !this.preview && state.phase !== 'matchEnd' && options.keyboard !== false,
       );
       const events = this.events.splice(0);
       this.renderer.events(events);
       this.audio.play(events);
       this.renderer.draw(
-        snapshot.state,
+        state,
         paused ? 1 : alpha,
         elapsed,
         paused && !this.preview ? 0 : dt,
         this.preview,
       );
       if (options.hud !== false) {
-        const state = snapshot.state,
-          presentation = transitionPresentation(state);
-        const radius =
-          (presentation.wipeRadius * Math.hypot(container.clientWidth, container.clientHeight)) / 2;
-        this.wipe.hidden = presentation.wipeRadius >= 1 || this.preview;
-        this.wipe.style.maskImage = `radial-gradient(circle at center, transparent ${Math.max(0, radius - 1)}px, black ${radius}px)`;
-        this.score.textContent = `${state.actors.map((a) => `${ROSTER[a.id].name}  ${a.score}${a.alive ? '' : ` (${eliminationLabel(a)})`}`).join('    ·    ')}\n${mapInfo(state.arena.id).name} · 第 ${state.round} 回合`;
+        const presentation = transitionPresentation(state);
+        setHidden(this.wipe, presentation.wipeRadius >= 1 || this.preview);
+        if (!this.wipe.hidden) {
+          const radius =
+            (presentation.wipeRadius * Math.hypot(container.clientWidth, container.clientHeight)) /
+            2;
+          const mask = `radial-gradient(circle at center, transparent ${Math.max(0, radius - 1)}px, black ${radius}px)`;
+          if (this.wipe.style.maskImage !== mask) this.wipe.style.maskImage = mask;
+        }
+        setText(
+          this.score,
+          `${state.actors.map((a) => `${ROSTER[a.id].name}  ${a.score}${a.alive ? '' : ` (${eliminationLabel(a)})`}`).join('    ·    ')}\n${mapInfo(state.arena.id).name} · 第 ${state.round} 回合`,
+        );
         const notice = this.preview ? '' : boundaryNotice(state);
-        this.notice.hidden = !notice;
-        this.notice.textContent = notice;
-        this.center.textContent =
+        setHidden(this.notice, !notice);
+        setText(this.notice, notice);
+        setText(
+          this.center,
           paused && !this.preview
             ? '已暂停'
             : state.phase === 'matchEnd'
               ? `${ROSTER[state.matchWinnerId ?? 0].name}获胜！`
-              : presentation.label;
+              : presentation.label,
+        );
       }
       this.frames++;
       this.elapsed = elapsed;
       try {
         this.onFrame({
-          state: snapshot.state,
-          status: snapshot.status,
+          state,
+          status,
           alpha,
           elapsed,
           dt,

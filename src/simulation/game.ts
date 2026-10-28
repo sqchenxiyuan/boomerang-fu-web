@@ -5,11 +5,13 @@ import { idleCommand } from '../core/types';
 import type { Command, GameEvent, GameState, MatchOptions } from '../core/types';
 import { tickActor } from './actors';
 import { resolveMelee, separateActors } from './combat';
-import { tickPowerups } from './powerups';
+import { grantPowerup, tickPowerups } from './powerups';
 import { tickDiscs } from './projectiles';
 import { createState, defaultOptions, resetRound } from './state';
 import { tickActorPortals } from './portals';
 import { stopShrinkingBoundary, tickBoundary } from './boundary';
+import { discCapacity, setHeldDiscs } from './inventory';
+import { tickStatusEffects } from './status-effects';
 
 /** Sole authoritative owner of gameplay state. No rendering or DOM dependencies. */
 export class Game {
@@ -66,8 +68,17 @@ export class Game {
     if (!state.weaponsGranted && state.roundTime + 1e-8 >= PRESENTATION.equipDelay) {
       for (const actor of state.actors)
         if (actor.alive) {
-          actor.armed = true;
+          if (state.round === 1)
+            for (const power of state.options.startingPowers ?? [])
+              grantPowerup(state, actor, power);
+          setHeldDiscs(actor, discCapacity(actor));
           actor.throwBlocked = true;
+          state.events.push({
+            type: 'equip',
+            position: { ...actor.position },
+            actorId: actor.id,
+            value: discCapacity(actor),
+          });
         }
       state.weaponsGranted = true;
     }
@@ -79,6 +90,7 @@ export class Game {
     separateActors(state);
     resolveMelee(state);
     tickDiscs(state, dt);
+    tickStatusEffects(state, dt);
     tickPowerups(state, this.random, dt);
     const survivors = state.actors.filter((a) => a.alive);
     const newEvents = state.events.slice(eventStart);

@@ -1,8 +1,15 @@
 import { MAPS } from '../core/arena';
-import { RULES } from '../core/config';
+import { POWERUPS, RULES } from '../core/config';
 import { Random } from '../core/math';
 import type { Vec2 } from '../core/math';
-import type { Actor, Command, GameEvent, GameState, MatchOptions } from '../core/types';
+import type {
+  Actor,
+  Command,
+  GameEvent,
+  GameState,
+  MatchOptions,
+  PowerupKind,
+} from '../core/types';
 import { BotController } from '../simulation/ai';
 import type { Action } from './types';
 
@@ -100,6 +107,8 @@ export function matchOptions(
     'mapId',
     'mapRotation',
     'suddenDeathTime',
+    'powerupPool',
+    'startingPowers',
   ];
   for (const [key, value] of Object.entries(supplied)) {
     if (!keys.includes(key)) throw new TypeError(`Unknown match option: ${key}`);
@@ -122,6 +131,22 @@ export function matchOptions(
   if (!MAPS.some((map) => map.id === options.mapId)) throw new RangeError('Unknown mapId');
   if (options.mapRotation !== 'fixed' && options.mapRotation !== 'cycle')
     throw new RangeError('Unknown mapRotation');
+  // Copy inherited lists too: start({ seed }) must not retain an earlier caller's
+  // array, and validating an override must never mutate the current match.
+  for (const name of ['powerupPool', 'startingPowers'] as const) {
+    const values = options[name];
+    if (values === undefined) continue;
+    const minimum = name === 'powerupPool' ? 1 : 0;
+    const maximum = name === 'powerupPool' ? Object.keys(POWERUPS).length : 3;
+    if (!Array.isArray(values) || values.length < minimum || values.length > maximum)
+      throw new RangeError(`${name} must be an array containing ${minimum} to ${maximum} powerups`);
+    const copied = [...values];
+    if (copied.some((value) => typeof value !== 'string' || !Object.hasOwn(POWERUPS, value)))
+      throw new RangeError(`${name} contains an unknown powerup`);
+    if (name === 'powerupPool' && new Set(copied).size !== copied.length)
+      throw new RangeError(`${name} must not contain duplicate powerups`);
+    options[name] = copied as PowerupKind[];
+  }
   return options;
 }
 

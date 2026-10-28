@@ -329,6 +329,35 @@ h1 span {
   margin-right: 10px;
   color: #b3b99d;
 }
+.loadout-selects {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 12px 0;
+}
+.loadout-selects label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  min-width: 0;
+}
+.loadout-selects select {
+  width: 100%;
+  padding: 8px 4px;
+}
+.powerup-catalog p {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid #ffffff18;
+  padding-top: 9px;
+}
+.powerup-catalog b {
+  color: #254e3c !important;
+  border-left: 4px solid currentColor;
+  padding-left: 8px;
+}
 .instructions {
   border-top: 1px solid #e0e3d1;
   margin-top: 20px;

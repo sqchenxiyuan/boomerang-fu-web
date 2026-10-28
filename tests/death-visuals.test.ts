@@ -37,6 +37,21 @@ const samples = (record: DeathState, time: number) => ({
 function visuals(root: THREE.Object3D) {
   const output: unknown[] = [];
   root.traverse((o) => {
+    if (o instanceof THREE.InstancedMesh && o.visible) {
+      const matrix = new THREE.Matrix4(),
+        color = new THREE.Color();
+      for (let i = 0; i < o.count; i++) {
+        o.getMatrixAt(i, matrix);
+        o.getColorAt(i, color);
+        output.push({
+          matrix: matrix.toArray(),
+          color: color.getHex(),
+          opacity: o.geometry.getAttribute('instanceAlpha').getX(i),
+          type: o.geometry.type,
+        });
+      }
+      return;
+    }
     if (o instanceof THREE.Mesh && o.visible)
       output.push({
         position: o.position.toArray(),
@@ -154,16 +169,20 @@ describe('snapshot-driven death presentation', () => {
     });
     const before = visuals(second.root);
     first.clear();
+    expect(first.stats().particles).toBe(0);
+    expect(released).toBe(0);
+    first.dispose();
     expect(released).toBeGreaterThan(0);
     expect(otherReleased).toBe(0);
     expect(visuals(second.root)).toEqual(before);
     state.actors[0].alive = true;
     state.actors[0].death = undefined;
     second.syncDeaths(state);
-    expect(second.root.children).toHaveLength(0);
+    expect(second.stats().particles + second.stats().rings + second.stats().splats).toBe(0);
+    expect(otherReleased).toBe(0);
+    first.dispose();
+    second.dispose();
     expect(otherReleased).toBeGreaterThan(0);
-    first.clear();
-    second.clear();
   });
 
   it('samples falling from authoritative elapsed time and restores an actor after rescue', () => {

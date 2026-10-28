@@ -1,10 +1,79 @@
-import { moveAndSlide, onGround } from '../core/collision';
+import {
+  lineOfSight,
+  moveAndSlide,
+  onGround,
+  safePosition,
+  traceObstacles,
+} from '../core/collision';
 import { RULES } from '../core/config';
-import { add, angleBetween, clampLength, length, mul, normalize, rotate, v } from '../core/math';
+import {
+  add,
+  angleBetween,
+  clampLength,
+  distance,
+  length,
+  mul,
+  normalize,
+  rotate,
+  sub,
+  v,
+} from '../core/math';
 import type { Actor, Command, GameState } from '../core/types';
 import { throwDisc } from './projectiles';
 import { tickActorBoundary } from './boundary';
-import { rescueFall, tickFall } from './hazards';
+import { canRescueFall, rescueFall, tickFall } from './hazards';
+import { recoverDisc } from './inventory';
+import { damageActor } from './combat';
+import { breakDisguise, spawnDecoy } from './status-effects';
+
+/** Dash checks teleport before the ordinary dash cooldown, as Player.Dash does. */
+export function tryTeleport(state: GameState, actor: Actor): boolean {
+  if (!actor.powers.includes('teleport') || (actor.fall && !canRescueFall(actor))) return false;
+  const disc = state.discs.find(
+    (candidate) =>
+      candidate.ownerId === actor.id &&
+      !candidate.dead &&
+      safePosition(state.arena, candidate.position, RULES.playerRadius),
+  );
+  if (!disc) return false;
+  if (
+    distance(actor.position, disc.position) < RULES.playerRadius * 3 &&
+    lineOfSight(state.arena, actor.position, disc.position)
+  )
+    return true;
+  const origin = { ...actor.position };
+  if (actor.fall) rescueFall(actor);
+  actor.position = { ...disc.position };
+  actor.previous = { ...disc.position };
+  actor.velocity = v();
+  actor.phaseOrigin = undefined;
+  actor.dashTime = 0;
+  actor.attackCooldown = 0;
+  actor.recalling = false;
+  actor.controlling = false;
+  actor.charge = 0;
+  breakDisguise(actor);
+  for (const other of state.actors)
+    if (
+      other.id !== actor.id &&
+      other.alive &&
+      distance(other.position, actor.position) < RULES.playerRadius * 1.8
+    )
+      damageActor(state, other, actor.id, sub(other.position, origin), 'telefrag');
+  state.zones = state.zones.filter(
+    (zone) => zone.ownerId !== actor.id || distance(zone.position, actor.position) > 4,
+  );
+  // Disc.Explode removes an explosive projectile; it is not Grenade.Explode.
+  recoverDisc(state, disc, !disc.explosive);
+  state.events.push({
+    type: 'teleport',
+    position: origin,
+    destination: { ...actor.position },
+    actorId: actor.id,
+    entityType: 'actor',
+  });
+  return true;
+}
 
 export function tickActor(state: GameState, actor: Actor, command: Command, dt: number): void {
   actor.previous = { ...actor.position };
@@ -19,7 +88,25 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
   actor.invulnerable = decrease(actor.invulnerable);
   actor.bufferedDash = decrease(actor.bufferedDash);
   actor.bufferedAttack = decrease(actor.bufferedAttack);
-  const movement = clampLength(command.move, 1);
+  const movement = clampLength(mul(command.move, (actor.reverseTime ?? 0) > 0 ? -1 : 1), 1);
+  if ((actor.frozenTime ?? 0) > 0) {
+    if (
+      (command.attack || command.dash || command.throwReleased) &&
+      (actor.freezeChipCooldown ?? 0) <= 0
+    ) {
+      actor.frozenTime = Math.max(0, actor.frozenTime! - 7 / 12);
+      actor.freezeChipCooldown = 0.2;
+    }
+    actor.velocity = v();
+    actor.charge = 0;
+    actor.recalling = false;
+    actor.controlling = false;
+    actor.bufferedDash = 0;
+    actor.bufferedAttack = 0;
+    tickFall(state, actor, dt);
+    tickActorBoundary(state, actor, dt);
+    return;
+  }
   const clearBuffer = (): void => {
     actor.bufferedDash = 0;
     actor.bufferedAttack = 0;
@@ -28,11 +115,18 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
     if (actor.charge >= RULES.aimStart && length(movement) > 0) actor.aimMoveLag = 1;
     actor.charge = 0;
     actor.recalling = false;
+    actor.controlling = false;
     actor.facingHistory = [];
   };
   const tryAttack = (): boolean => {
     if (actor.fall || actor.stun > 0 || actor.attackCooldown > 0 || actor.charge >= RULES.aimStart)
       return false;
+    if (
+      actor.phaseOrigin &&
+      traceObstacles(state.arena, actor.position, v(), RULES.playerRadius * 0.3)
+    )
+      return false;
+    breakDisguise(actor);
     // A slash can cancel a dash, but cannot rotate while the dash recovery owns movement.
     if (actor.dashCooldown <= 0 && actor.lungeRecovery <= 0 && length(movement) > 0)
       actor.facing = normalize(movement);
@@ -58,17 +152,28 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
     return true;
   };
   const tryDash = (): boolean => {
-    if (actor.stun > 0 || actor.dashCooldown > 0 || actor.lungeRecovery > 0) return false;
+    if (actor.stun > 0 || actor.lungeRecovery > 0) return false;
+    if (tryTeleport(state, actor)) {
+      spawnDecoy(state, actor);
+      stopAim();
+      clearBuffer();
+      actor.throwBlocked ||= command.throwHeld;
+      return true;
+    }
+    if (actor.dashCooldown > 0) return false;
     if (actor.fall && !rescueFall(actor)) return false;
+    breakDisguise(actor);
     actor.dashTime = RULES.dashDuration * (hasted ? 0.8 : 1);
     actor.dashCooldown = RULES.dashCooldown * (hasted ? 0.6 : 1);
     actor.dashDirection = length(movement) > 0 ? normalize(movement) : { ...actor.facing };
     actor.facing = { ...actor.dashDirection };
+    if (actor.powers.includes('wallDash')) actor.phaseOrigin = { ...actor.position };
     stopAim();
     actor.throwBlocked ||= command.throwHeld;
     actor.velocity = add(actor.velocity, mul(actor.dashDirection, RULES.dashImpulse));
     clearBuffer();
     state.events.push({ type: 'dash', position: { ...actor.position }, actorId: actor.id });
+    spawnDecoy(state, actor);
     return true;
   };
   if (actor.fall) {
@@ -95,14 +200,22 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
       actor.dashTime <= 0 &&
       actor.lungeRecovery <= 0 &&
       state.discs.some((disc) => disc.ownerId === actor.id && !disc.dead);
+    actor.controlling =
+      actor.recalling &&
+      state.discs.some(
+        (disc) => disc.ownerId === actor.id && !disc.dead && disc.powers?.includes('controlled'),
+      );
+    actor.controlDirection = { ...movement };
     if (
       command.throwHeld &&
       !actor.throwBlocked &&
       actor.armed &&
       actor.dashTime <= 0 &&
       actor.lungeRecovery <= 0
-    )
+    ) {
       actor.charge = Math.min(RULES.chargeTime, actor.charge + dt);
+      breakDisguise(actor);
+    }
     if (command.dash && !tryDash()) actor.bufferedDash = RULES.dashBuffer;
     if (!command.dash && !command.attack && !command.throwReleased) {
       // Two retained action slots, ordered by age; the original keeps an eight-entry queue.
@@ -137,11 +250,13 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
       );
     } else actor.aimMoveLag = 0;
     let force = (actor.armed ? RULES.walkForce : RULES.unarmedWalkForce) * (hasted ? 1.4 : 1);
-    if (actor.charge >= RULES.aimStart || actor.recalling) force = 0;
+    if (actor.controlling) force *= 0.1;
+    else if (actor.charge >= RULES.aimStart || actor.recalling) force = 0;
     else if (actor.aimMoveLag > 0) {
       actor.aimMoveLag = Math.max(0, actor.aimMoveLag - dt / RULES.aimMoveRecovery);
       force *= 1 - Math.sin((Math.PI / 2) * actor.aimMoveLag);
     }
+    if (actor.slowed) force *= 0.33;
     actor.velocity = add(actor.velocity, mul(movement, force * dt));
   }
   if (actor.charge > RULES.aimStart * 0.5) {
@@ -164,7 +279,10 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
     mul(actor.velocity, Math.max(0, 1 - RULES.damping * dt)),
     RULES.speedLimit * (isDashing ? 2 : 1),
   );
-  let next = moveAndSlide(state.arena, actor.position, mul(actor.velocity, dt), RULES.playerRadius);
+  const phasing = actor.phaseOrigin !== undefined && isDashing;
+  let next = phasing
+    ? add(actor.position, mul(actor.velocity, dt))
+    : moveAndSlide(state.arena, actor.position, mul(actor.velocity, dt), RULES.playerRadius);
   // Gentle fall protection applies to walking; a dash can cross a gap or miss its landing.
   if (
     !actor.fall &&
@@ -183,7 +301,33 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
   }
   actor.position = next;
   actor.dashTime = decrease(actor.dashTime);
+  if (actor.phaseOrigin && actor.dashTime <= 0) {
+    if (traceObstacles(state.arena, actor.position, v(), RULES.playerRadius * 0.3)) {
+      actor.dashTime = RULES.dashDuration * 0.4;
+      actor.dashCooldown = Math.max(actor.dashCooldown, 0.2);
+    } else actor.phaseOrigin = undefined;
+  }
   actor.lungeTime = decrease(actor.lungeTime);
   tickFall(state, actor, dt);
   tickActorBoundary(state, actor, dt);
+  const canDisguise =
+    actor.alive &&
+    actor.powers.includes('disguise') &&
+    !actor.fall &&
+    actor.stun <= 0 &&
+    actor.dashTime <= 0 &&
+    actor.lungeRecovery <= 0 &&
+    actor.charge <= 0 &&
+    !actor.recalling &&
+    actor.attackTime <= 0 &&
+    (actor.burnTime ?? 0) <= 0 &&
+    length(actor.velocity) < 5.5 * RULES.worldScale;
+  if (!canDisguise) breakDisguise(actor);
+  else if (!actor.disguised && length(actor.velocity) < 0.5 * RULES.worldScale) {
+    actor.disguiseTime = (actor.disguiseTime ?? 0) + dt;
+    if (actor.disguiseTime >= 0.2 - 1e-10) {
+      actor.disguised = true;
+      state.events.push({ type: 'disguise', position: { ...actor.position }, actorId: actor.id });
+    }
+  }
 }

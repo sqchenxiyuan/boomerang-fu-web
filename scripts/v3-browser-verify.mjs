@@ -507,7 +507,15 @@ try {
       window.v3.updateCharacter(view, actor, 1, state.time);
       const effects = new window.v3.Effects();
       effects.syncDeaths(state);
-      const [particles, rings, splats] = effects.root.children[0].children;
+      const counts = {};
+      for (const name of ['particles', 'rings', 'splats']) {
+        const batch = effects.root.getObjectByName(`effect-${name}`);
+        if (!batch?.isInstancedMesh) throw new Error(`Missing ${name} instance batch`);
+        const alpha = batch.geometry.getAttribute('instanceAlpha');
+        counts[name] = Array.from({ length: batch.count }, (_, i) => alpha.getX(i)).filter(
+          (value) => value > 0,
+        ).length;
+      }
       const result = {
         variant: kind,
         bodyVisible: view.body.visible,
@@ -515,11 +523,11 @@ try {
         stump: view.death.stump.visible,
         piece: view.death.piece.visible,
         squash: view.death.squash.visible,
-        particles: particles.children.filter((item) => item.visible).length,
-        rings: rings.children.filter((item) => item.visible).length,
-        splats: splats.children.filter((item) => item.visible).length,
+        particles: counts.particles,
+        rings: counts.rings,
+        splats: counts.splats,
       };
-      effects.clear();
+      effects.dispose();
       view.root.traverse((object) => {
         object.geometry?.dispose();
         if (object.isSprite) {

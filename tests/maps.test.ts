@@ -224,8 +224,13 @@ describe('complete autonomous matches on every map', () => {
         for (const actor of game.state.actors) {
           if (!Number.isFinite(actor.position.x + actor.position.y))
             throw new Error('Non-finite position');
-          if (game.state.discs.filter((disc) => disc.ownerId === actor.id).length > 1)
-            throw new Error('Duplicate owned disc');
+          const owned = game.state.discs.filter((disc) => disc.ownerId === actor.id);
+          const groups = new Set(owned.map((disc) => disc.groupId ?? disc.id));
+          if (groups.size + (actor.armed ? Math.max(1, actor.heldDiscs ?? 1) : 0) > 2)
+            throw new Error('Duplicate weapon inventory');
+          for (const group of groups)
+            if (owned.filter((disc) => (disc.groupId ?? disc.id) === group).length > 5)
+              throw new Error('Too many fragments in one weapon');
         }
       }
       const result = {

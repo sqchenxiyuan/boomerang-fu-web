@@ -1,6 +1,6 @@
 import { POWERUPS, ROSTER, RULES } from '../core/config';
 import { MAPS, mapInfo } from '../core/arena';
-import { transitionPresentation } from '../core/presentation';
+import { PRESENTATION, transitionPresentation } from '../core/presentation';
 import { boundaryNotice, eliminationLabel } from '../core/feedback';
 import { clamp } from '../core/math';
 import type {
@@ -10,6 +10,7 @@ import type {
   MatchOptions,
   MapId,
   MapRotation,
+  PowerupKind,
 } from '../core/types';
 
 const boomerang =
@@ -42,6 +43,7 @@ export class View {
   private lastAbilities = '';
   private toastUntil = 0;
   private muted = false;
+  private htmlCache = new Map<HTMLElement, string>();
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -70,7 +72,27 @@ export class View {
           <p>按住投掷蓄力，松开出手；空手时按住同一键召回。挥砍能反弹飞镖，冲刺能躲攻击、越过水坑。刚开始下落时可冲刺自救一次。</p>
           <p>决胜时矩形边界向箭头收缩。出界后有短暂返回时间，倒计时结束即出局。</p>
           <p>手柄：左摇杆移动 · X 近战 · B / RB 蓄力投掷 · A 冲刺 · Start 暂停。两支手柄按连接顺序分配。</p>
-          <p>地上的配方书提供护盾、加速或爆炸镖。爆炸会伤到自己；普通强化可保留到下一回合。</p>
+          <p>开始后 1.2 秒自动发镖，无需寻找武器。配方书有 14 种效果，最多保留 3 个强化；第 4 个替换最早获得的。火与冰互斥。</p>
+        </div></details>
+        <details class="instructions powerup-guide"><summary>14 种道具 · 组合试验 <span>＋</span></summary><div class="instruction-content">
+          <p>选最多三种效果开始练习，全员使用相同配方；头昏眼花与缩圈只在开场触发。留空恢复普通随机对局。</p>
+          <div class="loadout-selects">${[1, 2, 3]
+            .map(
+              (i) =>
+                `<label>配方 ${i}<select id="power-${i}" aria-label="配方 ${i}"><option value="">不指定</option>${Object.entries(
+                  POWERUPS,
+                )
+                  .map(([id, p]) => `<option value="${id}">${p.name}</option>`)
+                  .join('')}</select></label>`,
+            )
+            .join('')}</div>
+          <button class="secondary-button" id="practice-start">带此配方进入花园</button>
+          <div class="powerup-catalog">${Object.values(POWERUPS)
+            .map(
+              (p) =>
+                `<p><b style="color:${p.color}">${p.short} · ${p.name}</b><span>${p.description}</span></p>`,
+            )
+            .join('')}</div>
         </div></details>
       </section>
       <div class="scene-caption" id="scene-caption"><span class="location-dot">✦</span><div>山间庭院<small>THE LITTLE COURTYARD</small></div><span class="scene-line"></span><span>短回合 · 随时再来</span></div>
@@ -107,7 +129,14 @@ export class View {
             : '<option value="0">只有我们俩</option><option value="2">再加 2 位</option>';
       }),
     );
-    this.get('start').addEventListener('click', () =>
+    const start = (practice = false): void => {
+      const powers = practice
+        ? ([
+            ...new Set(
+              [1, 2, 3].map((i) => this.get<HTMLSelectElement>(`power-${i}`).value).filter(Boolean),
+            ),
+          ] as PowerupKind[])
+        : [];
       this.onStart({
         mode: selectedMode,
         bots: Number(this.get<HTMLSelectElement>('bots').value),
@@ -117,8 +146,12 @@ export class View {
         mapId: this.get<HTMLSelectElement>('map').value as MapId,
         mapRotation: this.get<HTMLSelectElement>('rotation').value as MapRotation,
         suddenDeathTime: Number(this.get<HTMLSelectElement>('sudden-death').value),
-      }),
-    );
+        startingPowers: powers,
+        powerupPool: powers.length ? powers : (Object.keys(POWERUPS) as PowerupKind[]),
+      });
+    };
+    this.get('start').addEventListener('click', () => start());
+    this.get('practice-start').addEventListener('click', () => start(true));
     this.get('map').addEventListener('change', () => {
       const id = this.get<HTMLSelectElement>('map').value as MapId;
       const info = mapInfo(id);
@@ -143,6 +176,17 @@ export class View {
 
   private get<T extends HTMLElement = HTMLElement>(id: string): T {
     return this.root.querySelector<T>(`#${id}`)!;
+  }
+
+  private text(id: string, value: string): void {
+    const element = this.get(id);
+    if (element.textContent !== value) element.textContent = value;
+  }
+
+  private html(element: HTMLElement, value: string): void {
+    if (this.htmlCache.get(element) === value) return;
+    this.htmlCache.set(element, value);
+    element.innerHTML = value;
   }
 
   setMode(mode: typeof this.mode): void {
@@ -175,13 +219,19 @@ export class View {
   }
 
   events(events: GameEvent[], elapsed: number): void {
-    for (const event of events)
+    for (const event of events) {
       if (event.type === 'pickup' && event.power) {
         this.get('toast').textContent =
           `${ROSTER[event.actorId].name} 获得${POWERUPS[event.power].name} · ${POWERUPS[event.power].description}`;
         this.toastUntil = elapsed + 2.7;
         this.get('toast').hidden = false;
       }
+    }
+    if (events.some((event) => event.type === 'equip' && event.actorId === 0)) {
+      this.text('toast', '回旋镖已就绪！按 K 蓄力投掷 · J 挥砍');
+      this.toastUntil = elapsed + 2;
+      this.get('toast').hidden = false;
+    }
   }
 
   update(state: GameState, elapsed: number): void {
@@ -192,8 +242,9 @@ export class View {
     wipe.hidden = presentation.wipeRadius >= 1 || state.phase === 'matchEnd';
     const radius =
       (presentation.wipeRadius * Math.hypot(this.root.clientWidth, this.root.clientHeight)) / 2;
-    wipe.style.maskImage = `radial-gradient(circle at center, transparent ${Math.max(0, radius - 1)}px, black ${radius}px)`;
-    wipe.dataset.stage = presentation.stage;
+    if (!wipe.hidden)
+      wipe.style.maskImage = `radial-gradient(circle at center, transparent ${Math.max(0, radius - 1)}px, black ${radius}px)`;
+    if (wipe.dataset.stage !== presentation.stage) wipe.dataset.stage = presentation.stage;
     const scores = state.actors
       .map(
         (a) =>
@@ -213,18 +264,23 @@ export class View {
         )
         .join('<span class="vs">·</span>');
     }
-    this.get('round-label').textContent =
-      `${mapInfo(state.arena.id).name} · ROUND ${String(state.round).padStart(2, '0')}`;
-    this.get('round-timer').textContent =
-      `${String(Math.floor(state.roundTime / 60)).padStart(2, '0')}:${String(Math.floor(state.roundTime % 60)).padStart(2, '0')}`;
+    this.text(
+      'round-label',
+      `${mapInfo(state.arena.id).name} · ROUND ${String(state.round).padStart(2, '0')}`,
+    );
+    this.text(
+      'round-timer',
+      `${String(Math.floor(state.roundTime / 60)).padStart(2, '0')}:${String(Math.floor(state.roundTime % 60)).padStart(2, '0')}`,
+    );
     const danger = boundaryNotice(state);
     this.get('danger-note').hidden = !danger;
-    this.get('danger-note').textContent = danger;
+    this.text('danger-note', danger);
+    const equipLeft = Math.max(0, PRESENTATION.equipDelay - state.roundTime).toFixed(1);
     const humans = state.actors.filter((a) => a.controller === 'human');
     const abilities = humans
       .map(
         (a) =>
-          `${a.id}:${a.alive}:${eliminationLabel(a)}:${state.weaponsGranted}:${a.armed}:${a.recalling}:${Math.round(a.charge * 20)}:${Math.round(a.dashCooldown * 20)}:${a.powers.join(',')}`,
+          `${a.id}:${a.alive}:${eliminationLabel(a)}:${state.weaponsGranted ? 'ready' : equipLeft}:${a.armed}:${a.heldDiscs}:${a.recalling}:${a.controlling}:${a.disguised}:${Math.ceil(a.reverseTime ?? 0)}:${Math.ceil(a.frozenTime ?? 0)}:${Math.ceil(a.burnTime ?? 0)}:${Math.round(a.charge * 20)}:${Math.round(a.dashCooldown * 20)}:${a.powers.join(',')}`,
       )
       .join('|');
     if (abilities !== this.lastAbilities) {
@@ -237,28 +293,49 @@ export class View {
             !actor.alive || actor.fall
               ? eliminationLabel(actor)
               : !state.weaponsGranted
-                ? '开场准备 · 即将发镖'
-                : actor.armed
-                  ? actor.charge > 0.1
-                    ? '蓄力中…'
-                    : '回旋镖就绪'
-                  : disc?.explosive
-                    ? '爆炸镖在场'
-                    : actor.recalling
-                      ? '召回中…'
-                      : '按住投掷键召回';
+                ? `自动发镖 · ${equipLeft} 秒`
+                : (actor.frozenTime ?? 0) > 0
+                  ? `冰冻 · ${Math.ceil(actor.frozenTime!)} 秒`
+                  : (actor.reverseTime ?? 0) > 0
+                    ? `方向反转 · ${Math.ceil(actor.reverseTime!)} 秒`
+                    : (actor.burnTime ?? 0) > 0
+                      ? '着火了 · 快移动或寻找冰面'
+                      : actor.disguised
+                        ? '伪装中 · 行动解除'
+                        : actor.controlling
+                          ? '遥控中 · 方向键转向'
+                          : actor.armed
+                            ? actor.charge > 0.1
+                              ? '蓄力中…'
+                              : `回旋镖就绪${actor.heldDiscs === 2 ? ' ×2' : ''}`
+                            : disc?.explosive
+                              ? '爆炸镖在场'
+                              : actor.recalling
+                                ? '召回中…'
+                                : '按住投掷键召回';
           return `<div class="ability-card" style="--player-color:${ROSTER[actor.id].color}"><div class="ability-top"><span class="small-token">${actor.humanIndex + 1}P</span><b>${weapon}</b><span class="power-icons">${actor.powers.map((p) => `<i style="--power:${POWERUPS[p].color}" title="${POWERUPS[p].description}">${POWERUPS[p].short}</i>`).join('')}</span></div><div class="ability-meters"><span>冲刺 <i><em style="width:${ready ? 100 : clamp(1 - actor.dashCooldown / (RULES.dashCooldown * (actor.powers.includes('haste') ? 0.6 : 1)), 0, 1) * 100}%"></em></i><small>${ready ? '就绪' : '恢复'}</small></span><span>蓄力 <i><em class="charge-fill" style="width:${(actor.charge / RULES.chargeTime) * 100}%"></em></i></span></div></div>`;
         })
         .join('');
     }
     if (state.phase === 'countdown') {
-      this.center.innerHTML = `<div class="countdown" style="transform:scale(${presentation.labelScale})"><small>第 ${state.round} 回合 · ${mapInfo(state.arena.id).name}</small><strong>${presentation.label}</strong><span>${presentation.stage === 'ready' ? '准备移动，开场稍后发镖' : '伙伴们正在入场'}</span></div>`;
+      this.html(
+        this.center,
+        `<div class="countdown"><small>第 ${state.round} 回合 · ${mapInfo(state.arena.id).name}</small><strong>${presentation.label}</strong><span>${presentation.stage === 'ready' ? '开始后 1.2 秒自动发镖' : '伙伴们正在入场'}</span></div>`,
+      );
     } else if (state.phase === 'roundEnd') {
       const winner = state.winnerId === null ? null : ROSTER[state.winnerId];
-      this.center.innerHTML = `<div class="round-banner" style="opacity:${presentation.showScores ? presentation.scoreOpacity : 1};transform:scale(${presentation.labelScale})"><span class="eyebrow">${presentation.showScores ? 'ROUND SCORES' : winner ? 'ROUND SURVIVED' : 'WHAT A ROUND'}</span><h2>${winner ? `${winner.name}赢下这一回合` : '无人存活 · 平局'}</h2><p>${presentation.showScores ? state.actors.map((a) => `${ROSTER[a.id].name} ${a.score}`).join(' · ') : winner ? '＋1 分' : '本回合不计分'}<span>下一回合马上开始</span></p></div>`;
+      this.html(
+        this.center,
+        `<div class="round-banner"><span class="eyebrow">${presentation.showScores ? 'ROUND SCORES' : winner ? 'ROUND SURVIVED' : 'WHAT A ROUND'}</span><h2>${winner ? `${winner.name}赢下这一回合` : '无人存活 · 平局'}</h2><p>${presentation.showScores ? state.actors.map((a) => `${ROSTER[a.id].name} ${a.score}`).join(' · ') : winner ? '＋1 分' : '本回合不计分'}<span>下一回合马上开始</span></p></div>`,
+      );
     } else if (presentation.stage === 'go')
-      this.center.innerHTML = `<div class="go-text" style="transform:scale(${presentation.labelScale})">开始！</div>`;
-    else this.center.innerHTML = '';
+      this.html(this.center, '<div class="go-text">开始！</div>');
+    else this.html(this.center, '');
+    const banner = this.center.firstElementChild as HTMLElement | null;
+    if (banner) {
+      banner.style.transform = `scale(${presentation.labelScale})`;
+      banner.style.opacity = String(presentation.showScores ? presentation.scoreOpacity : 1);
+    }
     if (state.phase === 'matchEnd' && this.mode !== 'ended') {
       const winner = state.actors.find((a) => a.id === state.matchWinnerId)!;
       this.get('result-title').textContent = `${ROSTER[winner.id].name}，花园冠军！`;

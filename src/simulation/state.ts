@@ -35,6 +35,23 @@ export function makeActor(id: number, controller: Actor['controller'], humanInde
     score: 0,
     kills: 0,
     armed: true,
+    heldDiscs: 1,
+    reverseTime: 0,
+    frozenTime: 0,
+    burnTime: 0,
+    burnSourceId: -1,
+    burnDistance: 0,
+    disguised: false,
+    disguiseTime: 0,
+    controlling: false,
+    controlDirection: v(),
+    abilityCooldown: 0,
+    phaseOrigin: undefined,
+    positivePickups: 0,
+    iceExposure: 0,
+    slowed: false,
+    decoyCreated: false,
+    freezeChipCooldown: 0,
     charge: 0,
     aimMoveLag: 0,
     lungeTime: 0,
@@ -70,6 +87,8 @@ export function createState(options: MatchOptions = defaultOptions()): GameState
   const state: GameState = {
     options: {
       ...options,
+      powerupPool: options.powerupPool ? [...options.powerupPool] : undefined,
+      startingPowers: options.startingPowers ? [...options.startingPowers] : undefined,
       bots: botCount,
       suddenDeathTime: options.suddenDeathTime ?? RULES.suddenDeathStart,
     },
@@ -83,6 +102,8 @@ export function createState(options: MatchOptions = defaultOptions()): GameState
     actors,
     discs: [],
     pickups: [],
+    zones: [],
+    decoys: [],
     arena: createArena(options.mapId),
     events: [],
     nextId: 1,
@@ -114,6 +135,8 @@ export function resetRound(state: GameState): void {
   state.winnerId = null;
   state.discs = [];
   state.pickups = [];
+  state.zones = [];
+  state.decoys = [];
   state.pickupTimer = 2.5;
   for (const actor of state.actors) {
     const fresh = makeActor(actor.id, actor.controller, actor.humanIndex);
@@ -124,6 +147,8 @@ export function resetRound(state: GameState): void {
       powers: [...actor.powers],
       shield: actor.powers.includes('shield'),
       armed: false,
+      heldDiscs: 0,
+      positivePickups: actor.positivePickups ?? 0,
       position: { ...position },
       previous: { ...position },
       facing: normalize(sub(v(), position)),

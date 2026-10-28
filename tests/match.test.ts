@@ -74,8 +74,13 @@ describe('match lifecycle', () => {
         for (const actor of game.state.actors) {
           if (!Number.isFinite(actor.position.x + actor.position.y))
             throw new Error('Non-finite position');
-          if (game.state.discs.filter((d) => d.ownerId === actor.id).length > 1)
-            throw new Error('Duplicated owned disc');
+          const owned = game.state.discs.filter((d) => d.ownerId === actor.id);
+          const groups = new Set(owned.map((d) => d.groupId ?? d.id));
+          if (groups.size + (actor.armed ? Math.max(1, actor.heldDiscs ?? 1) : 0) > 2)
+            throw new Error('Duplicated weapon inventory');
+          for (const group of groups)
+            if (owned.filter((d) => (d.groupId ?? d.id) === group).length > 5)
+              throw new Error('Too many fragments in one weapon');
         }
       }
       expect(
@@ -109,7 +114,8 @@ describe('match lifecycle', () => {
       driveBotGame(game);
       ticks++;
       for (const event of game.drainEvents()) counts[event.type] = (counts[event.type] ?? 0) + 1;
-      expect(game.state.discs.length).toBeLessThanOrEqual(4);
+      // Four actors, two inventory units each, at most five fragments per unit.
+      expect(game.state.discs.length).toBeLessThanOrEqual(40);
     }
     expect(game.state.phase).toBe('matchEnd');
     expect(game.state.actors.some((a) => a.score === 5)).toBe(true);

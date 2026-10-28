@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { POWERUPS, ROSTER } from '../core/config';
+import { POWERUPS } from '../core/config';
 import { introPose, transitionPresentation } from '../core/presentation';
 import { lerpV } from '../core/math';
 import type { GameEvent, GameState, Pickup } from '../core/types';
@@ -9,7 +9,58 @@ import { createCharacter, updateCharacter } from './characters';
 import type { CharacterView } from './characters';
 import { Effects } from './effects';
 import { BoundaryView } from './boundary-view';
-import { box, cylinder, makeBoomerang, place, shadow } from './palette';
+import { box, cylinder, makeBoomerang, material, place, shadow } from './palette';
+import { mergeStaticMeshes } from './batches';
+import { WeaponsView, discEffectColor } from './weapons-view';
+import { PowersView } from './powers-view';
+
+function cloneCharacter(source: CharacterView): CharacterView {
+  const root = source.root.clone(true);
+  const lookup = new Map<THREE.Object3D, THREE.Object3D>();
+  const link = (a: THREE.Object3D, b: THREE.Object3D): void => {
+    lookup.set(a, b);
+    a.children.forEach((child, i) => link(child, b.children[i]));
+  };
+  link(source.root, root);
+  const copy = <T extends THREE.Object3D>(object: T): T => lookup.get(object) as T;
+  return {
+    ...source,
+    root,
+    body: copy(source.body),
+    leftArm: copy(source.leftArm),
+    rightArm: copy(source.rightArm),
+    feet: source.feet.map(copy),
+    weapon: copy(source.weapon),
+    shield: copy(source.shield),
+    slash: copy(source.slash),
+    aim: copy(source.aim),
+    ring: copy(source.ring),
+    label: copy(source.label),
+    shadow: copy(source.shadow),
+    leftWeapon: source.leftWeapon && copy(source.leftWeapon),
+    disguise: source.disguise && copy(source.disguise),
+    iceBlock: source.iceBlock && copy(source.iceBlock),
+    death: {
+      root: copy(source.death.root),
+      stump: copy(source.death.stump),
+      piece: copy(source.death.piece),
+      squash: copy(source.death.squash),
+    },
+  };
+}
+
+function buildArena(state: GameState): ArenaView {
+  const arena = createArenaView(state.arena);
+  const animated = new Set<THREE.Object3D>([
+    arena.water,
+    ...arena.flags,
+    ...arena.portals.values(),
+    ...arena.obstacles.values(),
+  ]);
+  mergeStaticMeshes(arena.root, animated);
+  for (const obstacle of arena.obstacles.values()) mergeStaticMeshes(obstacle);
+  return arena;
+}
 
 function disposeVisual(root: THREE.Object3D): void {
   root.traverse((object) => {
@@ -70,9 +121,13 @@ export class GameRenderer {
   private camera = new THREE.PerspectiveCamera(31, 1, 0.1, 180);
   private arena: ArenaView;
   private characters = new Map<number, CharacterView>();
+  private decoys = new Map<number, CharacterView>();
   private discs = new Map<number, THREE.Group>();
+  private discPool: THREE.Group[] = [];
   private pickups = new Map<number, THREE.Group>();
   private effects = new Effects();
+  private weapons = new WeaponsView();
+  private powers = new PowersView();
   private boundary = new BoundaryView();
   private resizeObserver: ResizeObserver;
   private width = 1;
@@ -117,10 +172,17 @@ export class GameRenderer {
     sun.shadow.bias = -0.0003;
     sun.shadow.radius = 3;
     this.scene.add(sun);
-    this.arena = createArenaView(state.arena);
+    this.arena = buildArena(state);
     this.arenaSource = '';
-    this.scene.add(this.arena.root, this.effects.root, this.boundary.root);
+    this.scene.add(
+      this.arena.root,
+      this.effects.root,
+      this.weapons.root,
+      this.powers.root,
+      this.boundary.root,
+    );
     this.reset(state);
+    this.arenaSource = `${state.arena.id ?? 'courtyard'}:${state.round}`;
     this.resizeObserver = new ResizeObserver(() =>
       this.resize(container.clientWidth, container.clientHeight),
     );
@@ -130,6 +192,9 @@ export class GameRenderer {
 
   reset(state: GameState): void {
     this.arenaSource = '';
+    // Decoys borrow their owner's GPU assets; only the owner disposes them.
+    for (const view of this.decoys.values()) this.scene.remove(view.root);
+    this.decoys.clear();
     for (const view of this.characters.values()) {
       this.scene.remove(view.root);
       disposeVisual(view.root);
@@ -140,13 +205,16 @@ export class GameRenderer {
       this.characters.set(actor.id, view);
       this.scene.add(view.root);
     }
-    for (const group of [...this.discs.values(), ...this.pickups.values()]) {
+    for (const group of this.discs.values()) this.releaseDisc(group);
+    for (const group of this.pickups.values()) {
       this.scene.remove(group);
       disposeVisual(group);
     }
     this.discs.clear();
     this.pickups.clear();
     this.effects.clear();
+    this.weapons.clear();
+    this.powers.clear();
     this.boundary.reset();
     this.previousTime = state.time;
   }
@@ -160,7 +228,19 @@ export class GameRenderer {
   }
 
   events(events: GameEvent[]): void {
-    for (const event of events) this.effects.emit(event);
+    for (const event of events) {
+      this.effects.emit(event);
+      this.weapons.observe(event);
+    }
+  }
+
+  private releaseDisc(group: THREE.Group): void {
+    group.visible = false;
+    if (this.discPool.length < 32) this.discPool.push(group);
+    else {
+      this.scene.remove(group);
+      disposeVisual(group);
+    }
   }
 
   draw(state: GameState, alpha: number, elapsed: number, dt: number, menu: boolean): void {
@@ -169,10 +249,12 @@ export class GameRenderer {
     if (this.arenaSource !== arenaKey) {
       this.scene.remove(this.arena.root);
       disposeVisual(this.arena.root);
-      this.arena = createArenaView(state.arena);
+      this.arena = buildArena(state);
       this.scene.add(this.arena.root);
       this.arenaSource = arenaKey;
       this.effects.clear();
+      this.weapons.clear();
+      this.powers.clear();
       this.boundary.reset();
     }
     const presentation = transitionPresentation(state);
@@ -186,6 +268,7 @@ export class GameRenderer {
           alpha,
           simulationTime,
         );
+        view.slash.visible = false;
         const pose =
           !menu && state.phase === 'countdown'
             ? introPose(
@@ -204,6 +287,59 @@ export class GameRenderer {
         view.ring.scale.setScalar(1 + pose.landing * 0.45);
       }
     }
+    const liveDecoys = new Set<number>();
+    for (const decoy of state.decoys) {
+      if (!decoy.alive) continue;
+      const owner = state.actors.find((actor) => actor.id === decoy.ownerId);
+      const source = this.characters.get(decoy.ownerId);
+      if (!owner || !source) continue;
+      liveDecoys.add(decoy.id);
+      let view = this.decoys.get(decoy.id);
+      if (!view) {
+        view = cloneCharacter(source);
+        this.decoys.set(decoy.id, view);
+        this.scene.add(view.root);
+      }
+      updateCharacter(
+        view,
+        {
+          ...owner,
+          position: decoy.position,
+          previous: decoy.previous,
+          velocity: decoy.velocity,
+          facing: decoy.facing,
+          powers: decoy.powers,
+          alive: true,
+          dashTime: decoy.dashTime,
+          death: undefined,
+          fall: undefined,
+          outOfBounds: undefined,
+          disguised: false,
+          frozenTime: 0,
+          burnTime: 0,
+          reverseTime: 0,
+          charge: 0,
+          attackTime: 0,
+          controlling: false,
+          shield: false,
+          invulnerable: 0,
+          heldDiscs: 1,
+          armed: true,
+        },
+        alpha,
+        simulationTime,
+      );
+      view.root.visible = true;
+      view.label.visible = false;
+      view.ring.visible = false;
+      view.slash.visible = false;
+      view.root.scale.setScalar(1);
+    }
+    for (const [id, view] of this.decoys)
+      if (!liveDecoys.has(id)) {
+        this.scene.remove(view.root);
+        this.decoys.delete(id);
+      }
     for (const obstacle of state.arena.obstacles) {
       const object = this.arena.obstacles.get(obstacle.id);
       if (object) object.visible = !obstacle.broken;
@@ -211,16 +347,21 @@ export class GameRenderer {
     for (const disc of state.discs) {
       let object = this.discs.get(disc.id);
       if (!object) {
-        object = new THREE.Group();
-        object.add(
-          makeBoomerang(
-            disc.explosive ? '#f5a56a' : (ROSTER[disc.damageOwnerId]?.color ?? '#f7dda4'),
-          ),
-        );
-        object.add(shadow(0.4, 0.13));
+        object = this.discPool.pop();
+        if (!object) {
+          object = new THREE.Group();
+          object.add(makeBoomerang(), shadow(0.4, 0.13));
+        }
+        object.visible = true;
         this.scene.add(object);
         this.discs.set(disc.id, object);
       }
+      const color = discEffectColor(disc);
+      if (object.userData.color !== color) {
+        (object.children[0].children[0] as THREE.Mesh).material = material(color);
+        object.userData.color = color;
+      }
+      object.scale.setScalar(disc.mini ? 0.62 : 1);
       const position = lerpV(disc.previous, disc.position, alpha);
       object.position.set(position.x, 0, position.y);
       object.children[0].position.y = disc.state === 'dropped' ? 0.12 : 0.78;
@@ -234,8 +375,7 @@ export class GameRenderer {
     const liveDiscs = new Set(state.discs.map((d) => d.id));
     for (const [id, object] of this.discs)
       if (!liveDiscs.has(id)) {
-        this.scene.remove(object);
-        disposeVisual(object);
+        this.releaseDisc(object);
         this.discs.delete(id);
       }
     for (const pickup of state.pickups) {
@@ -265,15 +405,19 @@ export class GameRenderer {
     (this.arena.water.material as THREE.MeshStandardMaterial).roughness =
       0.28 + Math.sin(simulationTime * 0.5) * 0.04;
     this.boundary.update(state, menu);
-    this.effects.syncDeaths(state);
-    this.effects.update(menu ? dt : Math.max(0, Math.min(0.1, state.time - this.previousTime)));
+    this.effects.update(
+      menu ? dt : Math.max(0, Math.min(0.1, state.time - this.previousTime)),
+      state,
+    );
+    this.weapons.update(state, alpha);
+    this.powers.update(state);
     this.previousTime = state.time;
 
     // A narrow perspective lens keeps the tabletop look while preserving depth.
     const aspect = this.width / this.height;
     const scale = Math.max(1, 1.65 / aspect) * (menu ? 1 : presentation.cameraScale);
     const menuOffset = menu && aspect > 1.4 ? -2.1 : 0;
-    this.cameraTarget.lerp(new THREE.Vector3(menuOffset, 0, 0), Math.min(1, dt * 3));
+    this.cameraTarget.x += (menuOffset - this.cameraTarget.x) * Math.min(1, dt * 3);
     this.camera.position.set(this.cameraTarget.x, 26 * scale, 27 * scale);
     if (this.effects.shake > 0) {
       this.camera.position.x += Math.sin(simulationTime * 87) * this.effects.shake;
@@ -294,7 +438,11 @@ export class GameRenderer {
 
   dispose(): void {
     this.resizeObserver.disconnect();
-    this.effects.clear();
+    this.effects.dispose();
+    this.weapons.dispose();
+    this.powers.dispose();
+    for (const view of this.decoys.values()) this.scene.remove(view.root);
+    this.decoys.clear();
     this.boundary.dispose();
     disposeVisual(this.scene);
     this.renderer.dispose();

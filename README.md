@@ -24,8 +24,9 @@ npm run dev
 - 墙体、可破坏箱子、水坑、矩形决胜缩圈；人物和飞镖均可穿过传送门。
 - 默认 180 秒缩圈（菜单可选 30/60 秒），出界后有 3～3.75 秒返回宽限，配有箭头和倒计时。
 - 切片、爆炸压扁、落水、坠崖、界外爆散分别呈现；下落有短暂冲刺救回窗口，淘汰后延迟 1.45 秒核对胜负。
-- 护盾、加速、爆炸镖；掩体遮挡爆炸，允许自伤。
-- 角色依次入场、Ready/Go、每回合延后发镖、命中停顿、比分揭示、圆形幕布与换图。
+- 14 种正式道具：护盾、加速、穿墙、反向输入、爆炸、分裂、传送、火焰、双镖、冰冻、伪装、遥控、缩圈、诱饵。三槽 FIFO、火冰互斥、跨回合保留；菜单支持配方组合试验。
+- 角色依次入场、Ready/Go、开始后 1.2 秒自动发镖及就绪提示、命中停顿、比分揭示、圆形幕布与换图。
+- 连续飞镖拖尾、蓄力环和挥砍弧线；粒子实例化、静态场景合并和飞镖对象复用。
 - 最后存活者得一分，同时出局不得分，先得五分获胜；暂停/恢复、重开、合成音效。
 - 独立 SDK 的状态/事件、外部动作注入、JS 控制器、人工接管、控制权恢复与销毁。
 
@@ -48,10 +49,10 @@ npm run dev
 npm run build:sdk
 npm run verify:sdk
 # 在另一个项目安装；也可以使用绝对路径
-npm install ./dist-sdk/boomerang-garden-sdk-0.3.0.tgz
+npm install ./dist-sdk/boomerang-garden-sdk-0.4.0.tgz
 ```
 
-交付的是本地 ESM 包 `@boomerang-garden/sdk@0.3.0`，未发布 npm。
+交付的是本地 ESM 包 `@boomerang-garden/sdk@0.4.0`，未发布 npm。
 
 ```js
 import { createBrowserGame } from '@boomerang-garden/sdk/browser';
@@ -91,12 +92,13 @@ npm run preview
 npm run test:browser        # 5173：五图、输入、装备、暂停、换图
 npm run test:sdk-browser    # 5173：注入、接管、多实例、销毁
 npm run test:v3-browser     # 5173：缩圈/死亡实际流程与独立呈现样本
+node scripts/v4-browser-verify.mjs # 5173：发镖、配方、键盘道具操作、真实拾取
 node scripts/production-smoke.mjs # 4173：正式游戏 + SDK 演示
 npm run build:sdk
 npm run verify:sdk          # 独立目录安装 tarball，Node + 浏览器消费
 ```
 
-`dist/` 可部署到普通静态站点；本轮没有对外部署。第三阶段覆盖缩圈、死亡、下落与 SDK 0.3，详见 [第三阶段验收](docs/v3-validation.md)。[第二阶段验收](docs/v2-validation.md)及第一版报告保留为历史记录。
+`dist/` 可部署到普通静态站点。当前只在本地预览，GitHub Pages 等用户明确要求部署时再发布；提交不会自动部署。第四阶段见 [道具研究](docs/v4-powerups-analysis.md)、[性能基线](docs/v4-performance-baseline.md)和[验收记录](docs/v4-validation.md)。[第三阶段验收](docs/v3-validation.md)及更早报告保留为历史记录。
 
 ## 分层
 
@@ -125,6 +127,6 @@ src/sdk-demo.ts  使用相同公开 API 的接管演示
 
 研究对象：`F:\SteamLibrary\steamapps\common\Boomerang Fu`。本轮未启动原版；结论来自安装文件、反编译 CIL 和 Unity 序列化资源。报告区分代码默认值、资源值和 Web 设计选择，不能据此声称逐帧还原或实机手感一致。
 
-Web 保留简化的飞镖动力学、回收、下落惯性与 AI；边界仅支持轴对齐矩形，地图为原创布局，并非导入原版全部地图。尚未覆盖缩圈强化、全部角色美术、14 种强化、组队/黄金回旋镖/躲猫猫或联网。原版资源及分析工具不进入站点或 SDK。
+Web 保留简化的飞镖动力学、回收、下落惯性与 AI；边界仅支持轴对齐矩形，地图为原创布局，并非导入原版全部地图。14 种正式道具已进入模拟规则，但爆炸伤害窗口、武器补发等待、诱饵决策等仍有 Web 适配差异，详见第四阶段报告。隐藏的 TimeImmune、全部角色美术、组队/黄金回旋镖/躲猫猫或联网尚未实现。原版资源及分析工具不进入站点或 SDK。
 
 `tools/`、`analysis/evidence/`、`analysis/derived/`、`test-results/` 和构建产物默认忽略 Git。原版离线分析使用 ILSpy / UnityPy，它们不是 Web 游戏运行或构建依赖。

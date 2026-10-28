@@ -15,9 +15,11 @@ import {
   sub,
   v,
 } from '../core/math';
-import type { Actor, Disc, GameState } from '../core/types';
+import type { Actor, DecoyState, Disc, GameState, PowerupKind } from '../core/types';
 import { breakCrate, damageActor, explode, facingTarget } from './combat';
 import { tracePortal, teleportDisc } from './portals';
+import { heldDiscs, setHeldDiscs, recoverDisc } from './inventory';
+import { addZone, hitDecoy } from './status-effects';
 
 export function throwDisc(state: GameState, actor: Actor): boolean {
   if (
@@ -38,8 +40,12 @@ export function throwDisc(state: GameState, actor: Actor): boolean {
   const offset = mul(actor.facing, RULES.playerRadius + RULES.discRadius + 0.12);
   const hit = traceObstacles(state.arena, actor.position, offset, RULES.discRadius);
   const position = add(actor.position, mul(offset, hit ? Math.max(0, hit.t - 0.02) : 1));
+  const id = state.nextId++;
   state.discs.push({
-    id: state.nextId++,
+    id,
+    groupId: id,
+    powers: [...actor.powers],
+    mini: false,
     ownerId: actor.id,
     damageOwnerId: actor.id,
     position,
@@ -60,7 +66,9 @@ export function throwDisc(state: GameState, actor: Actor): boolean {
     lastDeflector: -1,
     dead: false,
   });
-  actor.armed = false;
+  setHeldDiscs(actor, heldDiscs(actor) - 1);
+  actor.disguised = false;
+  actor.disguiseTime = 0;
   actor.charge = 0;
   actor.attackCooldown = RULES.attackCooldown;
   state.events.push({ type: 'throw', position: { ...position }, actorId: actor.id, value: charge });
@@ -68,16 +76,46 @@ export function throwDisc(state: GameState, actor: Actor): boolean {
 }
 
 function finishDisc(state: GameState, disc: Disc, caught = false): void {
-  if (disc.dead) return;
-  disc.dead = true;
-  const owner = state.actors.find((a) => a.id === disc.ownerId);
-  if (owner?.alive) {
-    if (owner.recalling) owner.throwBlocked = true;
-    owner.armed = true;
-    owner.recalling = false;
-    if (caught)
-      state.events.push({ type: 'catch', position: { ...owner.position }, actorId: owner.id });
+  recoverDisc(state, disc, caught);
+}
+
+const has = (disc: Disc, power: PowerupKind): boolean => disc.powers?.includes(power) ?? false;
+
+function detonate(state: GameState, disc: Disc): void {
+  explode(state, disc.position, disc.damageOwnerId, disc.powers, disc.mini ? 0.5 : 1);
+  finishDisc(state, disc);
+}
+
+function splitDisc(state: GameState, parent: Disc): void {
+  const count = parent.explosive || has(parent, 'fire') ? 4 : 5;
+  parent.dead = true;
+  const direction = normalize(parent.velocity);
+  for (let i = 0; i < count; i++) {
+    state.discs.push({
+      ...parent,
+      id: state.nextId++,
+      groupId: parent.groupId ?? parent.id,
+      position: { ...parent.position },
+      previous: { ...parent.position },
+      velocity: mul(rotate(direction, -Math.PI / 2 + (Math.PI * i) / (count - 1)), RULES.discSpeed),
+      powers: parent.powers?.filter((power) => power !== 'multi'),
+      mini: true,
+      dead: false,
+      age: 0,
+      state: 'outbound',
+      stateTime: 0,
+      charge: 0,
+      curve: 0,
+      bounces: 0,
+      fuse: 0.931 + i * 0.1,
+    });
   }
+  state.events.push({
+    type: 'split',
+    position: { ...parent.position },
+    actorId: parent.ownerId,
+    value: count,
+  });
 }
 
 function deflectDisc(state: GameState, disc: Disc, actor: Actor): void {
@@ -115,6 +153,7 @@ function moveDisc(state: GameState, disc: Disc, dt: number): void {
     );
     let closest = wall?.t ?? 2;
     let target: Actor | null = null;
+    let decoyTarget: DecoyState | null = null;
     let parry = false;
     for (const actor of state.actors) {
       if (!actor.alive || actor.dashTime > 0 || actor.invulnerable > 0) continue;
@@ -134,6 +173,20 @@ function moveDisc(state: GameState, disc: Disc, dt: number): void {
         parry = canParry;
       }
     }
+    for (const decoy of state.decoys ?? []) {
+      if (!decoy.alive || decoy.ownerId === disc.damageOwnerId) continue;
+      const hit = segmentCircle(
+        disc.position,
+        delta,
+        decoy.position,
+        RULES.playerRadius + RULES.discRadius,
+      );
+      if (hit && hit.t < closest) {
+        closest = hit.t;
+        decoyTarget = decoy;
+        target = null;
+      }
+    }
     if (portal && portal.t < closest) {
       remaining *= 1 - portal.t;
       teleportDisc(state, disc, portal);
@@ -145,14 +198,20 @@ function moveDisc(state: GameState, disc: Disc, dt: number): void {
     }
     disc.position = add(disc.position, mul(delta, Math.max(0, closest - 0.0001)));
     remaining *= 1 - closest;
-    if (target) {
+    if (decoyTarget) {
+      hitDecoy(state, decoyTarget, disc.damageOwnerId);
+      if (disc.explosive) {
+        detonate(state, disc);
+        return;
+      }
+      disc.position = add(disc.position, mul(normalize(delta), 0.02));
+    } else if (target) {
       if (parry) {
         deflectDisc(state, disc, target);
         return;
       }
       if (disc.explosive) {
-        explode(state, disc.position, disc.damageOwnerId);
-        finishDisc(state, disc);
+        detonate(state, disc);
         return;
       }
       const result = damageActor(state, target, disc.damageOwnerId, disc.velocity);
@@ -186,7 +245,10 @@ function moveDisc(state: GameState, disc: Disc, dt: number): void {
 }
 
 export function tickDiscs(state: GameState, dt: number): void {
-  for (const disc of state.discs) {
+  // New fragments begin on the following fixed step, independent of array append behavior.
+  const count = state.discs.length;
+  for (let index = 0; index < count; index++) {
+    const disc = state.discs[index];
     if (disc.dead) continue;
     const owner = state.actors.find((a) => a.id === disc.ownerId);
     disc.previous = { ...disc.position };
@@ -194,11 +256,10 @@ export function tickDiscs(state: GameState, dt: number): void {
     disc.stateTime += dt;
     disc.grace = Math.max(0, disc.grace - dt);
     disc.portalCooldown = Math.max(0, (disc.portalCooldown ?? 0) - dt);
-    if (disc.explosive) {
+    if (disc.explosive && !has(disc, 'multi')) {
       disc.fuse -= dt;
       if (disc.fuse <= 0) {
-        explode(state, disc.position, disc.damageOwnerId);
-        finishDisc(state, disc);
+        detonate(state, disc);
         continue;
       }
     }
@@ -206,42 +267,72 @@ export function tickDiscs(state: GameState, dt: number): void {
       disc.state = 'dropped';
       disc.velocity = v();
     }
-    if (disc.state === 'outbound') {
-      disc.velocity = rotate(disc.velocity, disc.curve * dt * 2);
-      // Small, forward-only aim assist; no steering through cover.
-      const targets = state.actors.filter(
-        (a) =>
-          a.alive &&
-          a.id !== disc.damageOwnerId &&
-          a.dashTime <= 0 &&
-          distance(a.position, disc.position) < 3.5 &&
-          dot(normalize(sub(a.position, disc.position)), normalize(disc.velocity)) > 0.82 &&
-          lineOfSight(state.arena, disc.position, a.position),
+    const controlled =
+      owner?.alive && owner.controlling && has(disc, 'controlled') && disc.state !== 'dropped';
+    if (controlled && owner.controlDirection && length(owner.controlDirection) > 0.05) {
+      disc.velocity = mul(
+        normalize(
+          lerpV(normalize(disc.velocity), normalize(owner.controlDirection), clamp(dt * 9, 0, 1)),
+        ),
+        RULES.discSpeed,
       );
-      const target = targets.sort(
-        (a, b) => distance(a.position, disc.position) - distance(b.position, disc.position),
-      )[0];
-      if (target)
-        disc.velocity = mul(
-          normalize(
-            lerpV(
-              normalize(disc.velocity),
-              normalize(sub(target.position, disc.position)),
-              dt * 1.7,
-            ),
-          ),
-          length(disc.velocity),
+    }
+    if (controlled) {
+      const radial = sub(disc.position, owner.position);
+      const d = length(radial),
+        direction = normalize(radial);
+      const outward = dot(disc.velocity, direction);
+      if (d > 10.4 && outward > 0)
+        disc.velocity = sub(disc.velocity, mul(direction, outward * clamp((d - 10.4) / 1.6, 0, 1)));
+      if (d > 12) disc.velocity = add(disc.velocity, mul(direction, -(d - 12) * 12));
+    }
+    if (disc.state === 'outbound') {
+      if (!controlled) {
+        disc.velocity = rotate(disc.velocity, disc.curve * dt * 2);
+        // Small, forward-only aim assist; no steering through cover.
+        const targets = state.actors.filter(
+          (a) =>
+            a.alive &&
+            !a.disguised &&
+            a.id !== disc.damageOwnerId &&
+            a.dashTime <= 0 &&
+            distance(a.position, disc.position) < 3.5 &&
+            dot(normalize(sub(a.position, disc.position)), normalize(disc.velocity)) > 0.82 &&
+            lineOfSight(state.arena, disc.position, a.position),
         );
-      if (disc.stateTime >= RULES.discOutbound - disc.charge * 0.15) {
+        const target = targets.sort(
+          (a, b) => distance(a.position, disc.position) - distance(b.position, disc.position),
+        )[0];
+        if (target)
+          disc.velocity = mul(
+            normalize(
+              lerpV(
+                normalize(disc.velocity),
+                normalize(sub(target.position, disc.position)),
+                dt * 1.7,
+              ),
+            ),
+            length(disc.velocity),
+          );
+      }
+      const outbound = disc.mini
+        ? 0.3378 * (disc.explosive ? 0.2 : 1)
+        : RULES.discOutbound - disc.charge * 0.15;
+      if (!controlled && disc.stateTime >= outbound) {
+        if (has(disc, 'multi')) {
+          splitDisc(state, disc);
+          continue;
+        }
         disc.state = disc.explosive ? 'dropped' : 'returning';
         disc.stateTime = 0;
         if (disc.explosive) disc.velocity = mul(disc.velocity, 0.1);
       }
     }
-    if (owner?.alive && owner.recalling && !disc.explosive && disc.age > 0.15) {
+    if (owner?.alive && owner.recalling && !controlled && !disc.explosive && disc.age > 0.15) {
       if (disc.state !== 'returning') disc.bounces = 0;
       disc.state = 'returning';
     }
+    if (controlled && disc.state === 'returning') disc.state = 'outbound';
     if (disc.state === 'returning' && owner?.alive) {
       const direction = normalize(sub(owner.position, disc.position));
       const targetSpeed = RULES.discReturnSpeed * (owner.recalling ? 1.35 : 1);
@@ -299,12 +390,23 @@ export function tickDiscs(state: GameState, dt: number): void {
       disc.position = add(disc.position, mul(disc.velocity, dt));
     } else moveDisc(state, disc, dt);
     if (
+      !disc.dead &&
+      !has(disc, 'multi') &&
+      disc.state !== 'dropped' &&
+      ((has(disc, 'fire') && !disc.explosive) || has(disc, 'ice'))
+    ) {
+      disc.trailTime = (disc.trailTime ?? 0) - dt;
+      if (disc.trailTime <= 0) {
+        addZone(state, has(disc, 'fire') ? 'fire' : 'ice', disc.position, disc.damageOwnerId);
+        disc.trailTime = 0.08;
+      }
+    }
+    if (
       Math.abs(disc.position.x) > state.arena.halfWidth + 1.5 ||
       Math.abs(disc.position.y) > state.arena.halfHeight + 1.5
     ) {
       if (disc.explosive) {
-        explode(state, disc.position, disc.damageOwnerId);
-        finishDisc(state, disc);
+        detonate(state, disc);
       } else if (owner?.alive) {
         disc.state = 'returning';
         disc.bounces = 0;

@@ -49,6 +49,9 @@ export type SessionEvent =
 
 /** Public core contract. The implementation lives in session.ts, without DOM/Three imports. */
 export interface SessionAPI {
+  /** Allocation-free lifecycle reads; remain available after destroy. */
+  readonly status: SessionSnapshot['status'];
+  readonly tick: number;
   start(options?: Partial<MatchOptions>): void;
   pause(): void;
   resume(): void;

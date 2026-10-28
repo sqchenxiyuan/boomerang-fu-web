@@ -1,0 +1,56 @@
+// Timings come from static CIL evidence; the 0.4 spatial scale is a Web design choice.
+// See docs/mechanics-and-feel.md for formulas, resource limits and remaining differences.
+const WORLD_SCALE = 0.4;
+export const RULES = {
+  dt: 1 / 60,
+  playerRadius: 0.47,
+  worldScale: WORLD_SCALE,
+  walkForce: 200 * WORLD_SCALE,
+  unarmedWalkForce: 230 * WORLD_SCALE,
+  damping: 11,
+  turningSpeed: 12,
+  speedLimit: 40 * WORLD_SCALE,
+  dashDuration: 0.2,
+  dashCooldown: 0.55,
+  dashForce: 660 * WORLD_SCALE,
+  dashImpulse: 60 * WORLD_SCALE,
+  dashBuffer: 0.25,
+  attackBuffer: 0.35,
+  attackDuration: 0.2,
+  attackCooldown: 0.66,
+  lungeDuration: 0.1125,
+  lungeRecovery: 0.5,
+  lungeForce: 800 * WORLD_SCALE,
+  lungeImpulse: 26.4 * WORLD_SCALE,
+  attackRange: 1.55,
+  attackArc: Math.PI * 0.72,
+  aimStart: 0.1,
+  aimMoveRecovery: 0.5,
+  chargeTime: 1,
+  chargeCurveDuration: 0.9,
+  discRadius: 0.22,
+  discSpeed: 18,
+  discOutbound: 0.45,
+  discReturnSpeed: 15,
+  explosionRadius: 2.5,
+  explosionFuse: 1.5,
+  countdown: 2.8,
+  roundEndDelay: 2.6,
+  suddenDeathStart: 35,
+  roundLimit: 65,
+  scoreGoal: 5,
+  powerupInterval: 7,
+  powerupLimit: 3,
+} as const;
+
+export const ROSTER = [
+  { name: '瓜瓜', subtitle: 'WATERMELON', color: '#ed7d70', accent: '#3a936a', kind: 'melon' },
+  { name: '茄子', subtitle: 'EGGPLANT', color: '#ab8de0', accent: '#7660b0', kind: 'eggplant' },
+  { name: '小橙', subtitle: 'ORANGE', color: '#f2b34e', accent: '#e69632', kind: 'orange' },
+  { name: '牛奶', subtitle: 'MILK', color: '#82bada', accent: '#4a92b4', kind: 'milk' },
+] as const;
+export const POWERUPS = {
+  shield: { name: '护盾', short: '盾', color: '#7ddedb', description: '挡住一次伤害' },
+  haste: { name: '加速', short: '速', color: '#c6e573', description: '移动更快，冲刺恢复更快' },
+  explosive: { name: '爆炸镖', short: '爆', color: '#ffac67', description: '飞镖落点产生范围爆炸' },
+} as const;

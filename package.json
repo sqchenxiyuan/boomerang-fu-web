@@ -1,0 +1,32 @@
+{
+  "name": "boomerang-garden",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "build:sdk": "node scripts/build-sdk.mjs",
+    "verify:sdk": "node scripts/sdk-package-verify.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "tsc --noEmit",
+    "test:browser": "node scripts/v2-browser-verify.mjs",
+    "test:sdk-browser": "node scripts/sdk-browser-verify.mjs",
+    "format": "prettier --write src tests scripts/*.mjs examples/*.mjs examples/*.js index.html sdk-demo.html vite.config.ts package.json tsconfig.json tsconfig.sdk.json",
+    "format:check": "prettier --check src tests scripts/*.mjs examples/*.mjs examples/*.js index.html sdk-demo.html vite.config.ts package.json tsconfig.json tsconfig.sdk.json"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/three": "^0.180.0",
+    "esbuild": "0.28.2",
+    "prettier": "3.6.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12",
+    "vitest": "^3.2.4"
+  }
+}

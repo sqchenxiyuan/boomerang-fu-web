@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>回旋花园 · SDK 控制台</title>
+    <link rel="icon" href="/favicon.svg" />
+  </head>
+  <body>
+    <main id="sdk-demo">
+      <header>
+        <div>
+          <small>BOOMERANG GARDEN / SDK</small>
+          <h1>一场游戏，多种控制方式。</h1>
+        </div>
+        <a href="/">返回游戏 ↗</a>
+      </header>
+      <section class="demo-layout">
+        <div class="game-panel">
+          <div id="sdk-stage" aria-label="SDK 游戏画面"></div>
+          <p>点击画面后，人工操作：WASD 移动 · J 近战 · K 蓄力/召回 · L 或空格冲刺</p>
+        </div>
+        <aside>
+          <label
+            >地图<select id="demo-map">
+              <option value="courtyard">山间庭院</option>
+              <option value="canal">双桥水道</option>
+              <option value="market">货箱集市</option>
+              <option value="switchback">折返回廊</option>
+              <option value="portals">跃迁花园</option>
+            </select></label
+          >
+          <div class="buttons">
+            <button id="demo-start">开始 / 重开</button><button id="demo-pause">暂停</button>
+          </div>
+          <h2>1P 的控制权</h2>
+          <div id="control-status" role="status">准备中</div>
+          <div class="buttons">
+            <button id="demo-script">JS 脚本控制</button
+            ><button id="demo-external">外部动作注入</button
+            ><button id="demo-human">人工接管</button><button id="demo-release">恢复原控制</button>
+          </div>
+          <p class="hint">
+            接管会暂停原控制器。恢复后脚本继续运行；旧的外部控制凭据失效，需要重新获取。
+          </p>
+          <h2>外部动作</h2>
+          <p class="hint">选择外部注入后按住按钮，持续提交动作；松开投掷键出镖。</p>
+          <div class="direction-pad">
+            <button data-move="up">↑</button><button data-move="left">←</button
+            ><button data-move="down">↓</button><button data-move="right">→</button>
+          </div>
+          <div class="buttons">
+            <button data-action="attack">近战</button
+            ><button data-action="throw">投掷 / 召回</button
+            ><button data-action="dash">冲刺</button>
+          </div>
+          <pre id="session-status" aria-live="off"></pre>
+          <div id="sdk-log" aria-label="控制事件记录"></div>
+        </aside>
+      </section>
+      <details>
+        <summary>JavaScript 接入示例</summary>
+        <pre>
+const game = createBrowserGame(container, { match: { mapId: 'portals' } });
+const input = game.session.acquire(0, 'my-agent');
+input.submit({ move: { x: 1, y: 0 }, throw: true }, 6);
+// 继续提交完整按钮状态，松开时 throw: false。
+const human = game.session.takeover(0, 0);
+human.release(); // 恢复原脚本；外部来源需重新 acquire。
+game.session.useScript(0, ({ state, actorId, tick }) => ({ move: { x: 1, y: 0 } }));</pre
+        >
+      </details>
+    </main>
+    <script type="module" src="/src/sdk-demo.ts"></script>
+  </body>
+</html>

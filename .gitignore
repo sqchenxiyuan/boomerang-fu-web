@@ -1,0 +1,12 @@
+/tools/
+/analysis/evidence/
+/analysis/derived/
+__pycache__/
+*.pyc
+node_modules/
+dist/
+dist-sdk/
+test-results/
+playwright-report/
+.vite/
+*.log

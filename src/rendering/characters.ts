@@ -3,6 +3,9 @@ import { ROSTER, RULES } from '../core/config';
 import { length, lerpV } from '../core/math';
 import type { Actor } from '../core/types';
 import { box, cylinder, makeBoomerang, material, mesh, place, shadow, sphere } from './palette';
+import { createDeathModel, type DeathModel } from './death-models';
+import { sampleDeathPose, sampleFallPose } from './death-visuals';
+import { boundaryWarning } from '../core/feedback';
 
 export interface CharacterView {
   root: THREE.Group;
@@ -16,6 +19,8 @@ export interface CharacterView {
   aim: THREE.Group;
   ring: THREE.Mesh;
   label: THREE.Sprite;
+  shadow: THREE.Mesh;
+  death: DeathModel;
   lastAttack: number;
 }
 
@@ -48,7 +53,8 @@ export function createCharacter(actor: Actor): CharacterView {
   const profile = ROSTER[actor.id];
   const root = new THREE.Group(),
     body = new THREE.Group();
-  root.add(body, shadow(0.66));
+  const groundShadow = shadow(0.66);
+  root.add(body, groundShadow);
   body.position.y = 0.72;
   if (profile.kind === 'melon') {
     const shape = new THREE.Shape();
@@ -245,6 +251,8 @@ export function createCharacter(actor: Actor): CharacterView {
     profile.color,
   );
   root.add(label);
+  const death = createDeathModel(actor);
+  root.add(death.root);
   return {
     root,
     body,
@@ -257,6 +265,8 @@ export function createCharacter(actor: Actor): CharacterView {
     aim,
     ring,
     label,
+    shadow: groundShadow,
+    death,
     lastAttack: 0,
   };
 }
@@ -270,11 +280,11 @@ export function updateCharacter(
   const pos = lerpV(actor.previous, actor.position, alpha);
   view.root.position.set(pos.x, 0, pos.y);
   const facing = Math.atan2(actor.facing.x, actor.facing.y);
-  view.body.rotation.y = facing;
+  view.body.rotation.set(0, facing, 0);
   const speed = length(actor.velocity);
   const cycle = time * (actor.powers.includes('haste') ? 20 : 16) + actor.id;
   view.body.position.y = 0.82 + (actor.alive ? Math.sin(cycle) * Math.min(0.06, speed * 0.012) : 0);
-  view.body.rotation.z = actor.alive ? Math.sin(cycle / 2) * Math.min(0.07, speed * 0.01) : 1.45;
+  view.body.rotation.z = Math.sin(cycle / 2) * Math.min(0.07, speed * 0.01);
   const squash = actor.dashTime > 0 ? 0.82 : actor.attackTime > 0 ? 1.08 : 1;
   view.body.scale.set(1 / Math.sqrt(squash), squash, 1 / Math.sqrt(squash));
   view.feet.forEach((foot, i) => {
@@ -302,13 +312,44 @@ export function updateCharacter(
   view.aim.scale.z = 0.7 + (actor.charge / RULES.chargeTime) * 0.8;
   view.ring.visible = actor.alive;
   view.label.visible = actor.alive;
-  view.body.visible = actor.alive || time - actor.deathTime < 1.7;
+  view.body.visible = actor.alive;
+  view.death.root.visible = !actor.alive && !!actor.death;
+  view.shadow.visible = actor.alive && !actor.fall;
   view.feet.forEach((foot) => {
     foot.visible = actor.alive;
   });
-  if (!actor.alive) {
-    view.body.position.y = Math.max(-1, 0.5 - (time - actor.deathTime) * 0.8);
-    view.body.scale.setScalar(Math.max(0, 1 - (time - actor.deathTime) / 1.8));
+  if (!actor.alive && actor.death) {
+    const pose = sampleDeathPose(actor.death, time);
+    const model = view.death;
+    model.root.position.set(actor.death.position.x - pos.x, 0, actor.death.position.y - pos.y);
+    model.stump.visible = actor.death.variant === 'slice' && pose.baseVisible;
+    model.squash.visible = actor.death.variant === 'squash' && pose.baseVisible;
+    model.piece.visible = pose.pieceVisible;
+    for (const base of [model.stump, model.squash]) {
+      base.position.set(0, pose.baseHeight, 0);
+      base.rotation.set(pose.baseTilt, facing, 0, 'YXZ');
+      base.scale.set(pose.baseScale.x, pose.baseScale.y, pose.baseScale.z);
+    }
+    model.piece.position.set(pose.piece.x, pose.piece.y, pose.piece.z);
+    const spinAxis = new THREE.Vector3(actor.death.direction.y, 0, -actor.death.direction.x);
+    if (spinAxis.lengthSq() < 0.00001) spinAxis.set(1, 0, 0);
+    model.piece.quaternion.setFromAxisAngle(spinAxis.normalize(), pose.piece.spin);
+    model.piece.quaternion.multiply(
+      new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), facing),
+    );
   }
-  if (actor.invulnerable > 0) view.body.visible = Math.floor(time * 24) % 2 === 0;
+  if (actor.alive && actor.fall) {
+    const pose = sampleFallPose(actor.fall);
+    view.body.position.y += pose.height;
+    view.body.rotation.z += pose.tilt;
+    view.body.scale.multiplyScalar(pose.scale);
+    view.feet.forEach((foot) => {
+      foot.position.y += pose.height;
+    });
+    view.ring.visible = false;
+    view.aim.visible = false;
+  }
+  if (actor.alive && actor.invulnerable > 0) view.body.visible = Math.floor(time * 24) % 2 === 0;
+  const warning = boundaryWarning(actor);
+  if (actor.alive && warning.visible) view.body.visible &&= warning.pulse < 0.88;
 }

@@ -8,6 +8,11 @@ import { createArena } from '../src/core/arena';
 import { safePosition } from '../src/core/collision';
 import { ROUND_END_DURATION } from '../src/core/presentation';
 import { driveBotGame } from './bot-fixture';
+import { RULES } from '../src/core/config';
+
+function confirmRound(game: Game): void {
+  for (let i = 0; i <= Math.ceil(RULES.roundResolveDelay * 60); i++) game.step();
+}
 
 function finishRound(game: Game): void {
   for (let i = 0; i < Math.ceil((ROUND_END_DURATION + 0.3) * 60); i++) {
@@ -21,7 +26,7 @@ describe('match lifecycle', () => {
     const game = new Game({ ...defaultOptions(), scoreGoal: 2 });
     game.state.phase = 'playing';
     damageActor(game.state, game.state.actors[1], 0, v(1, 0));
-    game.step();
+    confirmRound(game);
     expect(game.state.phase).toBe('roundEnd');
     expect(game.state.actors[0].score).toBe(1);
     finishRound(game);
@@ -31,7 +36,7 @@ describe('match lifecycle', () => {
     expect(game.state.actors.every((a) => a.alive && !a.armed)).toBe(true);
     game.state.phase = 'playing';
     damageActor(game.state, game.state.actors[1], 0, v(1, 0));
-    game.step();
+    confirmRound(game);
     finishRound(game);
     expect(game.state.phase).toBe('matchEnd');
     expect(game.state.matchWinnerId).toBe(0);

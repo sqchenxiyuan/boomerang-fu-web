@@ -1,6 +1,7 @@
 import { POWERUPS, ROSTER, RULES } from '../core/config';
 import { MAPS, mapInfo } from '../core/arena';
 import { transitionPresentation } from '../core/presentation';
+import { boundaryNotice, eliminationLabel } from '../core/feedback';
 import { clamp } from '../core/math';
 import type {
   Difficulty,
@@ -60,12 +61,14 @@ export class View {
         <div class="settings-row"><label>机器人<select id="bots" aria-label="机器人数量"><option value="1">1 位对手</option><option value="3">3 位对手</option></select></label><label>难度<select id="difficulty" aria-label="机器人难度"><option value="easy">轻松</option><option value="normal" selected>标准</option><option value="hard">挑战</option></select></label></div>
         <div class="settings-row map-settings"><label>地图<select id="map" aria-label="地图">${MAPS.map((map) => `<option value="${map.id}">${map.name}</option>`).join('')}</select></label><label>回合换图<select id="rotation" aria-label="回合换图"><option value="fixed">固定地图</option><option value="cycle">依次轮换</option></select></label></div>
         <p class="map-description" id="map-description">${MAPS[0].description}</p>
+        <div class="settings-row"><label>决胜缩圈<select id="sudden-death" aria-label="决胜缩圈时间"><option value="180">180 秒 · 原版节奏</option><option value="60">60 秒</option><option value="30">30 秒 · 快速体验</option></select></label></div>
         <button class="primary-button" id="start">进入花园 <span>↗</span></button>
         <div class="match-meta"><span>先得 5 分</span><span>五张地图</span><span>支持手柄</span></div>
         <details class="instructions"><summary>第一次玩？看看操作 <span>＋</span></summary><div class="instruction-content">
           <p><b>1P</b> ${key('W A S D')} 移动 · ${key('J')} 近战 · ${key('K')} 投掷 · ${key('L / 空格')} 冲刺</p>
           <p><b>2P</b> ${key('↑ ↓ ← →')} 移动 · ${key(',')} 近战 · ${key('.')} 投掷 · ${key('/')} 冲刺；也支持小键盘 1 / 2 / 3。</p>
-          <p>按住投掷蓄力，松开出手；空手时按住同一键召回。挥砍能反弹飞镖，冲刺能躲攻击、越过水坑。别在水上结束冲刺！</p>
+          <p>按住投掷蓄力，松开出手；空手时按住同一键召回。挥砍能反弹飞镖，冲刺能躲攻击、越过水坑。刚开始下落时可冲刺自救一次。</p>
+          <p>决胜时矩形边界向箭头收缩。出界后有短暂返回时间，倒计时结束即出局。</p>
           <p>手柄：左摇杆移动 · X 近战 · B / RB 蓄力投掷 · A 冲刺 · Start 暂停。两支手柄按连接顺序分配。</p>
           <p>地上的配方书提供护盾、加速或爆炸镖。爆炸会伤到自己；普通强化可保留到下一回合。</p>
         </div></details>
@@ -76,7 +79,7 @@ export class View {
         <div class="round-chip"><span id="round-label">ROUND 01</span><i></i><span id="round-timer">00:00</span></div>
         <div class="abilities" id="abilities"></div>
         <div class="control-strip" id="control-strip"></div>
-        <div class="danger-note" id="danger-note" hidden>决胜时刻 · 留在光圈内</div>
+        <div class="danger-note" id="danger-note" role="status" hidden></div>
       </div>
       <div class="center-message" id="center" aria-live="polite"></div>
       <div class="toast" id="toast" role="status" hidden></div>
@@ -113,6 +116,7 @@ export class View {
         scoreGoal: 5,
         mapId: this.get<HTMLSelectElement>('map').value as MapId,
         mapRotation: this.get<HTMLSelectElement>('rotation').value as MapRotation,
+        suddenDeathTime: Number(this.get<HTMLSelectElement>('sudden-death').value),
       }),
     );
     this.get('map').addEventListener('change', () => {
@@ -191,7 +195,10 @@ export class View {
     wipe.style.maskImage = `radial-gradient(circle at center, transparent ${Math.max(0, radius - 1)}px, black ${radius}px)`;
     wipe.dataset.stage = presentation.stage;
     const scores = state.actors
-      .map((a) => `${a.id}:${a.score}:${a.alive}:${a.controller}:${a.humanIndex}`)
+      .map(
+        (a) =>
+          `${a.id}:${a.score}:${a.alive}:${a.controller}:${a.humanIndex}:${eliminationLabel(a)}`,
+      )
       .join('|');
     if (scores !== this.lastScores) {
       this.lastScores = scores;
@@ -202,7 +209,7 @@ export class View {
       this.scoreboard.innerHTML = state.actors
         .map(
           (actor) =>
-            `<div class="score-card ${actor.alive ? '' : 'eliminated'}" style="--player-color:${ROSTER[actor.id].color}"><div class="player-token">${actor.id === 0 ? '瓜' : actor.id === 1 ? '茄' : actor.id === 2 ? '橙' : '奶'}</div><div class="score-name">${ROSTER[actor.id].name}<small>${actor.controller === 'human' ? `${actor.humanIndex + 1}P` : 'BOT'}</small></div><strong>${actor.score}</strong><div class="score-dots">${Array.from({ length: state.options.scoreGoal }, (_, i) => `<i class="${i < actor.score ? 'filled' : ''}"></i>`).join('')}</div></div>`,
+            `<div class="score-card ${actor.alive ? '' : 'eliminated'}" style="--player-color:${ROSTER[actor.id].color}"><div class="player-token">${actor.id === 0 ? '瓜' : actor.id === 1 ? '茄' : actor.id === 2 ? '橙' : '奶'}</div><div class="score-name">${ROSTER[actor.id].name}<small>${eliminationLabel(actor) || (actor.controller === 'human' ? `${actor.humanIndex + 1}P` : 'BOT')}</small></div><strong>${actor.score}</strong><div class="score-dots">${Array.from({ length: state.options.scoreGoal }, (_, i) => `<i class="${i < actor.score ? 'filled' : ''}"></i>`).join('')}</div></div>`,
         )
         .join('<span class="vs">·</span>');
     }
@@ -210,12 +217,14 @@ export class View {
       `${mapInfo(state.arena.id).name} · ROUND ${String(state.round).padStart(2, '0')}`;
     this.get('round-timer').textContent =
       `${String(Math.floor(state.roundTime / 60)).padStart(2, '0')}:${String(Math.floor(state.roundTime % 60)).padStart(2, '0')}`;
-    this.get('danger-note').hidden = state.safeRadius > 50 || state.phase !== 'playing';
+    const danger = boundaryNotice(state);
+    this.get('danger-note').hidden = !danger;
+    this.get('danger-note').textContent = danger;
     const humans = state.actors.filter((a) => a.controller === 'human');
     const abilities = humans
       .map(
         (a) =>
-          `${a.id}:${a.alive}:${a.armed}:${a.recalling}:${Math.round(a.charge * 20)}:${Math.round(a.dashCooldown * 20)}:${a.powers.join(',')}`,
+          `${a.id}:${a.alive}:${eliminationLabel(a)}:${state.weaponsGranted}:${a.armed}:${a.recalling}:${Math.round(a.charge * 20)}:${Math.round(a.dashCooldown * 20)}:${a.powers.join(',')}`,
       )
       .join('|');
     if (abilities !== this.lastAbilities) {
@@ -224,19 +233,20 @@ export class View {
         .map((actor) => {
           const ready = actor.dashCooldown <= 0;
           const disc = state.discs.find((d) => d.ownerId === actor.id);
-          const weapon = !actor.alive
-            ? '下回合见'
-            : !state.weaponsGranted
-              ? '开场准备 · 即将发镖'
-              : actor.armed
-                ? actor.charge > 0.1
-                  ? '蓄力中…'
-                  : '回旋镖就绪'
-                : disc?.explosive
-                  ? '爆炸镖在场'
-                  : actor.recalling
-                    ? '召回中…'
-                    : '按住投掷键召回';
+          const weapon =
+            !actor.alive || actor.fall
+              ? eliminationLabel(actor)
+              : !state.weaponsGranted
+                ? '开场准备 · 即将发镖'
+                : actor.armed
+                  ? actor.charge > 0.1
+                    ? '蓄力中…'
+                    : '回旋镖就绪'
+                  : disc?.explosive
+                    ? '爆炸镖在场'
+                    : actor.recalling
+                      ? '召回中…'
+                      : '按住投掷键召回';
           return `<div class="ability-card" style="--player-color:${ROSTER[actor.id].color}"><div class="ability-top"><span class="small-token">${actor.humanIndex + 1}P</span><b>${weapon}</b><span class="power-icons">${actor.powers.map((p) => `<i style="--power:${POWERUPS[p].color}" title="${POWERUPS[p].description}">${POWERUPS[p].short}</i>`).join('')}</span></div><div class="ability-meters"><span>冲刺 <i><em style="width:${ready ? 100 : clamp(1 - actor.dashCooldown / (RULES.dashCooldown * (actor.powers.includes('haste') ? 0.6 : 1)), 0, 1) * 100}%"></em></i><small>${ready ? '就绪' : '恢复'}</small></span><span>蓄力 <i><em class="charge-fill" style="width:${(actor.charge / RULES.chargeTime) * 100}%"></em></i></span></div></div>`;
         })
         .join('');
@@ -245,7 +255,7 @@ export class View {
       this.center.innerHTML = `<div class="countdown" style="transform:scale(${presentation.labelScale})"><small>第 ${state.round} 回合 · ${mapInfo(state.arena.id).name}</small><strong>${presentation.label}</strong><span>${presentation.stage === 'ready' ? '准备移动，开场稍后发镖' : '伙伴们正在入场'}</span></div>`;
     } else if (state.phase === 'roundEnd') {
       const winner = state.winnerId === null ? null : ROSTER[state.winnerId];
-      this.center.innerHTML = `<div class="round-banner" style="opacity:${presentation.showScores ? presentation.scoreOpacity : 1};transform:scale(${presentation.labelScale})"><span class="eyebrow">${presentation.showScores ? 'ROUND SCORES' : winner ? 'NICE THROW' : 'WHAT A ROUND'}</span><h2>${winner ? `${winner.name}赢下这一回合` : '同时出局 · 平局'}</h2><p>${presentation.showScores ? state.actors.map((a) => `${ROSTER[a.id].name} ${a.score}`).join(' · ') : winner ? '＋1 分' : '本回合不计分'}<span>下一回合马上开始</span></p></div>`;
+      this.center.innerHTML = `<div class="round-banner" style="opacity:${presentation.showScores ? presentation.scoreOpacity : 1};transform:scale(${presentation.labelScale})"><span class="eyebrow">${presentation.showScores ? 'ROUND SCORES' : winner ? 'ROUND SURVIVED' : 'WHAT A ROUND'}</span><h2>${winner ? `${winner.name}赢下这一回合` : '无人存活 · 平局'}</h2><p>${presentation.showScores ? state.actors.map((a) => `${ROSTER[a.id].name} ${a.score}`).join(' · ') : winner ? '＋1 分' : '本回合不计分'}<span>下一回合马上开始</span></p></div>`;
     } else if (presentation.stage === 'go')
       this.center.innerHTML = `<div class="go-text" style="transform:scale(${presentation.labelScale})">开始！</div>`;
     else this.center.innerHTML = '';

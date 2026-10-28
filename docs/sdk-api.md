@@ -1,6 +1,6 @@
 # Boomerang Garden SDK API
 
-本文对应本地 ESM 包 **`@boomerang-garden/sdk` 0.2.0**。SDK 把固定步长模拟、人物控制来源和浏览器呈现分开；运行不需要 Boomerang Fu 的安装目录或原版素材。
+本文对应本地 ESM 包 **`@boomerang-garden/sdk` 0.3.0**。SDK 把固定步长模拟、人物控制来源和浏览器呈现分开；运行不需要 Boomerang Fu 的安装目录或原版素材。
 
 公开类型以 `src/sdk/types.ts`、`src/sdk/browser.ts` 及打包后的 `.d.ts` 为准。示例采用公开包入口，不依赖开发调试接口。
 
@@ -15,7 +15,7 @@ npm run build:sdk
 在使用 SDK 的项目里安装生成的 tarball，路径按实际位置调整：
 
 ```sh
-npm install /path/to/dist-sdk/boomerang-garden-sdk-0.2.0.tgz
+npm install /path/to/dist-sdk/boomerang-garden-sdk-0.3.0.tgz
 ```
 
 这不是 npm 在线发布。包提供以下入口：
@@ -78,6 +78,7 @@ node node_modules/@boomerang-garden/sdk/examples/node-bots.mjs
 | `scoreGoal`   | `5`           | 1–100 的整数                                                      |
 | `mapId`       | `'courtyard'` | `'courtyard'`、`'canal'`、`'market'`、`'switchback'`、`'portals'` |
 | `mapRotation` | `'fixed'`     | `'fixed'` 固定地图；`'cycle'` 从所选地图开始按上述顺序轮换        |
+| `suddenDeathTime` | `180` | 有限非负秒数；超过该时刻且仍有两名以上存活角色时开始缩圈，`0` 表示开场即触发 |
 
 角色 ID 从 0 开始，当前存在的 ID 通过 `getState().actors` 查询。`mode` 决定初始人数和来源；之后 `useBot`、`useScript`、`acquire` 等可以控制任意存在的角色，不受其初始人工/机器人身份限制。
 
@@ -309,6 +310,20 @@ takeover.release();
 **当前控制权看 `snapshot().controls`。** `state.actors[].controller` 和 `humanIndex` 保留比赛初始分配元数据，不能用于判断脚本/外部/接管后的实际来源。修改返回对象不会修改模拟，也不会改变其他调用者的副本。
 
 快照用于观察，不是可写状态入口或完整存档。SDK 不提供从快照恢复任意 tick 的 API；要复现比赛，应保存初始选项和逐 tick 控制序列。
+
+### 0.3：矩形边界、下落与死亡
+
+`state.boundary` 是实际判定矩形：`center` / `halfSize` 为当前位置/半尺寸，`phase` 为 `idle | shrinking | settled`；`startCenter` / `startHalfSize`、`targetCenter` / `targetHalfSize` 保存插值起点和目标，`elapsed` / `duration` 为收缩秒数，`progress` 为线性时间进度，`startedAt` 是开始时的模拟时钟。位置和尺寸已应用曲线，宿主不要再次插值曲线。`ownerId` 是触发者或 `null`；自动决胜为 `null`。
+
+默认 180 秒触发，最终矩形为 4×4 Web 单位，中心按种子随机选择。少于两人存活时停止收缩。`safeRadius` 仅保留为旧客户端的派生显示字段，已弃用，不能用于安全区判定；原先 65 秒强制结束回合的规则已移除。
+
+`actor.outOfBounds` 存在时包含 `remaining` / `duration`（秒）。进入圈外时给予 3 秒，进入时正在收缩则为 3.75 秒；返回后清除，重入重新计时。圈外超时忽略护盾、冲刺和无敌。基础浏览器 HUD 显示边界提示、回场箭头与个人倒计时。
+
+`actor.fall` 包含 `kind: 'water' | 'cliff'`、`elapsed`、`duration`；水/崖分别延迟 0.66/0.74 秒死亡，期间角色仍 `alive`。前 0.33 秒内、冲刺冷却允许时可救回一次，`fallsSaved` 在安全着地后清零。下落时普通移动、近战、投掷不执行，但仍能提交救回冲刺。
+
+`actor.death` 保留 `cause`（`weapon | explosion | fall | boundary`）、`variant`（`slice | squash | water | cliff | burst`）、固定的 `position` / `direction`、`time` 与确定性 `seed`。渲染可从状态重建死亡表现，不依赖收到历史事件；新回合清除记录。`death` 事件也附带 `cause`、`direction`、`variant`。`boundary` 事件在开始收缩时发出一次，`position` 是目标中心，自动决胜的 `actorId` 为 -1。
+
+`state.roundFinishTimer` 是延迟结算剩余秒数或 `null`。淘汰后继续模拟 1.45 秒再核对存活者；后续死亡重启计时，正在下落的最后一人也不会提前得分。宿主应以 `phase` / `winnerId` 判断回合结果，不要仅凭当前人数提前结算。
 
 ```js
 const unsubscribe = session.onEvent((entry) => {

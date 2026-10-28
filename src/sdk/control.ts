@@ -91,7 +91,16 @@ export function matchOptions(
 ): MatchOptions {
   const supplied = record(overrides, 'options');
   const options = { ...base };
-  const keys = ['mode', 'bots', 'difficulty', 'seed', 'scoreGoal', 'mapId', 'mapRotation'];
+  const keys = [
+    'mode',
+    'bots',
+    'difficulty',
+    'seed',
+    'scoreGoal',
+    'mapId',
+    'mapRotation',
+    'suddenDeathTime',
+  ];
   for (const [key, value] of Object.entries(supplied)) {
     if (!keys.includes(key)) throw new TypeError(`Unknown match option: ${key}`);
     if (value !== undefined) Object.assign(options, { [key]: value });
@@ -103,6 +112,13 @@ export function matchOptions(
   integer(options.bots, options.mode === 'solo' ? 1 : 0, options.mode === 'solo' ? 3 : 2, 'bots');
   integer(options.seed, 0, 0xffffffff, 'seed');
   integer(options.scoreGoal, 1, 100, 'scoreGoal');
+  if (
+    options.suddenDeathTime !== undefined &&
+    (typeof options.suddenDeathTime !== 'number' ||
+      !Number.isFinite(options.suddenDeathTime) ||
+      options.suddenDeathTime < 0)
+  )
+    throw new RangeError('suddenDeathTime must be a finite non-negative number');
   if (!MAPS.some((map) => map.id === options.mapId)) throw new RangeError('Unknown mapId');
   if (options.mapRotation !== 'fixed' && options.mapRotation !== 'cycle')
     throw new RangeError('Unknown mapRotation');

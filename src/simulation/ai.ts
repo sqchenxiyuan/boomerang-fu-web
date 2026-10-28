@@ -6,6 +6,7 @@ import { idleCommand } from '../core/types';
 import type { Actor, Command, GameState } from '../core/types';
 import { advancePath, findPath } from './navigation';
 import type { NavigationWaypoint } from './navigation';
+import { clampToBoundary, isInBoundary } from './boundary';
 
 interface Brain {
   thinkIn: number;
@@ -61,7 +62,15 @@ export class BotController {
       .sort(
         (a, b) => distance(actor.position, a.position) - distance(actor.position, b.position),
       )[0];
-    if (!enemy) return command;
+    if (!enemy) {
+      if (!isInBoundary(state.boundary, actor.position, RULES.playerRadius)) {
+        const path = findPath(state.arena, actor.position, state.boundary.center);
+        if (path.length) command.move = normalize(sub(path[0], actor.position));
+      }
+      return command;
+    }
+    const escapingBoundary =
+      state.boundary.phase !== 'idle' && !isInBoundary(state.boundary, actor.position, 1.2);
     brain.thinkIn -= dt;
     brain.attackIn -= dt;
     brain.pathAge += dt;
@@ -92,7 +101,37 @@ export class BotController {
         goal = add(actor.position, mul(rotate(towards, brain.strafe * 0.55), -3));
       else if (sight && d > 3.2 && d < 8.5 && actor.armed)
         goal = add(actor.position, mul(rotate(towards, brain.strafe * 1.1), 1.5));
-      if (length(actor.position) > state.safeRadius - 2.5) goal = v();
+      if (state.boundary.phase !== 'idle') {
+        if (escapingBoundary) goal = { ...state.boundary.center };
+        goal = clampToBoundary(state.boundary, goal, RULES.playerRadius + 0.2);
+        // A random original target can overlap water or a wall. Pick a traversable
+        // navigation goal inside the rectangle without changing the shrink target.
+        if (!safePosition(state.arena, goal, RULES.playerRadius + 0.13)) {
+          let nearest = Infinity;
+          const desiredGoal = { ...goal };
+          for (
+            let x = Math.ceil(state.boundary.center.x - state.boundary.halfSize.x);
+            x < state.boundary.center.x + state.boundary.halfSize.x;
+            x++
+          )
+            for (
+              let y = Math.ceil(state.boundary.center.y - state.boundary.halfSize.y);
+              y < state.boundary.center.y + state.boundary.halfSize.y;
+              y++
+            ) {
+              const candidate = v(x, y),
+                d = distance(candidate, desiredGoal);
+              if (
+                d < nearest &&
+                isInBoundary(state.boundary, candidate, RULES.playerRadius + 0.13) &&
+                safePosition(state.arena, candidate, RULES.playerRadius + 0.13)
+              ) {
+                nearest = d;
+                goal = candidate;
+              }
+            }
+        }
+      }
       if (distance(goal, brain.goal) > 1.5 || brain.pathAge > 0.65 || brain.path.length === 0) {
         brain.goal = { ...goal };
         brain.path = findPath(state.arena, actor.position, goal);
@@ -100,7 +139,13 @@ export class BotController {
       }
       advancePath(brain.path, actor.position);
       brain.move = brain.path.length ? normalize(sub(brain.path[0], actor.position)) : towards;
-      if (brain.attackIn <= 0 && actor.attackCooldown <= 0 && d < 2.1 && sight) {
+      if (
+        !escapingBoundary &&
+        brain.attackIn <= 0 &&
+        actor.attackCooldown <= 0 &&
+        d < 2.1 &&
+        sight
+      ) {
         brain.move = towards;
         command.attack = true;
         // Movement is locked for 0.5 s after a lunge. Leave time to actually retreat
@@ -108,6 +153,7 @@ export class BotController {
         brain.attackIn = RULES.attackCooldown + random.range(0.5, 1.1);
       }
       if (
+        !escapingBoundary &&
         actor.armed &&
         actor.attackCooldown <= 0 &&
         sight &&
@@ -127,8 +173,10 @@ export class BotController {
       if (danger) {
         const perpendicular = normalize(v(-danger.velocity.y, danger.velocity.x));
         const candidates = [perpendicular, mul(perpendicular, -1)];
-        const dodge = candidates.find((dir) =>
-          safePosition(state.arena, add(actor.position, mul(dir, 3.1)), RULES.playerRadius + 0.2),
+        const dodge = candidates.find(
+          (dir) =>
+            isInBoundary(state.boundary, add(actor.position, mul(dir, 3.1)), RULES.playerRadius) &&
+            safePosition(state.arena, add(actor.position, mul(dir, 3.1)), RULES.playerRadius + 0.2),
         );
         if (dodge && actor.dashCooldown <= 0) {
           brain.move = dodge;
@@ -152,6 +200,7 @@ export class BotController {
         command.dash = true;
     }
     command.move = brain.move;
+    if (escapingBoundary) brain.chargeFor = -1;
     if (brain.chargeFor >= 0 && actor.armed && !command.dash && !command.attack) {
       brain.chargeFor -= dt;
       // Small leading aim via the same direction input used by humans.
@@ -162,7 +211,7 @@ export class BotController {
         brain.chargeFor = -1;
       } else command.throwHeld = true;
     }
-    if (!actor.armed) {
+    if (!actor.armed && !escapingBoundary) {
       brain.chargeFor = -1;
       const disc = state.discs.find((p) => p.ownerId === actor.id);
       command.throwHeld = !!disc && !disc.explosive && (disc.state === 'dropped' || disc.age > 0.9);
@@ -171,6 +220,11 @@ export class BotController {
     if (
       command.dash &&
       (dot(command.move, command.move) < 0.1 ||
+        !isInBoundary(
+          state.boundary,
+          add(actor.position, mul(normalize(command.move), 3.1)),
+          RULES.playerRadius,
+        ) ||
         !safePosition(
           state.arena,
           add(actor.position, mul(normalize(command.move), 3.1)),

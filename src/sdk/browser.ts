@@ -6,6 +6,7 @@ import { Input } from '../platform/input';
 import { AudioEngine } from '../platform/audio';
 import { FixedLoop } from '../platform/loop';
 import { transitionPresentation } from '../core/presentation';
+import { boundaryNotice, eliminationLabel } from '../core/feedback';
 import { mapInfo } from '../core/arena';
 import { ROSTER } from '../core/config';
 
@@ -42,6 +43,7 @@ export class BrowserGame {
   private readonly wipe: HTMLDivElement;
   private readonly center: HTMLDivElement;
   private readonly score: HTMLDivElement;
+  private readonly notice: HTMLDivElement;
   private events: GameEvent[] = [];
   private disposed = false;
   private preview = false;
@@ -117,7 +119,23 @@ export class BrowserGame {
       fontSize: '13px',
       lineHeight: '1.8',
     });
-    this.overlay.append(this.wipe, this.score, this.center);
+    this.notice = document.createElement('div');
+    this.notice.className = 'garden-sdk-notice';
+    this.notice.setAttribute('role', 'status');
+    Object.assign(this.notice.style, {
+      position: 'absolute',
+      left: '50%',
+      top: '98px',
+      transform: 'translateX(-50%)',
+      maxWidth: '90%',
+      textAlign: 'center',
+      color: '#fff7e4',
+      background: '#a74c3ce8',
+      borderRadius: '12px',
+      padding: '7px 14px',
+      fontSize: '12px',
+    });
+    this.overlay.append(this.wipe, this.score, this.notice, this.center);
     this.overlay.hidden = options.hud === false;
     container.append(this.overlay);
     this.input.onPause = () => {
@@ -191,7 +209,10 @@ export class BrowserGame {
           (presentation.wipeRadius * Math.hypot(container.clientWidth, container.clientHeight)) / 2;
         this.wipe.hidden = presentation.wipeRadius >= 1 || this.preview;
         this.wipe.style.maskImage = `radial-gradient(circle at center, transparent ${Math.max(0, radius - 1)}px, black ${radius}px)`;
-        this.score.textContent = `${state.actors.map((a) => `${ROSTER[a.id].name}  ${a.score}`).join('    ·    ')}\n${mapInfo(state.arena.id).name} · 第 ${state.round} 回合`;
+        this.score.textContent = `${state.actors.map((a) => `${ROSTER[a.id].name}  ${a.score}${a.alive ? '' : ` (${eliminationLabel(a)})`}`).join('    ·    ')}\n${mapInfo(state.arena.id).name} · 第 ${state.round} 回合`;
+        const notice = this.preview ? '' : boundaryNotice(state);
+        this.notice.hidden = !notice;
+        this.notice.textContent = notice;
         this.center.textContent =
           paused && !this.preview
             ? '已暂停'

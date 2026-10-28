@@ -14,6 +14,7 @@
     "check": "tsc --noEmit",
     "test:browser": "node scripts/v2-browser-verify.mjs",
     "test:sdk-browser": "node scripts/sdk-browser-verify.mjs",
+    "test:v3-browser": "node scripts/v3-browser-verify.mjs",
     "format": "prettier --write src tests scripts/*.mjs examples/*.mjs examples/*.js index.html sdk-demo.html vite.config.ts package.json tsconfig.json tsconfig.sdk.json",
     "format:check": "prettier --check src tests scripts/*.mjs examples/*.mjs examples/*.js index.html sdk-demo.html vite.config.ts package.json tsconfig.json tsconfig.sdk.json"
   },

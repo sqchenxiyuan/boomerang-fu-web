@@ -1,19 +1,10 @@
 import { moveAndSlide, onGround } from '../core/collision';
 import { RULES } from '../core/config';
-import {
-  add,
-  angleBetween,
-  clampLength,
-  length,
-  mul,
-  normalize,
-  rotate,
-  sub,
-  v,
-} from '../core/math';
+import { add, angleBetween, clampLength, length, mul, normalize, rotate, v } from '../core/math';
 import type { Actor, Command, GameState } from '../core/types';
-import { damageActor } from './combat';
 import { throwDisc } from './projectiles';
+import { tickActorBoundary } from './boundary';
+import { rescueFall, tickFall } from './hazards';
 
 export function tickActor(state: GameState, actor: Actor, command: Command, dt: number): void {
   actor.previous = { ...actor.position };
@@ -40,7 +31,8 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
     actor.facingHistory = [];
   };
   const tryAttack = (): boolean => {
-    if (actor.stun > 0 || actor.attackCooldown > 0 || actor.charge >= RULES.aimStart) return false;
+    if (actor.fall || actor.stun > 0 || actor.attackCooldown > 0 || actor.charge >= RULES.aimStart)
+      return false;
     // A slash can cancel a dash, but cannot rotate while the dash recovery owns movement.
     if (actor.dashCooldown <= 0 && actor.lungeRecovery <= 0 && length(movement) > 0)
       actor.facing = normalize(movement);
@@ -67,6 +59,7 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
   };
   const tryDash = (): boolean => {
     if (actor.stun > 0 || actor.dashCooldown > 0 || actor.lungeRecovery > 0) return false;
+    if (actor.fall && !rescueFall(actor)) return false;
     actor.dashTime = RULES.dashDuration * (hasted ? 0.8 : 1);
     actor.dashCooldown = RULES.dashCooldown * (hasted ? 0.6 : 1);
     actor.dashDirection = length(movement) > 0 ? normalize(movement) : { ...actor.facing };
@@ -78,7 +71,10 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
     state.events.push({ type: 'dash', position: { ...actor.position }, actorId: actor.id });
     return true;
   };
-  if (actor.stun <= 0) {
+  if (actor.fall) {
+    // Falling retains drift and only accepts the short, single dash rescue.
+    if (command.dash || actor.bufferedDash > 0) tryDash();
+  } else if (actor.stun <= 0) {
     // PlayerInput.Update evaluates fresh melee, throw release, held aim, then dash.
     if (command.attack && !tryAttack()) actor.bufferedAttack = RULES.attackBuffer;
     if (command.throwReleased) {
@@ -131,7 +127,8 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
   }
 
   const isDashing = actor.dashTime > 0;
-  const canMove = actor.stun <= 0 && actor.dashCooldown <= 0 && actor.lungeRecovery <= 0;
+  const canMove =
+    !actor.fall && actor.stun <= 0 && actor.dashCooldown <= 0 && actor.lungeRecovery <= 0;
   if (canMove) {
     if (length(movement) > 0) {
       actor.facing = rotate(
@@ -170,6 +167,7 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
   let next = moveAndSlide(state.arena, actor.position, mul(actor.velocity, dt), RULES.playerRadius);
   // Gentle fall protection applies to walking; a dash can cross a gap or miss its landing.
   if (
+    !actor.fall &&
     !isDashing &&
     actor.stun <= 0 &&
     onGround(state.arena, actor.position, RULES.playerRadius * 0.45) &&
@@ -186,8 +184,6 @@ export function tickActor(state: GameState, actor: Actor, command: Command, dt: 
   actor.position = next;
   actor.dashTime = decrease(actor.dashTime);
   actor.lungeTime = decrease(actor.lungeTime);
-  if (!onGround(state.arena, actor.position) && actor.dashTime <= 0)
-    damageActor(state, actor, actor.id, v(), 'fall');
-  if (length(actor.position) > state.safeRadius && actor.alive)
-    damageActor(state, actor, actor.id, normalize(sub(v(), actor.position)), 'boundary');
+  tickFall(state, actor, dt);
+  tickActorBoundary(state, actor, dt);
 }

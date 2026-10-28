@@ -64,8 +64,9 @@ export class AudioEngine {
     if (!this.context) return;
     for (const event of events) {
       const now = this.context.currentTime;
-      if (now - (this.recent.get(event.type) ?? -1) < 0.05) continue;
-      this.recent.set(event.type, now);
+      const key = event.type === 'death' ? `${event.type}:${event.variant}` : event.type;
+      if (now - (this.recent.get(key) ?? -1) < 0.05) continue;
+      this.recent.set(key, now);
       switch (event.type) {
         case 'throw':
           this.tone(520, 170, 0.15, 'triangle');
@@ -93,7 +94,22 @@ export class AudioEngine {
           this.tone(120, 50, 0.13, 'square', 0, 0.13);
           break;
         case 'death':
-          this.tone(240, 48, 0.32, 'triangle', 0, 0.5);
+          if (event.variant === 'water') {
+            this.tone(680, 95, 0.24, 'sine', 0, 0.3);
+            this.tone(220, 460, 0.12, 'sine', 0.17, 0.15);
+          } else if (event.variant === 'cliff') {
+            this.tone(520, 45, 0.4, 'triangle', 0, 0.18);
+          } else if (event.variant === 'burst') {
+            this.tone(160, 32, 0.16, 'square', 0, 0.14);
+          } else if (event.variant === 'squash') {
+            this.tone(100, 35, 0.25, 'triangle', 0, 0.4);
+          } else {
+            this.tone(400, 65, 0.12, 'sawtooth', 0, 0.13);
+            this.tone(240, 48, 0.32, 'triangle', 0.04, 0.32);
+          }
+          break;
+        case 'boundary':
+          [330, 440, 550].forEach((f, i) => this.tone(f, f * 0.9, 0.2, 'triangle', i * 0.14, 0.22));
           break;
         case 'explosion':
           this.tone(90, 22, 0.38, 'sawtooth', 0, 0.4);

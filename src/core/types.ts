@@ -14,6 +14,8 @@ export interface MatchOptions {
   scoreGoal: number;
   mapId?: MapId;
   mapRotation?: MapRotation;
+  /** Seconds of active play before sudden death; packaged default is 180. */
+  suddenDeathTime?: number;
 }
 export interface Command {
   move: Vec2;
@@ -30,6 +32,33 @@ export const idleCommand = (): Command => ({
   throwReleased: false,
 });
 
+export type DeathCause = 'weapon' | 'explosion' | 'fall' | 'boundary';
+export interface DeathState {
+  cause: DeathCause;
+  variant: 'slice' | 'squash' | 'water' | 'cliff' | 'burst';
+  time: number;
+  position: Vec2;
+  direction: Vec2;
+  seed: number;
+}
+
+export interface BoundaryState {
+  /** Settled includes an early stop when fewer than two opponents remain. */
+  phase: 'idle' | 'shrinking' | 'settled';
+  center: Vec2;
+  halfSize: Vec2;
+  startCenter: Vec2;
+  startHalfSize: Vec2;
+  targetCenter: Vec2;
+  targetHalfSize: Vec2;
+  elapsed: number;
+  duration: number;
+  startedAt: number;
+  /** Normalized time; geometry uses the packaged Hermite curve. */
+  progress: number;
+  ownerId: number | null;
+}
+
 export interface Actor {
   id: number;
   controller: 'human' | 'bot';
@@ -41,6 +70,10 @@ export interface Actor {
   facingHistory: Vec2[];
   alive: boolean;
   deathTime: number;
+  death?: DeathState;
+  fall?: { kind: 'water' | 'cliff'; elapsed: number; duration: number };
+  fallsSaved?: number;
+  outOfBounds?: { remaining: number; duration: number };
   score: number;
   kills: number;
   armed: boolean;
@@ -140,13 +173,16 @@ export interface GameEvent {
     | 'round'
     | 'win'
     | 'countdown'
-    | 'teleport';
+    | 'teleport'
+    | 'boundary';
   position: Vec2;
   actorId: number;
   value?: number;
   power?: PowerupKind;
   feedback?: 'parry' | 'clash' | 'disarm';
-  cause?: 'weapon' | 'explosion' | 'fall' | 'boundary';
+  cause?: DeathCause;
+  direction?: Vec2;
+  variant?: DeathState['variant'];
   destination?: Vec2;
   entityId?: number;
   entityType?: 'actor' | 'disc';
@@ -166,6 +202,10 @@ export interface GameState {
   events: GameEvent[];
   nextId: number;
   pickupTimer: number;
+  boundary: BoundaryState;
+  suddenDeathStarted: boolean;
+  roundFinishTimer: number | null;
+  /** @deprecated Display-only radius derived from the current rectangle. */
   safeRadius: number;
   hitStop: number;
   weaponsGranted: boolean;

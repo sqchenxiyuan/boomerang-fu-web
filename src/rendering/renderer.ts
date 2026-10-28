@@ -8,6 +8,7 @@ import type { ArenaView } from './arena-view';
 import { createCharacter, updateCharacter } from './characters';
 import type { CharacterView } from './characters';
 import { Effects } from './effects';
+import { BoundaryView } from './boundary-view';
 import { box, cylinder, makeBoomerang, place, shadow } from './palette';
 
 function disposeVisual(root: THREE.Object3D): void {
@@ -72,7 +73,7 @@ export class GameRenderer {
   private discs = new Map<number, THREE.Group>();
   private pickups = new Map<number, THREE.Group>();
   private effects = new Effects();
-  private safeRing: THREE.LineLoop;
+  private boundary = new BoundaryView();
   private resizeObserver: ResizeObserver;
   private width = 1;
   private height = 1;
@@ -118,21 +119,7 @@ export class GameRenderer {
     this.scene.add(sun);
     this.arena = createArenaView(state.arena);
     this.arenaSource = '';
-    this.scene.add(this.arena.root, this.effects.root);
-    const points = Array.from(
-      { length: 100 },
-      (_, i) =>
-        new THREE.Vector3(
-          Math.cos((i / 100) * Math.PI * 2),
-          0.12,
-          Math.sin((i / 100) * Math.PI * 2),
-        ),
-    );
-    this.safeRing = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineBasicMaterial({ color: '#e97865', transparent: true, opacity: 0.9 }),
-    );
-    this.scene.add(this.safeRing);
+    this.scene.add(this.arena.root, this.effects.root, this.boundary.root);
     this.reset(state);
     this.resizeObserver = new ResizeObserver(() =>
       this.resize(container.clientWidth, container.clientHeight),
@@ -160,6 +147,8 @@ export class GameRenderer {
     this.discs.clear();
     this.pickups.clear();
     this.effects.clear();
+    this.boundary.reset();
+    this.previousTime = state.time;
   }
 
   private resize(width: number, height: number): void {
@@ -184,6 +173,7 @@ export class GameRenderer {
       this.scene.add(this.arena.root);
       this.arenaSource = arenaKey;
       this.effects.clear();
+      this.boundary.reset();
     }
     const presentation = transitionPresentation(state);
     const entranceOrder = [...state.actors].sort((a, b) => b.score - a.score || a.id - b.id);
@@ -274,8 +264,8 @@ export class GameRenderer {
     }
     (this.arena.water.material as THREE.MeshStandardMaterial).roughness =
       0.28 + Math.sin(simulationTime * 0.5) * 0.04;
-    this.safeRing.visible = state.safeRadius < 50 && !menu;
-    this.safeRing.scale.set(state.safeRadius, 1, state.safeRadius);
+    this.boundary.update(state, menu);
+    this.effects.syncDeaths(state);
     this.effects.update(menu ? dt : Math.max(0, Math.min(0.1, state.time - this.previousTime)));
     this.previousTime = state.time;
 
@@ -305,6 +295,7 @@ export class GameRenderer {
   dispose(): void {
     this.resizeObserver.disconnect();
     this.effects.clear();
+    this.boundary.dispose();
     disposeVisual(this.scene);
     this.renderer.dispose();
     this.canvas.remove();

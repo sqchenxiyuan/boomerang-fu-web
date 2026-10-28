@@ -9,6 +9,7 @@ import { tickPowerups } from './powerups';
 import { tickDiscs } from './projectiles';
 import { createState, defaultOptions, resetRound } from './state';
 import { tickActorPortals } from './portals';
+import { stopShrinkingBoundary, tickBoundary } from './boundary';
 
 /** Sole authoritative owner of gameplay state. No rendering or DOM dependencies. */
 export class Game {
@@ -70,10 +71,7 @@ export class Game {
         }
       state.weaponsGranted = true;
     }
-    state.safeRadius =
-      state.roundTime < RULES.suddenDeathStart
-        ? 100
-        : Math.max(0.2, 15 - (state.roundTime - RULES.suddenDeathStart) * 0.55);
+    tickBoundary(state, this.random, dt);
     const eventStart = state.events.length;
     for (const actor of state.actors)
       tickActor(state, actor, commands.get(actor.id) ?? idleCommand(), dt);
@@ -83,7 +81,8 @@ export class Game {
     tickDiscs(state, dt);
     tickPowerups(state, this.random, dt);
     const survivors = state.actors.filter((a) => a.alive);
-    for (const event of state.events.slice(eventStart)) {
+    const newEvents = state.events.slice(eventStart);
+    for (const event of newEvents) {
       const freeze =
         event.type === 'death' && (event.cause === 'weapon' || event.cause === 'explosion')
           ? HIT_STOP.death
@@ -94,7 +93,19 @@ export class Game {
               : 0;
       state.hitStop = Math.max(state.hitStop, freeze);
     }
-    if (survivors.length <= 1 || state.roundTime >= RULES.roundLimit) {
+    if (survivors.length > 1) state.roundFinishTimer = null;
+    else {
+      stopShrinkingBoundary(state);
+      state.roundFinishTimer =
+        state.roundFinishTimer === null
+          ? RULES.roundResolveDelay
+          : newEvents.some((event) => event.type === 'death')
+            ? RULES.roundResolveDelay
+            : Math.max(0, state.roundFinishTimer - dt - 1e-12);
+    }
+    // The original checks again after 0.15 + 1.3 scaled seconds. Keep simulating
+    // pending discs/explosions, and never award a survival point while still falling.
+    if (survivors.length <= 1 && state.roundFinishTimer === 0 && !survivors.some((a) => a.fall)) {
       state.winnerId = survivors.length === 1 ? survivors[0].id : null;
       if (survivors.length === 1) survivors[0].score++;
       state.phase = 'roundEnd';

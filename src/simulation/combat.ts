@@ -2,7 +2,7 @@ import { lineOfSight, moveAndSlide } from '../core/collision';
 import { RULES } from '../core/config';
 import { add, distance, dot, mul, normalize, sub, v } from '../core/math';
 import type { Vec2 } from '../core/math';
-import type { Actor, GameState, Obstacle } from '../core/types';
+import type { Actor, DeathCause, DeathState, GameState, Obstacle } from '../core/types';
 
 export function breakCrate(state: GameState, obstacle: Obstacle, actorId: number): void {
   if (obstacle.kind !== 'crate' || obstacle.broken) return;
@@ -15,7 +15,7 @@ export function damageActor(
   actor: Actor,
   sourceId: number,
   direction: Vec2,
-  cause: 'weapon' | 'explosion' | 'fall' | 'boundary' = 'weapon',
+  cause: DeathCause = 'weapon',
 ): 'ignored' | 'shield' | 'killed' {
   if (!actor.alive) return 'ignored';
   const environmental = cause === 'fall' || cause === 'boundary';
@@ -30,6 +30,35 @@ export function damageActor(
   }
   actor.alive = false;
   actor.deathTime = state.time;
+  const deathDirection = normalize(dot(direction, direction) > 1e-10 ? direction : actor.facing);
+  const variant: DeathState['variant'] =
+    cause === 'weapon'
+      ? 'slice'
+      : cause === 'explosion'
+        ? 'squash'
+        : cause === 'boundary'
+          ? 'burst'
+          : (actor.fall?.kind ??
+            (Math.abs(actor.position.x) > state.arena.halfWidth ||
+            Math.abs(actor.position.y) > state.arena.halfHeight
+              ? 'cliff'
+              : 'water'));
+  actor.death = {
+    cause,
+    variant,
+    time: state.time,
+    position: { ...actor.position },
+    direction: deathDirection,
+    seed:
+      (Math.imul(state.round, 0x9e3779b9) ^
+        Math.imul(actor.id + 1, 0x85ebca6b) ^
+        Math.round(state.time * 1e6)) >>>
+      0,
+  };
+  actor.fall = undefined;
+  actor.outOfBounds = undefined;
+  actor.shield = false;
+  state.roundFinishTimer = RULES.roundResolveDelay;
   actor.armed = false;
   actor.charge = 0;
   actor.recalling = false;
@@ -46,6 +75,8 @@ export function damageActor(
     actorId: actor.id,
     value: sourceId,
     cause,
+    direction: { ...deathDirection },
+    variant,
   });
   return 'killed';
 }

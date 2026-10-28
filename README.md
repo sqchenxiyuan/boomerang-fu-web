@@ -21,7 +21,9 @@ npm run dev
 - 山间庭院、双桥水道、货箱集市、折返回廊、跃迁花园；支持固定地图或逐回合轮换。
 - 单人对机器人、本地双人、最多四人混合对战、三档机器人难度。
 - 移动与惯性、转向、冲刺、近战/空手击退、正面反弹、蓄力投掷、弧线与追踪、回返/接取/召回。
-- 墙体、可破坏箱子、水坑、决胜缩圈；人物和飞镖均可穿过传送门。
+- 墙体、可破坏箱子、水坑、矩形决胜缩圈；人物和飞镖均可穿过传送门。
+- 默认 180 秒缩圈（菜单可选 30/60 秒），出界后有 3～3.75 秒返回宽限，配有箭头和倒计时。
+- 切片、爆炸压扁、落水、坠崖、界外爆散分别呈现；下落有短暂冲刺救回窗口，淘汰后延迟 1.45 秒核对胜负。
 - 护盾、加速、爆炸镖；掩体遮挡爆炸，允许自伤。
 - 角色依次入场、Ready/Go、每回合延后发镖、命中停顿、比分揭示、圆形幕布与换图。
 - 最后存活者得一分，同时出局不得分，先得五分获胜；暂停/恢复、重开、合成音效。
@@ -38,7 +40,7 @@ npm run dev
 | 暂停/继续 | Esc | Esc | Start |
 | 静音 | M | M | 界面按钮 |
 
-点击画面获得输入焦点。按住投掷蓄力，松开投出；空手按住同一键召回。完整蓄力约一秒。冲刺可越过水坑，落点仍在水上会出局。两支手柄按连接顺序分配；Gamepad API 已使用虚拟输入验证，未用实体手柄复验。
+点击画面获得输入焦点。按住投掷蓄力，松开投出；空手按住同一键召回。完整蓄力约一秒。冲刺可越过水坑；下落前 0.33 秒可在冷却允许时冲刺自救一次。两支手柄按连接顺序分配；Gamepad API 已使用虚拟输入验证，未用实体手柄复验。
 
 ## SDK
 
@@ -46,10 +48,10 @@ npm run dev
 npm run build:sdk
 npm run verify:sdk
 # 在另一个项目安装；也可以使用绝对路径
-npm install ./dist-sdk/boomerang-garden-sdk-0.2.0.tgz
+npm install ./dist-sdk/boomerang-garden-sdk-0.3.0.tgz
 ```
 
-交付的是本地 ESM 包 `@boomerang-garden/sdk@0.2.0`，未发布 npm。
+交付的是本地 ESM 包 `@boomerang-garden/sdk@0.3.0`，未发布 npm。
 
 ```js
 import { createBrowserGame } from '@boomerang-garden/sdk/browser';
@@ -88,12 +90,13 @@ npm run preview
 # 以下浏览器测试需对应服务器运行，使用本机 Chrome
 npm run test:browser        # 5173：五图、输入、装备、暂停、换图
 npm run test:sdk-browser    # 5173：注入、接管、多实例、销毁
+npm run test:v3-browser     # 5173：缩圈/死亡实际流程与独立呈现样本
 node scripts/production-smoke.mjs # 4173：正式游戏 + SDK 演示
 npm run build:sdk
 npm run verify:sdk          # 独立目录安装 tarball，Node + 浏览器消费
 ```
 
-`dist/` 可部署到普通静态站点；本轮没有对外部署。最新验收包括 92 项逻辑测试、五地图多种种子的完整对局、真实浏览器输入与 SDK 包独立消费，详见 [第二阶段验收](docs/v2-validation.md)。第一版报告保留为历史记录。
+`dist/` 可部署到普通静态站点；本轮没有对外部署。第三阶段覆盖缩圈、死亡、下落与 SDK 0.3，详见 [第三阶段验收](docs/v3-validation.md)。[第二阶段验收](docs/v2-validation.md)及第一版报告保留为历史记录。
 
 ## 分层
 
@@ -116,10 +119,12 @@ src/sdk-demo.ts  使用相同公开 API 的接管演示
 - [机制与操作手感](docs/mechanics-and-feel.md)
 - [过场与动画](docs/transitions-analysis.md)
 - [地图扩展与验证](docs/maps-expansion.md)
+- [矩形边界与缩圈](docs/sudden-death-analysis.md)
+- [死亡反馈](docs/death-feedback-analysis.md)
 - [官方玩法和版本资料](docs/official-gameplay.md)
 
 研究对象：`F:\SteamLibrary\steamapps\common\Boomerang Fu`。本轮未启动原版；结论来自安装文件、反编译 CIL 和 Unity 序列化资源。报告区分代码默认值、资源值和 Web 设计选择，不能据此声称逐帧还原或实机手感一致。
 
-Web 保留简化的飞镖动力学、回收、边缘保护/落水、AI 和自动回合结算；地图为原创布局，并非导入原版全部地图。尚未覆盖全部角色美术、14 种强化、组队/黄金回旋镖/躲猫猫或联网。原版资源及分析工具不进入站点或 SDK。
+Web 保留简化的飞镖动力学、回收、下落惯性与 AI；边界仅支持轴对齐矩形，地图为原创布局，并非导入原版全部地图。尚未覆盖缩圈强化、全部角色美术、14 种强化、组队/黄金回旋镖/躲猫猫或联网。原版资源及分析工具不进入站点或 SDK。
 
 `tools/`、`analysis/evidence/`、`analysis/derived/`、`test-results/` 和构建产物默认忽略 Git。原版离线分析使用 ILSpy / UnityPy，它们不是 Web 游戏运行或构建依赖。

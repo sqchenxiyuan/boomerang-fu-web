@@ -72,7 +72,7 @@ assert.equal(
 );
 const installed = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'));
 assert.equal(installed.name, '@boomerang-garden/sdk');
-assert.equal(installed.version, '0.2.0');
+assert.equal(installed.version, '0.3.0');
 assert.ok(
   installed.exports['.'].types &&
     installed.exports['./browser'].types &&
@@ -112,6 +112,7 @@ function ready(session) {
   throw new Error('Session did not reach playable armed state.');
 }
 const session = createSession({ mapId: 'canal', seed: 41, bots: 1 });
+assert.equal(session.getState().options.suddenDeathTime, 180);
 session.acquire(1, 'idle opponent');
 const external = session.acquire(0, 'node external controller');
 const events = [];
@@ -174,6 +175,27 @@ humanAgain.release();
 assert.equal(handoff.snapshot().controls.find((control) => control.actorId === 0).kind, 'idle', 'Expired external ownership cannot be resurrected by releasing a takeover.');
 handoff.destroy();
 
+const shrinking = createSession({ mapId: 'market', seed: 41, mode: 'local', bots: 0, suddenDeathTime: 1 });
+const shrinkEvents = [];
+shrinking.onEvent((entry) => { if (entry.type === 'game') shrinkEvents.push(entry.event); });
+for (let i = 0; i < 1800; i++) {
+  shrinking.step();
+  if (shrinking.getState().actors.some((actor) => actor.death?.variant === 'burst')) break;
+}
+const shrunkState = shrinking.getState();
+assert.equal(shrinkEvents.filter((event) => event.type === 'boundary').length, 1);
+assert.ok(shrunkState.boundary.halfSize.x < shrunkState.boundary.startHalfSize.x);
+assert.ok(shrunkState.actors.some((actor) => actor.death?.cause === 'boundary' && actor.death.variant === 'burst'));
+assert.ok(shrinkEvents.some((event) => event.type === 'death' && event.variant === 'burst' && event.direction));
+shrinking.pause();
+const deathSnapshot = shrinking.getState();
+shrinking.step(60);
+assert.deepEqual(shrinking.getState(), deathSnapshot);
+shrinking.start();
+assert.equal(shrinking.getState().boundary.phase, 'idle');
+assert.ok(shrinking.getState().actors.every((actor) => !actor.death && !actor.outOfBounds && !actor.fall));
+shrinking.destroy();
+
 for (const name of names) {
   const descriptor = descriptors.get(name);
   if (descriptor) Object.defineProperty(globalThis, name, descriptor);
@@ -181,7 +203,7 @@ for (const name of names) {
 }
 const browser = await import('@boomerang-garden/sdk/browser');
 assert.equal(typeof browser.createBrowserGame, 'function');
-console.log(JSON.stringify({ ok: true, imports: ['core', 'types', 'browser'], coreWithoutDOM: true, externalMovement: true, chargeRelease: true, ttlCancelsCharge: true, detachedSnapshots: true, pause: true, script: true, humanTakeover: true, staleHandleRejected: true }));
+console.log(JSON.stringify({ ok: true, imports: ['core', 'types', 'browser'], coreWithoutDOM: true, externalMovement: true, chargeRelease: true, ttlCancelsCharge: true, detachedSnapshots: true, pause: true, script: true, humanTakeover: true, staleHandleRejected: true, rectangularBoundary: true, persistentDeath: true }));
 `;
 await writeFile(resolve(INSTALL, 'controls.mjs'), probe);
 const controls = JSON.parse(runNode([resolve(INSTALL, 'controls.mjs')]).trim());
@@ -189,11 +211,14 @@ const match = JSON.parse(runNode([resolve(packageRoot, 'examples/node-bots.mjs')
 
 const coreTypes = `import { createSession, GameSession } from '@boomerang-garden/sdk';
 import type { Action, ScriptContext, SessionSnapshot } from '@boomerang-garden/sdk/types';
-const session: GameSession = createSession({ mapId: 'canal', seed: 41 });
+const session: GameSession = createSession({ mapId: 'canal', seed: 41, suddenDeathTime: 30 });
 const action: Action = { move: { x: 1, y: 0 }, throw: true };
 session.acquire(0).submit(action, 6);
 session.useScript(0, (context: ScriptContext): Action => ({ attack: context.tick % 60 === 0 }));
 const snapshot: SessionSnapshot = session.snapshot();
+const phase: 'idle' | 'shrinking' | 'settled' = snapshot.state.boundary.phase;
+const deathVariant: 'slice' | 'squash' | 'water' | 'cliff' | 'burst' | undefined = snapshot.state.actors[0].death?.variant;
+void phase; void deathVariant;
 void snapshot;
 session.destroy();
 `;

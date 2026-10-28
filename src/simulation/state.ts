@@ -2,6 +2,7 @@ import { createArena, selectRoundMap } from '../core/arena';
 import { RULES } from '../core/config';
 import { normalize, sub, v } from '../core/math';
 import type { Actor, GameState, MatchOptions } from '../core/types';
+import { createBoundary } from './boundary';
 
 export const defaultOptions = (): MatchOptions => ({
   mode: 'solo',
@@ -11,6 +12,7 @@ export const defaultOptions = (): MatchOptions => ({
   scoreGoal: RULES.scoreGoal,
   mapId: 'courtyard',
   mapRotation: 'fixed',
+  suddenDeathTime: RULES.suddenDeathStart,
 });
 
 export function makeActor(id: number, controller: Actor['controller'], humanIndex: number): Actor {
@@ -26,6 +28,10 @@ export function makeActor(id: number, controller: Actor['controller'], humanInde
     facingHistory: [],
     alive: true,
     deathTime: 0,
+    death: undefined,
+    fall: undefined,
+    fallsSaved: 0,
+    outOfBounds: undefined,
     score: 0,
     kills: 0,
     armed: true,
@@ -62,7 +68,11 @@ export function createState(options: MatchOptions = defaultOptions()): GameState
     makeActor(i, i < humanCount ? 'human' : 'bot', i < humanCount ? i : -1),
   );
   const state: GameState = {
-    options: { ...options, bots: botCount },
+    options: {
+      ...options,
+      bots: botCount,
+      suddenDeathTime: options.suddenDeathTime ?? RULES.suddenDeathStart,
+    },
     phase: 'countdown',
     phaseTime: 0,
     time: 0,
@@ -77,6 +87,9 @@ export function createState(options: MatchOptions = defaultOptions()): GameState
     events: [],
     nextId: 1,
     pickupTimer: 3,
+    boundary: createBoundary(createArena(options.mapId)),
+    suddenDeathStarted: false,
+    roundFinishTimer: null,
     safeRadius: 100,
     hitStop: 0,
     weaponsGranted: false,
@@ -92,7 +105,10 @@ export function resetRound(state: GameState): void {
   state.phase = 'countdown';
   state.phaseTime = 0;
   state.roundTime = 0;
-  state.safeRadius = 100;
+  state.boundary = createBoundary(state.arena);
+  state.suddenDeathStarted = false;
+  state.roundFinishTimer = null;
+  state.safeRadius = Math.min(state.boundary.halfSize.x, state.boundary.halfSize.y);
   state.hitStop = 0;
   state.weaponsGranted = false;
   state.winnerId = null;

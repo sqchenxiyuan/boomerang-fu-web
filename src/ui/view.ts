@@ -77,7 +77,7 @@ export class View {
         <div class="eyebrow"><span class="live-dot"></span> COURTYARD CLUB · 01</div>
         <h1 id="menu-title">小小花园，<br>大大<span>回旋。</span></h1>
         <p class="intro">扔出去，接回来。<br>和食物伙伴过上几招，最后站着的人赢。</p>
-        <div class="mode-selector" role="group" aria-label="游戏模式"><button class="mode selected" data-mode="solo" aria-pressed="true">单人挑战 <span>VS 机器人</span></button><button class="mode" data-mode="local" aria-pressed="false">同屏双人 <span>和朋友一起</span></button></div>
+        <div class="mode-selector" role="group" aria-label="游戏模式"><button class="mode selected" data-mode="solo" aria-pressed="true">单人挑战 <span>VS 机器人</span></button><button class="mode" data-mode="local" aria-pressed="false">同屏双人 <span>和朋友一起</span></button><button class="mode" data-mode="bots" aria-pressed="false">AI 观战 <span>机器人互战</span></button></div>
         <div class="settings-row"><label>机器人<select id="bots" aria-label="机器人数量"><option value="1">1 位对手</option><option value="3">3 位对手</option></select></label><label>难度<select id="difficulty" aria-label="机器人难度"><option value="easy">轻松</option><option value="normal" selected>标准</option><option value="hard">挑战</option></select></label></div>
         <div class="settings-row map-settings"><label>地图<select id="map" aria-label="地图">${mapOptions()}</select></label><label>回合换图<select id="rotation" aria-label="回合换图"><option value="fixed">固定地图</option><option value="cycle">依次轮换</option></select></label></div>
         <p class="map-description" id="map-description">${mapInfo('original-enclosed').description}</p>
@@ -142,9 +142,11 @@ export class View {
           b.setAttribute('aria-pressed', String(b === button));
         });
         this.get<HTMLSelectElement>('bots').innerHTML =
-          selectedMode === 'solo'
-            ? '<option value="1">1 位对手</option><option value="3">3 位对手</option>'
-            : '<option value="0">只有我们俩</option><option value="2">再加 2 位</option>';
+          selectedMode === 'bots'
+            ? '<option value="2">2 位机器人</option><option value="4">4 位机器人</option>'
+            : selectedMode === 'solo'
+              ? '<option value="1">1 位对手</option><option value="3">3 位对手</option>'
+              : '<option value="0">只有我们俩</option><option value="2">再加 2 位</option>';
       }),
     );
     const start = (practice = false): void => {
@@ -236,7 +238,7 @@ export class View {
     button.setAttribute('aria-pressed', String(muted));
   }
 
-  events(events: GameEvent[], elapsed: number): void {
+  events(events: GameEvent[], elapsed: number, spectating = false): void {
     for (const event of events) {
       if (event.type === 'pickup' && event.power) {
         this.get('toast').textContent =
@@ -246,13 +248,16 @@ export class View {
       }
     }
     if (events.some((event) => event.type === 'equip' && event.actorId === 0)) {
-      this.text('toast', '回旋镖已就绪！按 K 蓄力投掷 · J 挥砍');
+      this.text(
+        'toast',
+        spectating ? '回旋镖已发放，战斗开始！' : '回旋镖已就绪！按 K 蓄力投掷 · J 挥砍',
+      );
       this.toastUntil = elapsed + 2;
       this.get('toast').hidden = false;
     }
   }
 
-  update(state: GameState, elapsed: number): void {
+  update(state: GameState, elapsed: number, replay = false): void {
     if (elapsed > this.toastUntil) this.get('toast').hidden = true;
     if (this.mode === 'menu') return;
     const presentation = transitionPresentation(state);
@@ -272,9 +277,11 @@ export class View {
     if (scores !== this.lastScores) {
       this.lastScores = scores;
       this.get('control-strip').innerHTML =
-        state.options.mode === 'local'
-          ? `<span>1P ${key('WASD')} ${key('J K L')}</span><span>2P ${key('↑↓←→')} ${key(', . /')}</span><span>近战 / 投掷 / 冲刺</span><span>${key('Esc')} 暂停</span>`
-          : `<span>${key('WASD')} 移动</span><span>${key('J')} 挥砍</span><span>${key('K')} 按住蓄力 / 召回</span><span>${key('L')} 冲刺</span><span>${key('Esc')} 暂停</span>`;
+        replay || state.options.mode === 'bots'
+          ? '<span>AI 对战 / 回放观战</span><span>右上方可以调整速度、录制和回放</span>'
+          : state.options.mode === 'local'
+            ? `<span>1P ${key('WASD')} ${key('J K L')}</span><span>2P ${key('↑↓←→')} ${key(', . /')}</span><span>近战 / 投掷 / 冲刺</span><span>${key('Esc')} 暂停</span>`
+            : `<span>${key('WASD')} 移动</span><span>${key('J')} 挥砍</span><span>${key('K')} 按住蓄力 / 召回</span><span>${key('L')} 冲刺</span><span>${key('Esc')} 暂停</span>`;
       this.scoreboard.innerHTML = state.actors
         .map(
           (actor) =>
@@ -354,13 +361,15 @@ export class View {
       banner.style.transform = `scale(${presentation.labelScale})`;
       banner.style.opacity = String(presentation.showScores ? presentation.scoreOpacity : 1);
     }
-    if (state.phase === 'matchEnd' && this.mode !== 'ended') {
+    if (!replay && state.phase === 'matchEnd' && this.mode !== 'ended') {
       const winner = state.actors.find((a) => a.id === state.matchWinnerId)!;
       this.get('result-title').textContent = `${ROSTER[winner.id].name}，花园冠军！`;
       this.get('result-subtitle').textContent =
-        winner.controller === 'human'
-          ? '漂亮的一局。回旋镖还想再飞一会儿。'
-          : '差一点点。下次试试用挥砍反弹它的飞镖。';
+        state.options.mode === 'bots'
+          ? 'AI 对战结束。可以保存录像、回看精彩瞬间或开始下一局。'
+          : winner.controller === 'human'
+            ? '漂亮的一局。回旋镖还想再飞一会儿。'
+            : '差一点点。下次试试用挥砍反弹它的飞镖。';
       this.get('final-scores').innerHTML = [...state.actors]
         .sort((a, b) => b.score - a.score)
         .map(

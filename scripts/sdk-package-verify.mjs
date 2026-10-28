@@ -77,7 +77,7 @@ assert.equal(
 );
 const installed = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'));
 assert.equal(installed.name, '@boomerang-garden/sdk');
-assert.equal(installed.version, '0.5.0');
+assert.equal(installed.version, '0.6.0');
 assert.ok(
   installed.exports['.'].types &&
     installed.exports['./browser'].types &&
@@ -248,7 +248,7 @@ await writeFile(resolve(INSTALL, 'controls.mjs'), probe);
 const controls = JSON.parse(runNode([resolve(INSTALL, 'controls.mjs')]).trim());
 const match = JSON.parse(runNode([resolve(packageRoot, 'examples/node-bots.mjs')]).trim());
 
-const coreTypes = `import { createSession, GameSession } from '@boomerang-garden/sdk';
+const coreTypes = `import { createSession, GameSession, ReplayPlayer, runAIMatch, createHttpAgent } from '@boomerang-garden/sdk';
 import type { PowerupKind, DeathCause } from '@boomerang-garden/sdk';
 import type { Action, ScriptContext, SessionSnapshot } from '@boomerang-garden/sdk/types';
 const powers: PowerupKind[] = ['shield','haste','explosive','wallDash','reverse','multi','teleport','fire','extra','ice','disguise','controlled','shrink','decoy'];
@@ -264,6 +264,11 @@ const deathVariant: 'slice' | 'squash' | 'water' | 'cliff' | 'burst' | undefined
 const deathCauses: DeathCause[] = ['weapon','explosion','fall','boundary','fire','telefrag'];
 void phase; void deathVariant; void deathCauses; void status; void tick;
 void snapshot;
+session.startRecording({label:'typecheck'});
+const recording = session.stopRecording();
+if (recording) new ReplayPlayer(recording).seek(0);
+void runAIMatch({agents:{0:(observation,signal)=>({attack:!signal.aborted && observation.tick%30===0})}});
+void createHttpAgent('http://127.0.0.1:8787/action');
 session.destroy();
 `;
 const browserTypes = `import { createBrowserGame } from '@boomerang-garden/sdk/browser';
@@ -272,6 +277,8 @@ const game = createBrowserGame(host, { match: { mapId: 'portals' }, keyboard: fa
 const calls: number = game.stats().render.calls;
 const canvas: HTMLCanvasElement = game.canvas;
 game.session.useBot(0);
+game.configureAudio({music:0.5,sfx:0.8,muted:false});
+game.setSpeed(4);
 void calls; void canvas;
 game.destroy();
 `;

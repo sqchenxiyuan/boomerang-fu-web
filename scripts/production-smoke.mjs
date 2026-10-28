@@ -24,7 +24,10 @@ page.on('console', (message) => {
   if (message.type() === 'error') errors.push(message.text());
 });
 page.on('request', (request) => {
-  if (!request.url().startsWith(`${BASE}/`) && !request.url().startsWith('data:'))
+  // Tone's audio scheduler creates local blob workers; these do not contact a server.
+  const localBlob =
+    request.url().startsWith('blob:') && new URL(request.url()).origin === new URL(BASE).origin;
+  if (!request.url().startsWith(`${BASE}/`) && !request.url().startsWith('data:') && !localBlob)
     external.push(request.url());
 });
 page.on('response', (response) => {

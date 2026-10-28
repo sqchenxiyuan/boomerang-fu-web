@@ -11,7 +11,10 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && node scripts/build-replay-schema.mjs --check",
+    "test:v6-browser": "node scripts/v6-browser-verify.mjs",
+    "test:v6-audio": "node scripts/v6-audio-clock-verify.mjs",
+    "test:v6-node": "node scripts/v6-node-verify.mjs",
     "test:browser": "node scripts/v2-browser-verify.mjs",
     "test:sdk-browser": "node scripts/sdk-browser-verify.mjs",
     "test:v3-browser": "node scripts/v3-browser-verify.mjs",
@@ -19,7 +22,8 @@
     "format:check": "prettier --check src tests scripts/*.mjs examples/*.mjs examples/*.js index.html sdk-demo.html vite.config.ts package.json tsconfig.json tsconfig.sdk.json"
   },
   "dependencies": {
-    "three": "^0.180.0"
+    "three": "^0.180.0",
+    "tone": "15.1.22"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",

@@ -1,5 +1,6 @@
 import type { Command, GameEvent, GameState, MatchOptions } from '../core/types';
 import type { Vec2 } from '../core/math';
+import type { ReplayData, RecordingOptions, RecordingStatus } from './recording';
 
 /** A full button-state sample. Omitted controls are neutral; edges are derived by the SDK. */
 export interface Action {
@@ -52,6 +53,10 @@ export interface SessionAPI {
   /** Allocation-free lifecycle reads; remain available after destroy. */
   readonly status: SessionSnapshot['status'];
   readonly tick: number;
+  readonly recording: RecordingStatus | null;
+  startRecording(options?: RecordingOptions): void;
+  stopRecording(): ReplayData | null;
+  getRecording(): ReplayData | null;
   start(options?: Partial<MatchOptions>): void;
   pause(): void;
   resume(): void;

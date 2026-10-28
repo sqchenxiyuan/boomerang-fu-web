@@ -3,6 +3,9 @@ import { idleCommand } from '../core/types';
 import type { Actor, Command, GameState, MatchOptions } from '../core/types';
 import { Game } from '../simulation/game';
 import { defaultOptions } from '../simulation/state';
+import { clearActorInput } from '../simulation/input-state';
+import { MatchRecorder } from './recording';
+import type { ReplayData, RecordingOptions, RecordingStatus } from './recording';
 import {
   actionSample,
   BotDriver,
@@ -64,6 +67,8 @@ export class GameSession implements SessionAPI {
   #generation = 0;
   #epoch = 0;
   #listenerErrors = 0;
+  #recorder: MatchRecorder | null = null;
+  #lastRecording: ReplayData | null = null;
 
   constructor(options: Partial<MatchOptions> = {}) {
     const resolved = matchOptions(defaultOptions(), options);
@@ -80,9 +85,32 @@ export class GameSession implements SessionAPI {
     return this.#tick;
   }
 
+  get recording(): RecordingStatus | null {
+    return this.#recorder?.status ?? null;
+  }
+  startRecording(options: RecordingOptions = {}): void {
+    this.#mutable();
+    if (this.#recorder) throw new Error('A recording is already active');
+    this.#recorder = new MatchRecorder(this.#game, options);
+  }
+  stopRecording(): ReplayData | null {
+    this.#mutable();
+    this.#finishRecording('manual');
+    return this.getRecording();
+  }
+  getRecording(): ReplayData | null {
+    return this.#lastRecording ? structuredClone(this.#lastRecording) : null;
+  }
+  #finishRecording(reason: ReplayData['stopReason']): void {
+    if (!this.#recorder) return;
+    this.#lastRecording = this.#recorder.finish(this.#game, reason);
+    this.#recorder = null;
+  }
+
   start(options: Partial<MatchOptions> = {}): void {
     this.#mutable();
     const resolved = matchOptions(this.#game.state.options, options);
+    this.#finishRecording('restart');
     this.#game.start(resolved);
     this.#bots = new BotDriver(resolved.seed);
     this.#controls.clear();
@@ -142,6 +170,7 @@ export class GameSession implements SessionAPI {
             this.#routing = false;
           }
         }
+        this.#recorder?.step(commands);
         this.#game.step(commands);
         this.#tick++;
         const events = this.#game.drainEvents();
@@ -155,6 +184,11 @@ export class GameSession implements SessionAPI {
         }
         if (!this.#sameEpoch(epoch)) break;
         this.#emit({ type: 'step', tick: this.#tick });
+        this.#recorder?.capture(this.#game);
+        if (this.#recorder?.full) this.#finishRecording('size-limit');
+        else if (this.#recorder && this.#recorder.status.ticks >= this.#recorder.maxTicks)
+          this.#finishRecording('limit');
+        else if (this.#game.state.phase === 'matchEnd') this.#finishRecording('match-end');
       }
     } finally {
       this.#stepping = false;
@@ -270,6 +304,7 @@ export class GameSession implements SessionAPI {
     if (this.#status === 'disposed') return;
     this.#mutable();
     this.#clearInputs();
+    this.#finishRecording('destroy');
     this.#status = 'disposed';
     this.#epoch++;
     this.#emit({ type: 'lifecycle', action: 'destroy' });
@@ -406,15 +441,7 @@ export class GameSession implements SessionAPI {
     slot.human = undefined;
     const actor = this.#game.state.actors.find((item) => item.id === slot.actorId);
     if (!actor) return;
-    actor.charge = 0;
-    actor.recalling = false;
-    actor.controlling = false;
-    actor.controlDirection = { x: 0, y: 0 };
-    actor.throwBlocked = false;
-    actor.facingHistory = [];
-    actor.aimMoveLag = 0;
-    actor.bufferedDash = 0;
-    actor.bufferedAttack = 0;
+    if (clearActorInput(actor)) this.#recorder?.reset(actor.id);
   }
 
   #clearInputs(): void {

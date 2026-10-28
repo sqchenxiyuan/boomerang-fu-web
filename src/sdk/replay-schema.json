@@ -1,0 +1,737 @@
+{
+  "root": "GameState",
+  "definitions": {
+    "GameState": {
+      "fields": {
+        "phase": { "ref": "Phase" },
+        "phaseTime": { "type": "number" },
+        "time": { "type": "number" },
+        "roundTime": { "type": "number" },
+        "round": { "type": "number" },
+        "winnerId": { "any": [{ "type": "number" }, { "enum": [null] }] },
+        "matchWinnerId": { "any": [{ "type": "number" }, { "enum": [null] }] },
+        "actors": { "array": { "ref": "Actor" } },
+        "discs": { "array": { "ref": "Disc" } },
+        "pickups": { "array": { "ref": "Pickup" } },
+        "zones": { "array": { "ref": "HazardZone" } },
+        "decoys": { "array": { "ref": "DecoyState" } },
+        "arena": { "ref": "Arena" },
+        "events": { "array": { "ref": "GameEvent" } },
+        "nextId": { "type": "number" },
+        "pickupTimer": { "type": "number" },
+        "boundary": { "ref": "BoundaryState" },
+        "suddenDeathStarted": { "type": "boolean" },
+        "roundFinishTimer": { "any": [{ "type": "number" }, { "enum": [null] }] },
+        "safeRadius": { "type": "number" },
+        "hitStop": { "type": "number" },
+        "weaponsGranted": { "type": "boolean" },
+        "options": { "ref": "MatchOptions" }
+      },
+      "optional": []
+    },
+    "Phase": {
+      "any": [
+        { "enum": ["menu"] },
+        { "enum": ["countdown"] },
+        { "enum": ["playing"] },
+        { "enum": ["roundEnd"] },
+        { "enum": ["matchEnd"] }
+      ]
+    },
+    "Actor": {
+      "fields": {
+        "id": { "type": "number" },
+        "controller": { "any": [{ "enum": ["human"] }, { "enum": ["bot"] }] },
+        "humanIndex": { "type": "number" },
+        "position": { "ref": "Vec2" },
+        "previous": { "ref": "Vec2" },
+        "velocity": { "ref": "Vec2" },
+        "facing": { "ref": "Vec2" },
+        "facingHistory": { "array": { "ref": "Vec2" } },
+        "alive": { "type": "boolean" },
+        "deathTime": { "type": "number" },
+        "death": { "ref": "DeathState" },
+        "fall": {
+          "fields": {
+            "kind": { "any": [{ "enum": ["water"] }, { "enum": ["cliff"] }] },
+            "elapsed": { "type": "number" },
+            "duration": { "type": "number" }
+          },
+          "optional": []
+        },
+        "fallsSaved": { "type": "number" },
+        "outOfBounds": {
+          "fields": { "remaining": { "type": "number" }, "duration": { "type": "number" } },
+          "optional": []
+        },
+        "score": { "type": "number" },
+        "kills": { "type": "number" },
+        "armed": { "type": "boolean" },
+        "heldDiscs": { "type": "number" },
+        "reverseTime": { "type": "number" },
+        "frozenTime": { "type": "number" },
+        "burnTime": { "type": "number" },
+        "burnSourceId": { "type": "number" },
+        "burnDistance": { "type": "number" },
+        "disguised": { "type": "boolean" },
+        "disguiseTime": { "type": "number" },
+        "controlling": { "type": "boolean" },
+        "controlDirection": { "ref": "Vec2" },
+        "abilityCooldown": { "type": "number" },
+        "phaseOrigin": { "ref": "Vec2" },
+        "positivePickups": { "type": "number" },
+        "iceExposure": { "type": "number" },
+        "slowed": { "type": "boolean" },
+        "wetFloor": { "type": "boolean" },
+        "slideFactor": { "type": "number" },
+        "surfaceDrag": { "type": "number" },
+        "movingFloorId": { "type": "string" },
+        "decoyCreated": { "type": "boolean" },
+        "freezeChipCooldown": { "type": "number" },
+        "charge": { "type": "number" },
+        "aimMoveLag": { "type": "number" },
+        "lungeTime": { "type": "number" },
+        "lungeRecovery": { "type": "number" },
+        "recalling": { "type": "boolean" },
+        "throwBlocked": { "type": "boolean" },
+        "dashTime": { "type": "number" },
+        "dashCooldown": { "type": "number" },
+        "dashDirection": { "ref": "Vec2" },
+        "attackTime": { "type": "number" },
+        "attackCooldown": { "type": "number" },
+        "attackSerial": { "type": "number" },
+        "attackArmed": { "type": "boolean" },
+        "hitTargets": { "array": { "type": "number" } },
+        "stun": { "type": "number" },
+        "invulnerable": { "type": "number" },
+        "powers": { "array": { "ref": "PowerupKind" } },
+        "shield": { "type": "boolean" },
+        "bufferedDash": { "type": "number" },
+        "bufferedAttack": { "type": "number" },
+        "portalCooldown": { "type": "number" }
+      },
+      "optional": [
+        "death",
+        "fall",
+        "fallsSaved",
+        "outOfBounds",
+        "heldDiscs",
+        "reverseTime",
+        "frozenTime",
+        "burnTime",
+        "burnSourceId",
+        "burnDistance",
+        "disguised",
+        "disguiseTime",
+        "controlling",
+        "controlDirection",
+        "abilityCooldown",
+        "phaseOrigin",
+        "positivePickups",
+        "iceExposure",
+        "slowed",
+        "wetFloor",
+        "slideFactor",
+        "surfaceDrag",
+        "movingFloorId",
+        "decoyCreated",
+        "freezeChipCooldown",
+        "portalCooldown"
+      ]
+    },
+    "Vec2": { "fields": { "x": { "type": "number" }, "y": { "type": "number" } }, "optional": [] },
+    "DeathState": {
+      "fields": {
+        "cause": { "ref": "DeathCause" },
+        "variant": {
+          "any": [
+            { "enum": ["slice"] },
+            { "enum": ["squash"] },
+            { "enum": ["water"] },
+            { "enum": ["cliff"] },
+            { "enum": ["burst"] }
+          ]
+        },
+        "time": { "type": "number" },
+        "position": { "ref": "Vec2" },
+        "direction": { "ref": "Vec2" },
+        "seed": { "type": "number" }
+      },
+      "optional": []
+    },
+    "DeathCause": {
+      "any": [
+        { "enum": ["weapon"] },
+        { "enum": ["explosion"] },
+        { "enum": ["fall"] },
+        { "enum": ["boundary"] },
+        { "enum": ["fire"] },
+        { "enum": ["telefrag"] },
+        { "enum": ["crush"] }
+      ]
+    },
+    "PowerupKind": {
+      "enum": [
+        "shield",
+        "haste",
+        "explosive",
+        "wallDash",
+        "reverse",
+        "multi",
+        "teleport",
+        "fire",
+        "extra",
+        "ice",
+        "disguise",
+        "controlled",
+        "shrink",
+        "decoy"
+      ]
+    },
+    "Disc": {
+      "fields": {
+        "id": { "type": "number" },
+        "ownerId": { "type": "number" },
+        "damageOwnerId": { "type": "number" },
+        "position": { "ref": "Vec2" },
+        "previous": { "ref": "Vec2" },
+        "velocity": { "ref": "Vec2" },
+        "state": {
+          "any": [{ "enum": ["outbound"] }, { "enum": ["returning"] }, { "enum": ["dropped"] }]
+        },
+        "age": { "type": "number" },
+        "stateTime": { "type": "number" },
+        "charge": { "type": "number" },
+        "curve": { "type": "number" },
+        "bounces": { "type": "number" },
+        "explosive": { "type": "boolean" },
+        "powers": { "array": { "ref": "PowerupKind" } },
+        "mini": { "type": "boolean" },
+        "groupId": { "type": "number" },
+        "trailTime": { "type": "number" },
+        "fuse": { "type": "number" },
+        "grace": { "type": "number" },
+        "lastDeflector": { "type": "number" },
+        "dead": { "type": "boolean" },
+        "portalCooldown": { "type": "number" }
+      },
+      "optional": ["powers", "mini", "groupId", "trailTime", "portalCooldown"]
+    },
+    "Pickup": {
+      "fields": {
+        "id": { "type": "number" },
+        "position": { "ref": "Vec2" },
+        "kind": { "ref": "PowerupKind" },
+        "age": { "type": "number" }
+      },
+      "optional": []
+    },
+    "HazardZone": {
+      "fields": {
+        "id": { "type": "number" },
+        "kind": { "any": [{ "enum": ["fire"] }, { "enum": ["ice"] }] },
+        "position": { "ref": "Vec2" },
+        "ownerId": { "type": "number" },
+        "radius": { "type": "number" },
+        "remaining": { "type": "number" },
+        "duration": { "type": "number" }
+      },
+      "optional": []
+    },
+    "DecoyState": {
+      "fields": {
+        "id": { "type": "number" },
+        "ownerId": { "type": "number" },
+        "position": { "ref": "Vec2" },
+        "previous": { "ref": "Vec2" },
+        "velocity": { "ref": "Vec2" },
+        "facing": { "ref": "Vec2" },
+        "powers": { "array": { "ref": "PowerupKind" } },
+        "alive": { "type": "boolean" },
+        "age": { "type": "number" },
+        "dashTime": { "type": "number" }
+      },
+      "optional": []
+    },
+    "Arena": {
+      "fields": {
+        "id": { "ref": "MapId" },
+        "revision": { "type": "number" },
+        "halfWidth": { "type": "number" },
+        "halfHeight": { "type": "number" },
+        "obstacles": { "array": { "ref": "Obstacle" } },
+        "pits": { "array": { "ref": "Pit" } },
+        "spawns": { "array": { "ref": "Vec2" } },
+        "pickupSpawns": { "array": { "ref": "Vec2" } },
+        "portals": { "array": { "ref": "Portal" } },
+        "floors": { "array": { "ref": "Floor" } },
+        "surfaces": { "array": { "ref": "Surface" } },
+        "environment": { "ref": "EnvironmentState" },
+        "sourceScene": { "type": "string" },
+        "hazard": { "any": [{ "enum": ["water"] }, { "enum": ["cliff"] }] },
+        "boundary": {
+          "fields": {
+            "center": { "ref": "Vec2" },
+            "half": { "ref": "Vec2" },
+            "angle": { "type": "number" },
+            "allowOutside": { "type": "boolean" }
+          },
+          "optional": []
+        }
+      },
+      "optional": [
+        "id",
+        "revision",
+        "portals",
+        "floors",
+        "surfaces",
+        "environment",
+        "sourceScene",
+        "hazard",
+        "boundary"
+      ]
+    },
+    "MapId": { "any": [{ "ref": "LegacyMapId" }, { "prefix": "original-" }] },
+    "LegacyMapId": {
+      "any": [
+        { "enum": ["courtyard"] },
+        { "enum": ["canal"] },
+        { "enum": ["market"] },
+        { "enum": ["switchback"] },
+        { "enum": ["portals"] }
+      ]
+    },
+    "Obstacle": {
+      "fields": {
+        "id": { "type": "string" },
+        "position": { "ref": "Vec2" },
+        "kind": { "any": [{ "enum": ["stone"] }, { "enum": ["crate"] }, { "enum": ["fountain"] }] },
+        "half": { "ref": "Vec2" },
+        "broken": { "type": "boolean" },
+        "paths": { "array": { "array": { "ref": "Vec2" } } },
+        "angle": { "type": "number" },
+        "radius": { "type": "number" },
+        "height": { "type": "number" },
+        "baseHeight": { "type": "number" },
+        "material": { "type": "string" },
+        "sourceName": { "type": "string" },
+        "sourceLayer": { "type": "number" },
+        "mechanismId": { "type": "string" },
+        "disabled": { "type": "boolean" }
+      },
+      "optional": [
+        "paths",
+        "angle",
+        "radius",
+        "height",
+        "baseHeight",
+        "material",
+        "sourceName",
+        "sourceLayer",
+        "mechanismId",
+        "disabled"
+      ]
+    },
+    "Pit": {
+      "fields": { "position": { "ref": "Vec2" }, "half": { "ref": "Vec2" } },
+      "optional": []
+    },
+    "Portal": {
+      "fields": {
+        "height": { "type": "number" },
+        "baseHeight": { "type": "number" },
+        "id": { "type": "string" },
+        "exitId": { "type": "string" },
+        "position": { "ref": "Vec2" },
+        "direction": { "ref": "Vec2" },
+        "radius": { "type": "number" },
+        "color": { "type": "string" },
+        "half": { "ref": "Vec2" },
+        "triggerOffset": { "ref": "Vec2" },
+        "angle": { "type": "number" },
+        "thickness": { "type": "number" },
+        "safeForAI": { "type": "boolean" }
+      },
+      "optional": [
+        "height",
+        "baseHeight",
+        "half",
+        "triggerOffset",
+        "angle",
+        "thickness",
+        "safeForAI"
+      ]
+    },
+    "Floor": {
+      "fields": {
+        "id": { "type": "string" },
+        "position": { "ref": "Vec2" },
+        "paths": { "array": { "array": { "ref": "Vec2" } } },
+        "radius": { "type": "number" },
+        "angle": { "type": "number" },
+        "kind": {
+          "any": [
+            { "enum": ["ground"] },
+            { "enum": ["ice"] },
+            { "enum": ["wood"] },
+            { "enum": ["falling"] },
+            { "enum": ["moving"] }
+          ]
+        },
+        "active": { "type": "boolean" },
+        "height": { "type": "number" },
+        "mechanismId": { "type": "string" },
+        "fallProgress": { "type": "number" },
+        "warning": { "type": "number" }
+      },
+      "optional": ["radius", "angle", "height", "mechanismId", "fallProgress", "warning"]
+    },
+    "Surface": {
+      "fields": {
+        "id": { "type": "string" },
+        "position": { "ref": "Vec2" },
+        "paths": { "array": { "array": { "ref": "Vec2" } } },
+        "radius": { "type": "number" },
+        "angle": { "type": "number" },
+        "kind": { "any": [{ "enum": ["ice"] }, { "enum": ["water"] }] }
+      },
+      "optional": ["radius", "angle"]
+    },
+    "EnvironmentState": {
+      "fields": {
+        "mechanisms": { "array": { "ref": "EnvironmentMechanism" } },
+        "initialized": { "type": "boolean" },
+        "navigationTimer": { "type": "number" },
+        "riders": { "record": { "type": "string" } },
+        "collapse": {
+          "fields": {
+            "enabled": { "type": "boolean" },
+            "interval": { "type": "number" },
+            "remaining": { "type": "number" },
+            "playlist": { "array": { "type": "string" } },
+            "finalPoint": { "ref": "Vec2" }
+          },
+          "optional": ["playlist", "finalPoint"]
+        }
+      },
+      "optional": ["initialized", "navigationTimer", "riders", "collapse"]
+    },
+    "EnvironmentMechanism": {
+      "fields": {
+        "id": { "type": "string" },
+        "kind": { "ref": "EnvironmentKind" },
+        "position": { "ref": "Vec2" },
+        "angle": { "type": "number" },
+        "previous": { "ref": "Vec2" },
+        "previousAngle": { "type": "number" },
+        "height": { "type": "number" },
+        "initialHeight": { "type": "number" },
+        "previousHeight": { "type": "number" },
+        "velocity": { "ref": "Vec2" },
+        "angularVelocity": { "type": "number" },
+        "parentId": { "type": "string" },
+        "floorIds": { "array": { "type": "string" } },
+        "obstacleIds": { "array": { "type": "string" } },
+        "portalIds": { "array": { "type": "string" } },
+        "paths": { "array": { "array": { "ref": "Vec2" } } },
+        "radius": { "type": "number" },
+        "active": { "type": "boolean" },
+        "phase": { "ref": "EnvironmentPhase" },
+        "elapsed": { "type": "number" },
+        "progress": { "type": "number" },
+        "ownerId": { "type": "number" },
+        "flashTime": { "type": "number" },
+        "initialized": { "type": "boolean" },
+        "waypoints": { "array": { "ref": "EnvironmentWaypoint" } },
+        "motion": { "ref": "EnvironmentMotion" },
+        "motionOrigin": { "ref": "Vec2" },
+        "motionAngle": { "type": "number" },
+        "targetIndex": { "type": "number" },
+        "startPosition": { "ref": "Vec2" },
+        "targetPosition": { "ref": "Vec2" },
+        "startAngle": { "type": "number" },
+        "targetAngle": { "type": "number" },
+        "duration": { "type": "number" },
+        "minDuration": { "type": "number" },
+        "maxDuration": { "type": "number" },
+        "currentDuration": { "type": "number" },
+        "targetDuration": { "type": "number" },
+        "preDelay": { "type": "number" },
+        "spring": { "type": "boolean" },
+        "springPause": { "type": "number" },
+        "returnDuration": { "type": "number" },
+        "returning": { "type": "boolean" },
+        "reverse": { "type": "boolean" },
+        "randomizedStart": { "type": "boolean" },
+        "rotating": { "type": "boolean" },
+        "clockwise": { "type": "boolean" },
+        "rotationDuration": { "type": "number" },
+        "rotationDurations": { "array": { "type": "number" } },
+        "rotationSmoothingVelocity": { "type": "number" },
+        "rotationModulation": {
+          "fields": {
+            "amplitude": { "type": "number" },
+            "rate": { "type": "number" },
+            "initialDuration": { "type": "number" }
+          },
+          "optional": []
+        },
+        "targetIds": { "array": { "type": "string" } },
+        "cooldown": { "type": "number" },
+        "cooldownDuration": { "type": "number" },
+        "oneShot": { "type": "boolean" },
+        "automaticDelay": { "type": "number" },
+        "closed": { "type": "boolean" },
+        "canClose": { "type": "boolean" },
+        "closedHeight": { "type": "number" },
+        "openHeight": { "type": "number" },
+        "startHeight": { "type": "number" },
+        "targetHeight": { "type": "number" },
+        "solidHeight": { "type": "number" },
+        "warningDuration": { "type": "number" },
+        "fallDuration": { "type": "number" },
+        "fallDistance": { "type": "number" },
+        "respawnDuration": { "type": "number" },
+        "riseDuration": { "type": "number" },
+        "solidAfter": { "type": "number" },
+        "hitsLeft": { "type": "number" },
+        "burnHealth": { "type": "number" },
+        "burnTime": { "type": "number" },
+        "disturbance": { "type": "number" },
+        "disturbedDirection": { "ref": "Vec2" },
+        "lastMeleeSerials": { "record": { "type": "number" } },
+        "source": {
+          "fields": {
+            "file": { "type": "string" },
+            "pathId": { "type": "number" },
+            "className": { "type": "string" }
+          },
+          "optional": []
+        }
+      },
+      "optional": [
+        "angle",
+        "previous",
+        "previousAngle",
+        "height",
+        "initialHeight",
+        "previousHeight",
+        "velocity",
+        "angularVelocity",
+        "parentId",
+        "floorIds",
+        "obstacleIds",
+        "portalIds",
+        "paths",
+        "radius",
+        "active",
+        "phase",
+        "elapsed",
+        "progress",
+        "ownerId",
+        "flashTime",
+        "initialized",
+        "waypoints",
+        "motion",
+        "motionOrigin",
+        "motionAngle",
+        "targetIndex",
+        "startPosition",
+        "targetPosition",
+        "startAngle",
+        "targetAngle",
+        "duration",
+        "minDuration",
+        "maxDuration",
+        "currentDuration",
+        "targetDuration",
+        "preDelay",
+        "spring",
+        "springPause",
+        "returnDuration",
+        "returning",
+        "reverse",
+        "randomizedStart",
+        "rotating",
+        "clockwise",
+        "rotationDuration",
+        "rotationDurations",
+        "rotationSmoothingVelocity",
+        "rotationModulation",
+        "targetIds",
+        "cooldown",
+        "cooldownDuration",
+        "oneShot",
+        "automaticDelay",
+        "closed",
+        "canClose",
+        "closedHeight",
+        "openHeight",
+        "startHeight",
+        "targetHeight",
+        "solidHeight",
+        "warningDuration",
+        "fallDuration",
+        "fallDistance",
+        "respawnDuration",
+        "riseDuration",
+        "solidAfter",
+        "hitsLeft",
+        "burnHealth",
+        "burnTime",
+        "disturbance",
+        "disturbedDirection",
+        "lastMeleeSerials",
+        "source"
+      ]
+    },
+    "EnvironmentKind": {
+      "any": [
+        { "enum": ["movingObstacle"] },
+        { "enum": ["movingFloor"] },
+        { "enum": ["reactiveFloor"] },
+        { "enum": ["door"] },
+        { "enum": ["fallingFloor"] },
+        { "enum": ["trapFloor"] },
+        { "enum": ["switch"] },
+        { "enum": ["trap"] },
+        { "enum": ["plant"] },
+        { "enum": ["destructible"] },
+        { "enum": ["destroyer"] },
+        { "enum": ["animated"] }
+      ]
+    },
+    "EnvironmentPhase": {
+      "any": [
+        { "enum": ["idle"] },
+        { "enum": ["preparing"] },
+        { "enum": ["moving"] },
+        { "enum": ["springPause"] },
+        { "enum": ["warning"] },
+        { "enum": ["falling"] },
+        { "enum": ["respawning"] },
+        { "enum": ["rising"] },
+        { "enum": ["charging"] },
+        { "enum": ["attacking"] },
+        { "enum": ["cooldown"] },
+        { "enum": ["cut"] }
+      ]
+    },
+    "EnvironmentWaypoint": {
+      "fields": { "position": { "ref": "Vec2" }, "angle": { "type": "number" } },
+      "optional": ["angle"]
+    },
+    "EnvironmentMotion": {
+      "any": [
+        { "enum": ["linear"] },
+        { "enum": ["circular"] },
+        { "enum": ["eased"] },
+        { "enum": ["supercircular"] },
+        { "enum": ["easedsoft"] }
+      ]
+    },
+    "GameEvent": {
+      "fields": {
+        "type": {
+          "any": [
+            { "enum": ["throw"] },
+            { "enum": ["dash"] },
+            { "enum": ["slash"] },
+            { "enum": ["bounce"] },
+            { "enum": ["catch"] },
+            { "enum": ["deflect"] },
+            { "enum": ["shield"] },
+            { "enum": ["death"] },
+            { "enum": ["explosion"] },
+            { "enum": ["pickup"] },
+            { "enum": ["crate"] },
+            { "enum": ["round"] },
+            { "enum": ["win"] },
+            { "enum": ["countdown"] },
+            { "enum": ["teleport"] },
+            { "enum": ["boundary"] },
+            { "enum": ["equip"] },
+            { "enum": ["split"] },
+            { "enum": ["freeze"] },
+            { "enum": ["burn"] },
+            { "enum": ["disguise"] },
+            { "enum": ["decoy"] },
+            { "enum": ["environment"] }
+          ]
+        },
+        "mechanismId": { "type": "string" },
+        "position": { "ref": "Vec2" },
+        "actorId": { "type": "number" },
+        "value": { "type": "number" },
+        "power": { "ref": "PowerupKind" },
+        "feedback": {
+          "any": [{ "enum": ["parry"] }, { "enum": ["clash"] }, { "enum": ["disarm"] }]
+        },
+        "cause": { "ref": "DeathCause" },
+        "direction": { "ref": "Vec2" },
+        "variant": {
+          "any": [
+            { "enum": ["slice"] },
+            { "enum": ["squash"] },
+            { "enum": ["water"] },
+            { "enum": ["cliff"] },
+            { "enum": ["burst"] }
+          ]
+        },
+        "destination": { "ref": "Vec2" },
+        "entityId": { "type": "number" },
+        "entityType": { "any": [{ "enum": ["actor"] }, { "enum": ["disc"] }] }
+      },
+      "optional": [
+        "mechanismId",
+        "value",
+        "power",
+        "feedback",
+        "cause",
+        "direction",
+        "variant",
+        "destination",
+        "entityId",
+        "entityType"
+      ]
+    },
+    "BoundaryState": {
+      "fields": {
+        "angle": { "type": "number" },
+        "allowOutside": { "type": "boolean" },
+        "phase": {
+          "any": [{ "enum": ["idle"] }, { "enum": ["shrinking"] }, { "enum": ["settled"] }]
+        },
+        "center": { "ref": "Vec2" },
+        "halfSize": { "ref": "Vec2" },
+        "startCenter": { "ref": "Vec2" },
+        "startHalfSize": { "ref": "Vec2" },
+        "targetCenter": { "ref": "Vec2" },
+        "targetHalfSize": { "ref": "Vec2" },
+        "elapsed": { "type": "number" },
+        "duration": { "type": "number" },
+        "startedAt": { "type": "number" },
+        "progress": { "type": "number" },
+        "ownerId": { "any": [{ "type": "number" }, { "enum": [null] }] }
+      },
+      "optional": ["angle", "allowOutside"]
+    },
+    "MatchOptions": {
+      "fields": {
+        "mode": { "any": [{ "enum": ["solo"] }, { "enum": ["local"] }, { "enum": ["bots"] }] },
+        "bots": { "type": "number" },
+        "difficulty": { "ref": "Difficulty" },
+        "seed": { "type": "number" },
+        "scoreGoal": { "type": "number" },
+        "mapId": { "ref": "MapId" },
+        "mapRotation": { "ref": "MapRotation" },
+        "suddenDeathTime": { "type": "number" },
+        "powerupPool": { "array": { "ref": "PowerupKind" } },
+        "startingPowers": { "array": { "ref": "PowerupKind" } }
+      },
+      "optional": ["mapId", "mapRotation", "suddenDeathTime", "powerupPool", "startingPowers"]
+    },
+    "Difficulty": { "any": [{ "enum": ["easy"] }, { "enum": ["normal"] }, { "enum": ["hard"] }] },
+    "MapRotation": { "any": [{ "enum": ["fixed"] }, { "enum": ["cycle"] }] }
+  }
+}

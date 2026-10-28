@@ -4,6 +4,9 @@ import type { SessionSnapshot } from './types';
 import { GameRenderer } from '../rendering/renderer';
 import { Input } from '../platform/input';
 import { AudioEngine } from '../platform/audio';
+import type { AudioSettings } from '../platform/audio';
+import { ReplayPlayer } from './recording';
+import type { ReplayData, RecordingStatus } from './recording';
 import { FixedLoop } from '../platform/loop';
 import { transitionPresentation } from '../core/presentation';
 import { boundaryNotice, eliminationLabel } from '../core/feedback';
@@ -26,6 +29,16 @@ export interface BrowserFrame {
   dt: number;
   events: GameEvent[];
   muted: boolean;
+  audio: AudioSettings;
+  speed: number;
+  recording: RecordingStatus | null;
+  replay: {
+    tick: number;
+    durationTicks: number;
+    status: ReplayPlayer['status'];
+    label: string;
+  } | null;
+  replayError: string | null;
 }
 export interface BrowserGameOptions {
   match?: Partial<MatchOptions>;
@@ -35,6 +48,8 @@ export interface BrowserGameOptions {
   hud?: boolean;
   pauseOnBlur?: boolean;
   onFrame?: (frame: BrowserFrame) => void;
+  audio?: Partial<AudioSettings>;
+  speed?: number;
 }
 
 /** Browser-only adapter. The session owns state; this adapter owns exactly one RAF and input device. */
@@ -58,6 +73,8 @@ export class BrowserGame {
   private frames = 0;
   private elapsed = 0;
   private frameErrors = 0;
+  private player: ReplayPlayer | null = null;
+  private replayError: string | null = null;
   onFrame: (frame: BrowserFrame) => void;
 
   constructor(
@@ -67,6 +84,8 @@ export class BrowserGame {
     if (!(container instanceof HTMLElement))
       throw new TypeError('A browser HTMLElement container is required');
     this.session = new GameSession(options.match);
+    if (options.audio) this.audio.configure(options.audio);
+    if (options.speed !== undefined) this.loop.timeScale = options.speed;
     this.originalPosition = container.style.position;
     if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
     this.input = new Input(options.inputTarget ?? container);
@@ -148,7 +167,9 @@ export class BrowserGame {
     container.append(this.overlay);
     this.input.onPause = () => {
       if (options.keyboard !== false)
-        this.session.status === 'paused' ? this.resume() : this.pause();
+        (this.player ? this.player.status !== 'playing' : this.session.status === 'paused')
+          ? this.resume()
+          : this.pause();
     };
     this.input.onSound = () => {
       if (options.keyboard !== false) this.toggleSound();
@@ -160,15 +181,20 @@ export class BrowserGame {
       if (event.type === 'game' && event.event.type === 'round') this.input.clear();
       if (event.type === 'lifecycle') {
         if (event.action === 'start') {
+          this.player = null;
+          this.replayError = null;
           this.preview = false;
           this.events = [];
           this.renderer.reset(this.session.getState());
           this.loop.reset();
           this.loop.paused = false;
+          this.audio.reset();
         }
         if (event.action === 'pause') {
           this.loop.paused = true;
           this.input.setEnabled(false);
+          // Hidden tabs may stop RAF entirely; silence the audio clock immediately.
+          this.audio.update(this.session.getState(), true, false);
         }
         if (event.action === 'resume') {
           this.preview = false;
@@ -180,27 +206,51 @@ export class BrowserGame {
       }
     });
     this.loop.onStep = () => {
-      if (this.disposed || this.preview) return;
-      if (this.session.status !== 'running') return;
+      if (this.disposed || this.preview) return false;
+      if (this.player) {
+        if (this.player.status !== 'playing') return false;
+        const before = this.player.tick;
+        try {
+          this.player.step();
+          this.events.push(...this.player.drainEvents());
+        } catch (error) {
+          this.replayError = String(error);
+          this.player.pause();
+          this.frameErrors++;
+        }
+        return this.player.tick > before;
+      }
+      if (this.session.status !== 'running') return false;
       if (options.keyboard !== false) {
         for (const [index, command] of this.input.read(2)) this.session.submitHuman(index, command);
       }
+      const before = this.session.tick;
       this.session.step();
+      return this.session.tick > before;
     };
     this.loop.onFrame = (alpha, elapsed, dt) => {
       if (this.disposed) return;
       if (options.keyboard !== false) this.input.pollSystemButtons();
       // The public frame gets its own detached world, without allocating the
       // controls metadata needed only by an explicit Session.snapshot() caller.
-      const state = this.session.getState();
-      const status = this.session.status;
+      const state = this.player ? this.player.getState() : this.session.getState();
+      const status = this.player
+        ? this.player.status === 'playing'
+          ? 'running'
+          : 'paused'
+        : this.session.status;
       const paused = status !== 'running';
       this.loop.paused = paused && !this.preview;
       this.input.setEnabled(
-        !paused && !this.preview && state.phase !== 'matchEnd' && options.keyboard !== false,
+        !this.player &&
+          !paused &&
+          !this.preview &&
+          state.phase !== 'matchEnd' &&
+          options.keyboard !== false,
       );
       const events = this.events.splice(0);
       this.renderer.events(events);
+      this.audio.update(state, paused, this.preview);
       this.audio.play(events);
       this.renderer.draw(
         state,
@@ -246,6 +296,18 @@ export class BrowserGame {
           dt,
           events,
           muted: this.audio.muted,
+          audio: this.audio.getSettings(),
+          speed: this.loop.timeScale,
+          recording: this.session.recording,
+          replay: this.player
+            ? {
+                tick: this.player.tick,
+                durationTicks: this.player.durationTicks,
+                status: this.player.status,
+                label: this.player.label,
+              }
+            : null,
+          replayError: this.replayError,
         });
       } catch {
         this.frameErrors++;
@@ -285,14 +347,19 @@ export class BrowserGame {
   }
   pause(): void {
     this.assertLive();
-    this.session.pause();
+    if (this.player) this.player.pause();
+    else this.session.pause();
     this.loop.paused = true;
     this.input.setEnabled(false);
+    if (this.player) this.audio.update(this.player.getState(), true, false);
   }
   resume(): void {
     this.assertLive();
     this.preview = false;
-    this.session.resume();
+    if (this.player) {
+      if (this.player.status === 'ended') this.seekReplay(0);
+      this.player.resume();
+    } else this.session.resume();
     this.loop.paused = false;
     this.loop.reset();
     this.input.setEnabled(this.options.keyboard !== false);
@@ -314,17 +381,69 @@ export class BrowserGame {
     this.audio.unlock();
     return this.audio.toggle();
   }
+  get playback(): ReplayPlayer | null {
+    return this.player;
+  }
+  get speed(): number {
+    return this.loop.timeScale;
+  }
+  setSpeed(value: number): void {
+    this.assertLive();
+    this.loop.timeScale = value;
+  }
+  unlockAudio(): void {
+    this.assertLive();
+    this.audio.unlock();
+  }
+  configureAudio(settings: Partial<AudioSettings>): void {
+    this.assertLive();
+    this.audio.configure(settings);
+  }
+  audioSettings(): AudioSettings {
+    return this.audio.getSettings();
+  }
+  loadReplay(data: ReplayData | string): void {
+    this.assertLive();
+    const player = new ReplayPlayer(data);
+    if (this.session.recording) this.session.stopRecording();
+    this.session.pause();
+    this.player = player;
+    this.preview = false;
+    this.replayError = null;
+    this.events = [];
+    this.renderer.reset(player.getState());
+    this.input.setEnabled(false);
+    this.loop.reset();
+    this.loop.paused = false;
+    this.audio.reset();
+    this.audio.unlock();
+  }
+  seekReplay(tick: number): void {
+    this.assertLive();
+    if (!this.player) throw new Error('No replay is loaded');
+    this.player.seek(tick);
+    this.events = [];
+    this.renderer.reset(this.player.getState());
+    this.loop.reset();
+    this.audio.reset();
+  }
   stats(): {
     frames: number;
     elapsed: number;
     frameErrors: number;
     render: { calls: number; triangles: number; geometries: number; textures: number };
+    audio: ReturnType<AudioEngine['stats']>;
+    clock: ReturnType<FixedLoop['stats']>;
+    replayError: string | null;
   } {
     return {
       frames: this.frames,
       elapsed: this.elapsed,
       frameErrors: this.frameErrors,
       render: this.renderer.stats(),
+      audio: this.audio.stats(),
+      clock: this.loop.stats(),
+      replayError: this.replayError,
     };
   }
   destroy(): void {

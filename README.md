@@ -23,6 +23,8 @@ npm run dev
 - 完整原版地图目录：地面轮廓、孔洞、出生点、旋转墙体、成对传送门及关卡边界；支持固定地图或同一地图集内逐回合轮换。教程场地不参与轮换，暂不包含原版引导任务。
 - 移动墙与夹击、往返/旋转浮筏、开关与升降门、永久坍塌和踩踏陷阱、湿滑地面、植被与可破坏物。保留山间庭院等 5 张 Web 原创布局。
 - 单人对机器人、本地双人、最多四人混合对战、三档机器人难度。
+- AI 观战（2/4 机器人互战）、外部 HTTP AI 协议和 Node 批量加速；0.25–8× 可视模拟与回放。
+- Tone.js 程序化 BGM/分层音效、独立音量；动作与状态检查点录像、下载/导入、暂停与进度跳转。[使用与 API](docs/replay-and-ai.md)。
 - 移动与惯性、转向、冲刺、近战/空手击退、正面反弹、蓄力投掷、弧线与追踪、回返/接取/召回。
 - 墙体、可破坏箱子、水坑、矩形决胜缩圈；人物和飞镖均可穿过传送门。
 - 默认 180 秒缩圈（菜单可选 30/60 秒），出界后有 3～3.75 秒返回宽限，配有箭头和倒计时。
@@ -52,10 +54,10 @@ npm run dev
 npm run build:sdk
 npm run verify:sdk
 # 在另一个项目安装；也可以使用绝对路径
-npm install ./dist-sdk/boomerang-garden-sdk-0.5.0.tgz
+npm install ./dist-sdk/boomerang-garden-sdk-0.6.0.tgz
 ```
 
-交付的是本地 ESM 包 `@boomerang-garden/sdk@0.5.0`，未发布 npm。`MAPS`、`ORIGINAL_MAPS`、`CUSTOM_MAPS` 提供可选目录；原版地图 ID 以 `original-` 开头。
+交付的是本地 ESM 包 `@boomerang-garden/sdk@0.6.0`，未发布 npm。`MAPS`、`ORIGINAL_MAPS`、`CUSTOM_MAPS` 提供可选目录；原版地图 ID 以 `original-` 开头。
 
 ```js
 import { createBrowserGame } from '@boomerang-garden/sdk/browser';
@@ -79,7 +81,7 @@ game.destroy();
 
 核心入口 `createSession` 不加载 DOM/Three.js，仅在调用 `step()` 时推进；浏览器入口拥有 RAF、画面与输入。每个角色只有一个当前控制源。旧外控租约在人工接管时失效，退出接管后需重新 acquire；脚本/机器人可直接恢复。暂停、到期和切换控制不会生成误投。
 
-动作 TTL 以实际消费输入的战斗 tick 计数，默认 6 tick；过场、暂停及命中停顿不消耗它，阶段变化会清空样本。脚本为受信任的同步 JS；外部异步模型/网络应由宿主接收结果后调用 submit，SDK 未包含网络协议或沙箱。
+动作 TTL 以实际消费输入的战斗 tick 计数，默认 6 tick；过场、暂停及命中停顿不消耗它，阶段变化会清空样本。脚本为受信任的同步 JS；外部异步模型/网络可用 `runAIMatch` 和 `createHttpAgent`，或自行接收后 submit。SDK 不提供脚本沙箱。
 
 完整签名、时钟、输入、错误和清理契约见 [SDK API](docs/sdk-api.md)。[Node 整场示例](examples/node-bots.mjs)和[普通 JS 对战策略](examples/duel-controller.js)随包交付。
 
@@ -96,6 +98,9 @@ npm run test:browser        # 5173：五图、输入、装备、暂停、换图
 node scripts/original-maps-browser-verify.mjs # 5173：58 场地逐图截图、暂停与状态检查
 npm run test:sdk-browser    # 5173：注入、接管、多实例、销毁
 npm run test:v3-browser     # 5173：缩圈/死亡实际流程与独立呈现样本
+npm run test:v6-node        # 先 build:sdk：AI HTTP、回放、容量与加速测量
+npm run test:v6-browser     # 5173：录像文件、跨运行时回放、倍速、音频、界面
+npm run test:v6-audio       # 5173：离线音频样本、音频隔离与固定步长时钟
 node scripts/v4-browser-verify.mjs # 5173：发镖、配方、键盘道具操作、真实拾取
 node scripts/production-smoke.mjs # 4173：正式游戏 + SDK 演示
 npm run build:sdk
@@ -107,6 +112,8 @@ npm run verify:sdk          # 独立目录安装 tarball，Node + 浏览器消�
 SDK 0.4.1 同步更新普通攻击表现，改动和验证见 [普通攻击动画](docs/melee-animation.md)。
 
 SDK 0.5.0 加入完整原版地图集与环境机制。参见[地图清单](docs/original-map-inventory.md)、[机关证据](docs/original-environment-analysis.md)、[验证记录](docs/original-maps-validation.md)。布局与机制依据安装包静态数据重建，模型、纹理、植被外观和音效为独立简化表现；尚未与原版运行画面逐帧比对，不代表像素级或全部模式复刻。
+
+SDK 0.6.0 加入 Tone.js 音乐/音效、混合录像、AI 互战与 HTTP 协议、倍速及无渲染批量模拟。参见[使用说明](docs/replay-and-ai.md)、[方案比较](docs/audio-replay-ai-plan.md)和[测量与验收](docs/v6-validation.md)。
 
 ## 分层
 

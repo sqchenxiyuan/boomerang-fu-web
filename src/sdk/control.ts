@@ -114,11 +114,15 @@ export function matchOptions(
     if (!keys.includes(key)) throw new TypeError(`Unknown match option: ${key}`);
     if (value !== undefined) Object.assign(options, { [key]: value });
   }
-  if (options.mode !== 'solo' && options.mode !== 'local')
-    throw new RangeError('Unknown match mode');
+  if (!['solo', 'local', 'bots'].includes(options.mode)) throw new RangeError('Unknown match mode');
   if (!['easy', 'normal', 'hard'].includes(options.difficulty))
     throw new RangeError('Unknown difficulty');
-  integer(options.bots, options.mode === 'solo' ? 1 : 0, options.mode === 'solo' ? 3 : 2, 'bots');
+  integer(
+    options.bots,
+    options.mode === 'bots' ? 2 : options.mode === 'solo' ? 1 : 0,
+    options.mode === 'bots' ? 4 : options.mode === 'solo' ? 3 : 2,
+    'bots',
+  );
   integer(options.seed, 0, 0xffffffff, 'seed');
   integer(options.scoreGoal, 1, 100, 'scoreGoal');
   if (

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = resolve(ROOT, 'dist-sdk');
 const NAME = '@boomerang-garden/sdk';
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const slash = (value) => value.replaceAll('\\', '/');
 
@@ -76,6 +76,7 @@ const result = await build({
   splitting: true,
   format: 'esm',
   platform: 'neutral',
+  mainFields: ['module', 'main'],
   target: 'es2022',
   external: ['three'],
   define: { 'import.meta.env.DEV': 'false' },
@@ -99,7 +100,8 @@ function auditCore(file) {
   for (const input of Object.keys(output.inputs)) {
     if (
       /(?:^|\/)(?:rendering|platform|ui)\//u.test(slash(input)) ||
-      input.includes('node_modules/three')
+      input.includes('node_modules/three') ||
+      input.includes('node_modules/tone')
     )
       throw new Error(`Core package imports a browser implementation: ${input}`);
   }
@@ -127,12 +129,16 @@ for (const path of await filesIn(resolve(OUT, 'types'))) {
 
 await mkdir(resolve(OUT, 'examples'), { recursive: true });
 await copyFile(resolve(ROOT, 'examples/node-bots.mjs'), resolve(OUT, 'examples/node-bots.mjs'));
+for (const name of ['ai-match.mjs', 'http-agent.mjs'])
+  await copyFile(resolve(ROOT, 'examples', name), resolve(OUT, 'examples', name));
+await copyFile(resolve(ROOT, 'THIRD_PARTY_NOTICES.md'), resolve(OUT, 'THIRD_PARTY_NOTICES.md'));
 await copyFile(
   resolve(ROOT, 'examples/duel-controller.js'),
   resolve(OUT, 'examples/duel-controller.js'),
 );
 await mkdir(resolve(OUT, 'docs'), { recursive: true });
 await copyFile(resolve(ROOT, 'docs/sdk-api.md'), resolve(OUT, 'docs/sdk-api.md'));
+await copyFile(resolve(ROOT, 'docs/replay-and-ai.md'), resolve(OUT, 'docs/replay-and-ai.md'));
 const manifest = {
   name: NAME,
   version: VERSION,
@@ -148,7 +154,7 @@ const manifest = {
     './types': { types: './types/sdk/types.d.ts', import: './lib/types.js' },
     './package.json': './package.json',
   },
-  files: ['lib', 'types', 'examples', 'docs', 'README.md'],
+  files: ['lib', 'types', 'examples', 'docs', 'README.md', 'THIRD_PARTY_NOTICES.md'],
   sideEffects: false,
   engines: { node: '>=20' },
   dependencies: { three: '^0.180.0' },
@@ -184,7 +190,7 @@ const sourceHashes = {};
 for (const file of Object.keys(result.metafile.inputs)) {
   const path = resolve(ROOT, file);
   const hash = sha256(await readFile(path));
-  if (hash !== initialSourceHashes.get(path))
+  if (initialSourceHashes.has(path) && hash !== initialSourceHashes.get(path))
     throw new Error(`Source changed during SDK build; rebuild after edits finish: ${file}`);
   sourceHashes[slash(file)] = hash;
 }

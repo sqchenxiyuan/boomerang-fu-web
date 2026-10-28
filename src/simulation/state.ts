@@ -81,9 +81,9 @@ export function makeActor(id: number, controller: Actor['controller'], humanInde
 }
 
 export function createState(options: MatchOptions = defaultOptions()): GameState {
-  const humanCount = options.mode === 'local' ? 2 : 1;
+  const humanCount = options.mode === 'bots' ? 0 : options.mode === 'local' ? 2 : 1;
   const botCount = Math.max(
-    options.mode === 'solo' ? 1 : 0,
+    options.mode === 'bots' ? 2 : options.mode === 'solo' ? 1 : 0,
     Math.min(4 - humanCount, options.bots),
   );
   const actors = Array.from({ length: humanCount + botCount }, (_, i) =>

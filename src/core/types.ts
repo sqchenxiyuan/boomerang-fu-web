@@ -10,7 +10,7 @@ export type LegacyMapId = 'courtyard' | 'canal' | 'market' | 'switchback' | 'por
 export type MapId = LegacyMapId | `original-${string}`;
 export type MapRotation = 'fixed' | 'cycle';
 export interface MatchOptions {
-  mode: 'solo' | 'local';
+  mode: 'solo' | 'local' | 'bots';
   bots: number;
   difficulty: Difficulty;
   seed: number;

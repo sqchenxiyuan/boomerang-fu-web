@@ -14,6 +14,11 @@ import { discCapacity, setHeldDiscs } from './inventory';
 import { tickStatusEffects } from './status-effects';
 import { tickEnvironment, tickEnvironmentContacts } from './environment';
 
+export interface SimulationCheckpoint {
+  state: GameState;
+  randomSeed: number;
+}
+
 /** Sole authoritative owner of gameplay state. No rendering or DOM dependencies. */
 export class Game {
   state: GameState;
@@ -27,6 +32,17 @@ export class Game {
   start(options: MatchOptions): void {
     this.state = createState(options);
     this.random = new Random(options.seed);
+  }
+
+  checkpoint(): SimulationCheckpoint {
+    return { state: structuredClone(this.state), randomSeed: this.random.seed };
+  }
+
+  /** Restore into fresh object identities so geometry/navigation caches cannot survive a seek. */
+  restore(checkpoint: SimulationCheckpoint): void {
+    this.state = structuredClone(checkpoint.state);
+    this.random = new Random(0);
+    this.random.seed = checkpoint.randomSeed;
   }
 
   step(commands: ReadonlyMap<number, Command> = new Map()): void {

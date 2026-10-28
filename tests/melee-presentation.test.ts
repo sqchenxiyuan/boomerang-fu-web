@@ -59,7 +59,9 @@ describe('melee presentation follows simulation clocks', () => {
     const trail = new MeleeTrail();
     const geometry = trail.mesh.geometry,
       positions = geometry.getAttribute('position');
-    let maxVertices = 0;
+    let maxVertices = 0,
+      maxRadius = 0,
+      allHeightsFinite = true;
     for (let frame = 0; frame < 200; frame++) {
       trail.begin();
       for (let i = 0; i < 4; i++) trail.add(0, 0, (i * Math.PI) / 2, (frame % 24) / 60);
@@ -68,15 +70,15 @@ describe('melee presentation follows simulation clocks', () => {
       maxVertices = Math.max(maxVertices, count);
       expect(count).toBeLessThanOrEqual(positions.count);
       for (let i = 0; i < count; i++) {
-        expect(Math.hypot(positions.getX(i), positions.getZ(i))).toBeLessThanOrEqual(
-          RULES.attackRange + 1e-6,
-        );
-        expect(Number.isFinite(positions.getY(i))).toBe(true);
+        maxRadius = Math.max(maxRadius, Math.hypot(positions.getX(i), positions.getZ(i)));
+        allHeightsFinite &&= Number.isFinite(positions.getY(i));
       }
       expect(trail.mesh.geometry).toBe(geometry);
       expect(geometry.getAttribute('position')).toBe(positions);
     }
     expect(maxVertices).toBeGreaterThan(0);
+    expect(maxRadius).toBeLessThanOrEqual(RULES.attackRange + 1e-6);
+    expect(allHeightsFinite).toBe(true);
     trail.clear();
     expect(geometry.drawRange.count).toBe(0);
     trail.dispose();

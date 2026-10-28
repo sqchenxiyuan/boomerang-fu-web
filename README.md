@@ -14,6 +14,8 @@ npm run dev
 - 游戏：[http://127.0.0.1:5173/](http://127.0.0.1:5173/)
 - SDK 控制演示：[http://127.0.0.1:5173/sdk-demo.html](http://127.0.0.1:5173/sdk-demo.html)
 
+线上试玩：[GitHub Pages](https://sqchenxiyuan.github.io/boomerang-fu-web/)；[线上 SDK 演示](https://sqchenxiyuan.github.io/boomerang-fu-web/sdk-demo.html)。
+
 演示页可启动 JS 对战脚本、按住按钮注入外部动作、切换到真实键盘人工接管，再恢复原脚本。开发服务器只绑定本机。
 
 ## 已实现
@@ -98,7 +100,7 @@ npm run build:sdk
 npm run verify:sdk          # 独立目录安装 tarball，Node + 浏览器消费
 ```
 
-`dist/` 可部署到普通静态站点。当前只在本地预览，GitHub Pages 等用户明确要求部署时再发布；提交不会自动部署。第四阶段见 [道具研究](docs/v4-powerups-analysis.md)、[性能基线](docs/v4-performance-baseline.md)和[验收记录](docs/v4-validation.md)。[第三阶段验收](docs/v3-validation.md)及更早报告保留为历史记录。
+`dist/` 可部署到普通静态站点。GitHub Pages 通过 Actions 中的 **Deploy game to GitHub Pages → Run workflow** 手动发布，提交不会自动部署。流程先运行测试，再按仓库子路径构建并部署游戏与 SDK 演示。线上冒烟测试可设置 `GARDEN_TEST_URL`、`GARDEN_TEST_DIST` 和 `GARDEN_TEST_OUTPUT` 后运行 `scripts/production-smoke.mjs`。第四阶段见 [道具研究](docs/v4-powerups-analysis.md)、[性能基线](docs/v4-performance-baseline.md)和[验收记录](docs/v4-validation.md)。[第三阶段验收](docs/v3-validation.md)及更早报告保留为历史记录。
 
 SDK 0.4.1 同步更新普通攻击表现，改动和验证见 [普通攻击动画](docs/melee-animation.md)。
 

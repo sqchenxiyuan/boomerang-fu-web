@@ -2,7 +2,12 @@ import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 
-await mkdir('test-results', { recursive: true });
+const BASE = new URL(process.env.GARDEN_SITE_URL ?? 'http://127.0.0.1:4173/').href.replace(
+  /\/?$/u,
+  '/',
+);
+const OUT = process.env.GARDEN_SMOKE_OUTPUT ?? 'test-results';
+await mkdir(OUT, { recursive: true });
 const files = await readdir('dist/assets');
 for (const file of files.filter((name) => name.endsWith('.js'))) {
   const text = await readFile(`dist/assets/${file}`, 'utf8');
@@ -21,22 +26,31 @@ page.on('console', (message) => {
   if (message.type() === 'error') errors.push(message.text());
 });
 page.on('request', (request) => {
-  if (!request.url().startsWith('http://127.0.0.1:4173/') && !request.url().startsWith('data:'))
+  if (!request.url().startsWith(BASE) && !request.url().startsWith('data:'))
     external.push(request.url());
 });
 page.on('response', (response) => {
   if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
 });
 try {
-  await page.goto('http://127.0.0.1:4173/', { waitUntil: 'networkidle' });
+  await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60000 });
   assert.equal(await page.evaluate(() => typeof window.__garden), 'undefined');
-  await page.screenshot({ path: 'test-results/production-menu.png' });
+  await page.screenshot({ path: `${OUT}/production-menu.png` });
   await page.getByRole('button', { name: '同屏双人' }).click();
   await page.getByRole('button', { name: '进入花园' }).click();
-  await page.waitForTimeout(3300);
+  await page.waitForFunction(() => window.boomerangGarden.session.getState().weaponsGranted);
+  const startX = await page.evaluate(
+    () => window.boomerangGarden.session.getState().actors[0].position.x,
+  );
   await page.keyboard.down('d');
-  await page.waitForTimeout(250);
-  await page.keyboard.up('d');
+  try {
+    await page.waitForFunction(
+      (x) => window.boomerangGarden.session.getState().actors[0].position.x > x + 0.2,
+      startX,
+    );
+  } finally {
+    await page.keyboard.up('d');
+  }
   await page.keyboard.press('j');
   await page.waitForTimeout(750);
   await page.keyboard.down('k');
@@ -46,7 +60,7 @@ try {
   assert.equal(await page.locator('#hud').isVisible(), true);
   assert.equal(await page.locator('.score-card').count(), 2);
   assert.notEqual(await page.locator('#round-timer').innerText(), '00:00');
-  await page.screenshot({ path: 'test-results/production-game.png' });
+  await page.screenshot({ path: `${OUT}/production-game.png` });
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '继续对局' }).waitFor({ state: 'visible' });
   await page.getByRole('button', { name: '继续对局' }).click();
@@ -63,7 +77,14 @@ try {
     0,
   );
   assert.equal(await page.locator('canvas').count(), 0);
-  await page.goto('http://127.0.0.1:4173/sdk-demo.html', { waitUntil: 'networkidle' });
+  await page.goto(new URL('sdk-demo.html', BASE).href, {
+    waitUntil: 'networkidle',
+    timeout: 60000,
+  });
+  assert.equal(
+    await page.getByRole('link', { name: '返回游戏' }).evaluate((link) => link.href),
+    BASE,
+  );
   assert.equal(await page.evaluate(() => typeof window.__garden), 'undefined');
   await page.selectOption('#demo-map', 'portals');
   await page.locator('#demo-start').click();
@@ -89,7 +110,7 @@ try {
     'script',
   );
   await page.locator('#demo-pause').click();
-  await page.screenshot({ path: 'test-results/production-sdk-demo.png', fullPage: true });
+  await page.screenshot({ path: `${OUT}/production-sdk-demo.png`, fullPage: true });
   assert.equal(await page.evaluate(() => window.sdkDemo.stats().frameErrors), 0);
   assert.equal(await page.evaluate(() => window.sdkDemo.session.snapshot().listenerErrors), 0);
   assert.equal(await page.evaluate(() => window.sdkDemo.session.getState().arena.id), 'portals');
@@ -98,6 +119,7 @@ try {
   console.log(
     JSON.stringify({
       passed: true,
+      url: BASE,
       debugHookAbsent: true,
       externalRequests: external,
       errors,
@@ -106,10 +128,11 @@ try {
     }),
   );
   await writeFile(
-    'test-results/production-verification.json',
+    `${OUT}/production-verification.json`,
     JSON.stringify(
       {
         passed: true,
+        url: BASE,
         debugHookAbsent: true,
         sdkDemo: true,
         frameErrors: 0,

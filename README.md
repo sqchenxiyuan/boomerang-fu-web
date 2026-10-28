@@ -4,6 +4,10 @@
 
 ## 启动与试玩
 
+在线试玩：[回旋花园](https://sqchenxiyuan.github.io/boomerang-fu-web/) · [SDK 控制台](https://sqchenxiyuan.github.io/boomerang-fu-web/sdk-demo.html)。
+
+GitHub Pages 在推送 `main` 后自动执行测试、构建和部署。部署工作流位于 `.github/workflows/deploy-pages.yml`，构建时设置仓库子路径；本地开发仍使用根路径。
+
 需要 Node.js 22.12+ 和支持 WebGL 2 的现代桌面浏览器。本机使用 Node 24.21.0 与 Chrome 验证。
 
 ```powershell
@@ -96,7 +100,7 @@ npm run build:sdk
 npm run verify:sdk          # 独立目录安装 tarball，Node + 浏览器消费
 ```
 
-`dist/` 可部署到普通静态站点；本轮没有对外部署。第三阶段覆盖缩圈、死亡、下落与 SDK 0.3，详见 [第三阶段验收](docs/v3-validation.md)。[第二阶段验收](docs/v2-validation.md)及第一版报告保留为历史记录。
+`dist/` 可部署到普通静态站点；GitHub Pages 使用带仓库子路径的正式构建。第三阶段覆盖缩圈、死亡、下落与 SDK 0.3，详见 [第三阶段验收](docs/v3-validation.md)。[第二阶段验收](docs/v2-validation.md)及第一版报告保留为历史记录。
 
 ## 分层
 

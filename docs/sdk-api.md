@@ -1,6 +1,6 @@
 # Boomerang Garden SDK API
 
-本文对应本地 ESM 包 **`@boomerang-garden/sdk` 0.4.0**。SDK 把固定步长模拟、人物控制来源和浏览器呈现分开；运行不需要 Boomerang Fu 的安装目录或原版素材。
+本文对应本地 ESM 包 **`@boomerang-garden/sdk` 0.4.1**。SDK 把固定步长模拟、人物控制来源和浏览器呈现分开；运行不需要 Boomerang Fu 的安装目录或原版素材。
 
 公开类型以 `src/sdk/types.ts`、`src/sdk/browser.ts` 及打包后的 `.d.ts` 为准。示例采用公开包入口，不依赖开发调试接口。
 
@@ -15,7 +15,7 @@ npm run build:sdk
 在使用 SDK 的项目里安装生成的 tarball，路径按实际位置调整：
 
 ```sh
-npm install /path/to/dist-sdk/boomerang-garden-sdk-0.4.0.tgz
+npm install /path/to/dist-sdk/boomerang-garden-sdk-0.4.1.tgz
 ```
 
 这不是 npm 在线发布。包提供以下入口：

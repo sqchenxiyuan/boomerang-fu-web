@@ -6,6 +6,7 @@ import { box, cylinder, makeBoomerang, material, mesh, place, shadow, sphere } f
 import { createDeathModel, type DeathModel } from './death-models';
 import { sampleDeathPose, sampleFallPose } from './death-visuals';
 import { boundaryWarning } from '../core/feedback';
+import { meleeAge, sampleMeleePose } from './melee-pose';
 
 export interface CharacterView {
   root: THREE.Group;
@@ -15,7 +16,6 @@ export interface CharacterView {
   feet: THREE.Group[];
   weapon: THREE.Group;
   shield: THREE.Mesh;
-  slash: THREE.Mesh;
   aim: THREE.Group;
   ring: THREE.Mesh;
   label: THREE.Sprite;
@@ -24,7 +24,8 @@ export interface CharacterView {
   leftWeapon?: THREE.Group;
   disguise?: THREE.Group;
   iceBlock?: THREE.Mesh;
-  lastAttack: number;
+  hands?: THREE.Group[];
+  limbs?: THREE.Mesh[];
 }
 
 function makeLabel(text: string, color: string): THREE.Sprite {
@@ -176,14 +177,19 @@ export function createCharacter(actor: Actor): CharacterView {
   );
   smile.rotation.z = Math.PI;
   place(smile, 0, 0.025, faceZ + 0.015, body);
-  const arms: THREE.Group[] = [];
+  const arms: THREE.Group[] = [],
+    hands: THREE.Group[] = [],
+    limbs: THREE.Mesh[] = [];
   for (const side of [-1, 1]) {
     const arm = new THREE.Group();
     place(arm, side * 0.58, -0.08, 0, body);
-    const limb = cylinder(0.08, 0.08, 0.35, '#344e3c', 6);
-    limb.rotation.z = side * 0.7;
+    const limb = cylinder(0.075, 0.075, 1, '#344e3c', 6);
     arm.add(limb);
-    place(sphere(0.12, '#fff0ca'), side * 0.13, -0.16, 0, arm);
+    const hand = new THREE.Group();
+    hand.add(sphere(0.12, '#fff0ca'));
+    arm.add(hand);
+    hands.push(hand);
+    limbs.push(limb);
     arms.push(arm);
   }
   const feet: THREE.Group[] = [];
@@ -198,11 +204,11 @@ export function createCharacter(actor: Actor): CharacterView {
   const weapon = makeBoomerang();
   weapon.scale.setScalar(0.62);
   weapon.rotation.z = 0.4;
-  place(weapon, 0.18, -0.05, 0.13, arms[1]);
+  place(weapon, 0.06, -0.025, 0.08, hands[1]);
   const leftWeapon = makeBoomerang();
   leftWeapon.scale.setScalar(0.62);
   leftWeapon.rotation.z = -0.4;
-  place(leftWeapon, -0.18, -0.05, 0.13, arms[0]);
+  place(leftWeapon, -0.06, -0.025, 0.08, hands[0]);
   leftWeapon.visible = false;
   const disguise = new THREE.Group();
   place(box(1.1, 0.95, 0.95, '#b58a52'), 0, 0.48, 0, disguise);
@@ -252,19 +258,6 @@ export function createCharacter(actor: Actor): CharacterView {
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.035;
   root.add(ring);
-  const slash = new THREE.Mesh(
-    new THREE.RingGeometry(0.6, RULES.attackRange, 24, 1, -RULES.attackArc / 2, RULES.attackArc),
-    new THREE.MeshBasicMaterial({
-      color: '#ffedbd',
-      transparent: true,
-      opacity: 0.8,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-  );
-  slash.rotation.set(-Math.PI / 2, 0, -Math.PI / 2);
-  slash.position.y = 0.6;
-  root.add(slash);
   const aim = new THREE.Group();
   for (let i = 0; i < 7; i++) {
     const dot = new THREE.Mesh(
@@ -290,7 +283,6 @@ export function createCharacter(actor: Actor): CharacterView {
     feet,
     weapon,
     shield,
-    slash,
     aim,
     ring,
     label,
@@ -299,8 +291,33 @@ export function createCharacter(actor: Actor): CharacterView {
     leftWeapon,
     disguise,
     iceBlock,
-    lastAttack: 0,
+    hands,
+    limbs,
   };
+}
+
+const armAxis = new THREE.Vector3(0, 1, 0),
+  armDirection = new THREE.Vector3();
+function poseHand(
+  view: CharacterView,
+  index: number,
+  x: number,
+  y: number,
+  z: number,
+  yaw: number,
+): void {
+  if (!view.hands || !view.limbs) return;
+  const arm = index === 0 ? view.leftArm : view.rightArm;
+  const hand = view.hands[index],
+    limb = view.limbs[index];
+  arm.rotation.set(0, 0, 0);
+  hand.position.set(x - arm.position.x, y - arm.position.y, z - arm.position.z);
+  hand.rotation.set(0, yaw, 0);
+  armDirection.copy(hand.position);
+  const reach = armDirection.length();
+  limb.position.copy(armDirection).multiplyScalar(0.5);
+  limb.scale.set(1, reach, 1);
+  limb.quaternion.setFromUnitVectors(armAxis, armDirection.normalize());
 }
 
 export function updateCharacter(
@@ -317,30 +334,55 @@ export function updateCharacter(
   const cycle = time * (actor.powers.includes('haste') ? 20 : 16) + actor.id;
   view.body.position.y = 0.82 + (actor.alive ? Math.sin(cycle) * Math.min(0.06, speed * 0.012) : 0);
   view.body.rotation.z = Math.sin(cycle / 2) * Math.min(0.07, speed * 0.01);
-  const squash = actor.dashTime > 0 ? 0.82 : actor.attackTime > 0 ? 1.08 : 1;
+  const age = meleeAge(actor, alpha);
+  const melee = age === null ? null : sampleMeleePose(age, actor.attackArmed);
+  const squash = actor.dashTime > 0 ? 0.82 : (melee?.stretch ?? 1);
   view.body.scale.set(1 / Math.sqrt(squash), squash, 1 / Math.sqrt(squash));
+  const twist = melee?.twist ?? 0;
+  view.body.rotation.order = 'YXZ';
+  view.body.rotation.y += twist;
+  view.body.rotation.x = melee?.lean ?? 0;
+  view.body.position.x = actor.facing.x * (melee?.step ?? 0) * 0.3;
+  view.body.position.z = actor.facing.y * (melee?.step ?? 0) * 0.3;
+  view.body.position.y += melee?.height ?? 0;
   view.feet.forEach((foot, i) => {
     foot.position.y =
       0.16 + Math.max(0, Math.sin(cycle + i * Math.PI)) * Math.min(speed * 0.025, 0.15);
     foot.rotation.y = facing;
+    const side = i === 0 ? -1 : 1;
+    const stride = (melee?.step ?? 0) * (i === 0 ? 1 : -0.45);
+    foot.position.x = side * 0.24 * Math.cos(facing) + stride * actor.facing.x;
+    foot.position.z = -side * 0.24 * Math.sin(facing) + stride * actor.facing.y;
   });
-  view.rightArm.rotation.x =
-    actor.attackTime > 0
-      ? -1.6 + (1 - actor.attackTime / RULES.attackDuration) * 2.5
-      : actor.charge > 0
-        ? -1.2
-        : Math.sin(cycle) * Math.min(speed * 0.05, 0.2);
-  view.leftArm.rotation.x = -view.rightArm.rotation.x * 0.45;
+  const swing = Math.sin(cycle) * Math.min(speed * 0.025, 0.12);
+  let handX = 0.72,
+    handY = actor.charge > 0 ? 0.1 : -0.24,
+    handZ = actor.charge > 0 ? -0.22 : swing;
+  let handYaw = 0;
+  if (melee) {
+    const w = melee.weight;
+    const x = melee.handX * Math.cos(twist) - melee.handZ * Math.sin(twist);
+    const z = melee.handX * Math.sin(twist) + melee.handZ * Math.cos(twist);
+    handX += (x - handX) * w;
+    handY += (melee.handY - handY) * w;
+    handZ += (z - handZ) * w;
+    handYaw = (melee.angle + Math.PI / 2 - twist) * w;
+  }
+  poseHand(view, 1, handX, handY, handZ, handYaw);
+  poseHand(
+    view,
+    0,
+    -0.72 + (melee?.weight ?? 0) * 0.24,
+    -0.24 + (melee?.weight ?? 0) * 0.26,
+    -swing + (melee?.weight ?? 0) * 0.34,
+    0,
+  );
+  view.weapon.rotation.z = 0.4 * (1 - (melee?.weight ?? 0));
   view.weapon.visible = actor.armed && actor.alive;
   if (view.leftWeapon)
     view.leftWeapon.visible = actor.alive && (actor.heldDiscs ?? (actor.armed ? 1 : 0)) > 1;
   view.shield.visible = actor.shield && actor.alive;
   view.shield.scale.setScalar(1 + Math.sin(time * 4) * 0.025);
-  view.slash.visible = actor.attackTime > 0 && actor.attackArmed && actor.alive;
-  view.slash.rotation.z =
-    facing - Math.PI / 2 + (1 - actor.attackTime / RULES.attackDuration) * 0.7 - 0.35;
-  (view.slash.material as THREE.MeshBasicMaterial).opacity =
-    (actor.attackTime / RULES.attackDuration) * 0.75;
   view.aim.visible = actor.charge > 0.1 && actor.alive;
   view.aim.rotation.y = facing;
   view.aim.scale.z = 0.7 + (actor.charge / RULES.chargeTime) * 0.8;

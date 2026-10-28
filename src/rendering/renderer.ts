@@ -32,7 +32,8 @@ function cloneCharacter(source: CharacterView): CharacterView {
     feet: source.feet.map(copy),
     weapon: copy(source.weapon),
     shield: copy(source.shield),
-    slash: copy(source.slash),
+    hands: source.hands?.map(copy),
+    limbs: source.limbs?.map(copy),
     aim: copy(source.aim),
     ring: copy(source.ring),
     label: copy(source.label),
@@ -268,7 +269,6 @@ export class GameRenderer {
           alpha,
           simulationTime,
         );
-        view.slash.visible = false;
         const pose =
           !menu && state.phase === 'countdown'
             ? introPose(
@@ -320,6 +320,8 @@ export class GameRenderer {
           reverseTime: 0,
           charge: 0,
           attackTime: 0,
+          attackSerial: 0,
+          lungeRecovery: 0,
           controlling: false,
           shield: false,
           invulnerable: 0,
@@ -332,7 +334,6 @@ export class GameRenderer {
       view.root.visible = true;
       view.label.visible = false;
       view.ring.visible = false;
-      view.slash.visible = false;
       view.root.scale.setScalar(1);
     }
     for (const [id, view] of this.decoys)

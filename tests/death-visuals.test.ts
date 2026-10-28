@@ -235,12 +235,10 @@ function fakeView(): CharacterView {
     feet: [new THREE.Group(), new THREE.Group()],
     weapon: new THREE.Group(),
     shield: new THREE.Mesh(),
-    slash: new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial()),
     aim: new THREE.Group(),
     ring: new THREE.Mesh(),
     label: new THREE.Sprite(),
     shadow: new THREE.Mesh(),
     death: createDeathModel(actor),
-    lastAttack: 0,
   };
 }

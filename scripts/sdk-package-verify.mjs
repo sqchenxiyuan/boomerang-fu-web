@@ -77,7 +77,7 @@ assert.equal(
 );
 const installed = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'));
 assert.equal(installed.name, '@boomerang-garden/sdk');
-assert.equal(installed.version, '0.4.0');
+assert.equal(installed.version, '0.4.1');
 assert.ok(
   installed.exports['.'].types &&
     installed.exports['./browser'].types &&

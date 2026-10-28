@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { ROSTER, RULES } from '../core/config';
 import type { Disc, GameEvent, GameState } from '../core/types';
 import { InstanceBatch } from './batches';
+import { meleeAge } from './melee-pose';
+import { MeleeTrail } from './melee-trail';
 
 interface TrailPoint {
   x: number;
@@ -32,7 +34,7 @@ export class WeaponsView {
   private trails = new Map<number, Trail>();
   private ribbon = new InstanceBatch(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), 768);
   private rings = new InstanceBatch(new THREE.RingGeometry(0.86, 1, 32), 96);
-  private arcs = new InstanceBatch(new THREE.RingGeometry(0.72, 1, 32, 1, 0, RULES.attackArc), 24);
+  private arcs = new MeleeTrail();
   private lastTime = -1;
   private round = -1;
   private disposed = false;
@@ -41,7 +43,6 @@ export class WeaponsView {
     this.root.add(this.ribbon.mesh, this.rings.mesh, this.arcs.mesh);
     this.ribbon.mesh.name = 'weapon-ribbons';
     this.rings.mesh.name = 'weapon-charge-rings';
-    this.arcs.mesh.name = 'weapon-slash-arcs';
   }
   observe(event: GameEvent): void {
     if (event.type === 'teleport' && event.entityType === 'disc' && event.entityId !== undefined)
@@ -168,25 +169,8 @@ export class WeaponsView {
             -Math.PI / 2,
           );
         }
-        if (actor.attackArmed && actor.attackTime > 0) {
-          const progress = Math.max(0, Math.min(1, 1 - actor.attackTime / RULES.attackDuration));
-          const turn = facing - Math.PI / 2 - RULES.attackArc / 2 + (progress - 0.5) * 0.75;
-          // Two overlapping sweeps form a bright edge and fading follow-through.
-          for (let i = 0; i < 2; i++)
-            this.arcs.add(
-              x,
-              0.62 + i * 0.015,
-              z,
-              RULES.attackRange,
-              RULES.attackRange,
-              1,
-              i === 0 ? '#fff3c7' : ROSTER[actor.id].color,
-              Math.sin(Math.PI * Math.min(0.99, progress + 0.06)) * (i === 0 ? 0.7 : 0.25),
-              -Math.PI / 2,
-              0,
-              turn - i * 0.13,
-            );
-        }
+        const age = meleeAge(actor, alpha);
+        if (actor.attackArmed && age !== null) this.arcs.add(x, z, facing, age);
       }
     this.ribbon.end();
     this.rings.end();

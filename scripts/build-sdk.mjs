@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = resolve(ROOT, 'dist-sdk');
 const NAME = '@boomerang-garden/sdk';
-const VERSION = '0.6.0';
+const VERSION = '0.7.0';
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const slash = (value) => value.replaceAll('\\', '/');
 

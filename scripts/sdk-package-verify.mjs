@@ -77,7 +77,7 @@ assert.equal(
 );
 const installed = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'));
 assert.equal(installed.name, '@boomerang-garden/sdk');
-assert.equal(installed.version, '0.6.0');
+assert.equal(installed.version, '0.7.0');
 assert.ok(
   installed.exports['.'].types &&
     installed.exports['./browser'].types &&
@@ -103,7 +103,7 @@ import assert from 'node:assert/strict';
 const names = ['window', 'document', 'navigator'];
 const descriptors = new Map(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
 for (const name of names) Object.defineProperty(globalThis, name, { configurable: true, get() { throw new Error('Core touched DOM global: ' + name); } });
-const { createSession, GameSession, ORIGINAL_MAPS, CUSTOM_MAPS, MAPS } = await import('@boomerang-garden/sdk');
+const { createSession, GameSession, ORIGINAL_MAPS, CUSTOM_MAPS, MAPS, ReplayTransport, ReplayTimeline } = await import('@boomerang-garden/sdk');
 assert.equal(typeof createSession, 'function');
 assert.equal(typeof GameSession, 'function');
 assert.equal(ORIGINAL_MAPS.length, 58);
@@ -115,6 +115,19 @@ assert.equal(original.getState().arena.id, 'original-turn-teleportals');
 assert(original.getState().arena.portals.length > 0);
 assert(original.getState().arena.environment.mechanisms.some(m => m.kind === 'movingObstacle'));
 original.destroy();
+const recorded = createSession({ mode: 'bots', bots: 2, seed: 41, mapId: 'courtyard' });
+recorded.startRecording(); recorded.step(300);
+const clip = recorded.stopRecording(); recorded.destroy();
+const replay = new ReplayTransport(clip);
+replay.seek(120); replay.stepFrames(-1);
+assert.equal(replay.snapshot().tick, 119);
+assert.equal(replay.snapshot().status, 'paused');
+replay.setLoop({ start: 100, end: 120 }); replay.resume(); replay.advance(21);
+assert.equal(replay.snapshot().tick, 100);
+const timeline = new ReplayTimeline(clip);
+timeline.advance(300);
+assert.equal(timeline.snapshot().status, 'ready');
+assert.equal(timeline.snapshot().markers[0].kind, 'round');
 await import('@boomerang-garden/sdk/types');
 
 function ready(session) {

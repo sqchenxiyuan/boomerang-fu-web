@@ -57,7 +57,7 @@ try {
   await page.waitForTimeout(150);
   assert.equal(await page.evaluate(() => window.boomerangGarden.playback.tick), frozen);
   await page.keyboard.press('j');
-  await page.keyboard.press('k');
+  await page.keyboard.press('l'); // K is now a replay transport shortcut.
   assert.equal(await page.evaluate(() => window.boomerangGarden.playback.tick), frozen);
   for (const tick of [Math.floor(data.durationTicks * 0.7), 0, data.durationTicks]) {
     await page.locator('#playback-seek').evaluate((el, t) => {
@@ -73,7 +73,7 @@ try {
       window.boomerangGarden.playback.tick > 0 &&
       window.boomerangGarden.playback.status === 'playing',
   );
-  await page.locator('#simulation-speed').selectOption('8');
+  await page.locator('#playback-speed').selectOption('8');
   await page.waitForFunction(() => window.boomerangGarden.playback.status === 'ended', undefined, {
     timeout: 15000,
   });
@@ -100,6 +100,7 @@ try {
   const nodePlayer = new ReplayPlayer(nodeData);
   nodePlayer.seek(nodeData.durationTicks);
   assert.deepEqual(numericalState(imported.state), numericalState(nodePlayer.getState()));
+  await page.locator('.play-tools summary').click();
   const redownload = page.waitForEvent('download');
   await page.locator('#export-recording').click();
   const importedFile = await redownload;

@@ -5,12 +5,15 @@ import { createBrowserGame } from './sdk/browser';
 import type { BrowserGame } from './sdk/browser';
 import { View } from './ui/view';
 import { PlayTools } from './ui/play-tools';
+import { ReplayStudio } from './ui/replay-studio';
+import './ui/replay-studio.css';
 
 /** The playable site is a client of the same SDK shipped to external callers. */
 class Application {
   private readonly view: View;
   private readonly runtime: BrowserGame;
   private readonly tools: PlayTools;
+  private readonly replayStudio: ReplayStudio;
   private screen: 'menu' | 'playing' | 'paused' = 'menu';
   private options: MatchOptions = { ...defaultOptions(), mapId: 'original-enclosed' };
 
@@ -32,6 +35,7 @@ class Application {
           this.view.events(events, elapsed, !!replay || state.options.mode === 'bots');
           this.view.update(state, elapsed, !!replay);
           this.tools?.update(frame, this.screen === 'menu');
+          this.replayStudio?.update(frame);
         },
       });
     } catch (error) {
@@ -39,15 +43,30 @@ class Application {
       throw error;
     }
     this.tools = new PlayTools(root, this.runtime);
+    this.replayStudio = new ReplayStudio(root, {
+      toggle: () =>
+        this.runtime.playback?.status === 'playing' ? this.runtime.pause() : this.runtime.resume(),
+      seek: (tick) => this.runtime.seekReplay(tick),
+      stepFrames: (delta) => this.runtime.stepReplayFrames(delta),
+      setSpeed: (speed) => this.runtime.setSpeed(speed),
+      setLoop: (range) => this.runtime.setReplayLoop(range),
+      beginScrub: () => this.runtime.beginReplayScrub(),
+      endScrub: (cancel) => this.runtime.endReplayScrub(cancel),
+      exit: () => {
+        this.view.onMenu();
+        this.tools.openHistory();
+      },
+    });
     this.tools.onReplay = (data) => {
       this.runtime.loadReplay(data);
+      this.replayStudio.reset();
       this.screen = 'playing';
       this.view.setMode('playing');
     };
-    this.tools.onExitReplay = () => this.view.onMenu();
     root.addEventListener('pointerdown', () => this.runtime.unlockAudio(), { once: true });
     this.runtime.showPreview(this.options);
     this.runtime.session.onEvent((event) => {
+      if (event.type === 'lifecycle' && event.action === 'destroy') this.replayStudio.destroy();
       if (event.type !== 'lifecycle' || event.action === 'destroy' || this.screen === 'menu')
         return;
       if (this.runtime.session.getState().phase === 'matchEnd') return;

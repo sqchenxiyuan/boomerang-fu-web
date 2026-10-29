@@ -5,8 +5,12 @@ import { GameRenderer } from '../rendering/renderer';
 import { Input } from '../platform/input';
 import { AudioEngine } from '../platform/audio';
 import type { AudioSettings } from '../platform/audio';
-import { ReplayPlayer } from './recording';
+import type { ReplayPlayer } from './recording';
 import type { ReplayData, RecordingStatus } from './recording';
+import { ReplayTransport } from './replay-transport';
+import type { ReplayLoop, ReplayTransportSnapshot } from './replay-transport';
+import { ReplayTimeline } from './replay-timeline';
+import type { ReplayTimelineSnapshot } from './replay-timeline';
 import { FixedLoop } from '../platform/loop';
 import { transitionPresentation } from '../core/presentation';
 import { boundaryNotice, eliminationLabel } from '../core/feedback';
@@ -32,12 +36,8 @@ export interface BrowserFrame {
   audio: AudioSettings;
   speed: number;
   recording: RecordingStatus | null;
-  replay: {
-    tick: number;
-    durationTicks: number;
-    status: ReplayPlayer['status'];
-    label: string;
-  } | null;
+  replay: ReplayTransportSnapshot | null;
+  replayTimeline: ReplayTimelineSnapshot | null;
   replayError: string | null;
 }
 export interface BrowserGameOptions {
@@ -74,6 +74,10 @@ export class BrowserGame {
   private elapsed = 0;
   private frameErrors = 0;
   private player: ReplayPlayer | null = null;
+  private transport: ReplayTransport | null = null;
+  private timeline: ReplayTimeline | null = null;
+  private replayRevision = -1;
+  private liveSpeed: number | null = null;
   private replayError: string | null = null;
   onFrame: (frame: BrowserFrame) => void;
 
@@ -182,6 +186,10 @@ export class BrowserGame {
       if (event.type === 'lifecycle') {
         if (event.action === 'start') {
           this.player = null;
+          this.transport = null;
+          this.timeline = null;
+          if (this.liveSpeed !== null) this.loop.timeScale = this.liveSpeed;
+          this.liveSpeed = null;
           this.replayError = null;
           this.preview = false;
           this.events = [];
@@ -211,14 +219,14 @@ export class BrowserGame {
         if (this.player.status !== 'playing') return false;
         const before = this.player.tick;
         try {
-          this.player.step();
+          this.transport!.advance();
           this.events.push(...this.player.drainEvents());
         } catch (error) {
           this.replayError = String(error);
           this.player.pause();
           this.frameErrors++;
         }
-        return this.player.tick > before;
+        return this.player.tick !== before || this.transport!.snapshot().loop !== null;
       }
       if (this.session.status !== 'running') return false;
       if (options.keyboard !== false) {
@@ -230,6 +238,14 @@ export class BrowserGame {
     };
     this.loop.onFrame = (alpha, elapsed, dt) => {
       if (this.disposed) return;
+      this.synchronizeReplay();
+      // Build a separate event index cooperatively; never advance the visible replay for indexing.
+      if (this.timeline?.snapshot().status === 'indexing') {
+        const deadline = performance.now() + 3;
+        do {
+          this.timeline.advance(8);
+        } while (this.timeline.snapshot().status === 'indexing' && performance.now() < deadline);
+      }
       if (options.keyboard !== false) this.input.pollSystemButtons();
       // The public frame gets its own detached world, without allocating the
       // controls metadata needed only by an explicit Session.snapshot() caller.
@@ -299,14 +315,8 @@ export class BrowserGame {
           audio: this.audio.getSettings(),
           speed: this.loop.timeScale,
           recording: this.session.recording,
-          replay: this.player
-            ? {
-                tick: this.player.tick,
-                durationTicks: this.player.durationTicks,
-                status: this.player.status,
-                label: this.player.label,
-              }
-            : null,
+          replay: this.transport?.snapshot() ?? null,
+          replayTimeline: this.timeline?.snapshot() ?? null,
           replayError: this.replayError,
         });
       } catch {
@@ -330,7 +340,10 @@ export class BrowserGame {
     this.audio.unlock();
   };
   private blur = (): void => {
-    if (!this.disposed && !this.preview) this.pause();
+    if (!this.disposed && !this.preview) {
+      this.transport?.endScrub(true);
+      this.pause();
+    }
   };
   private visibility = (): void => {
     if (document.hidden) this.blur();
@@ -347,7 +360,7 @@ export class BrowserGame {
   }
   pause(): void {
     this.assertLive();
-    if (this.player) this.player.pause();
+    if (this.transport) this.transport.pause();
     else this.session.pause();
     this.loop.paused = true;
     this.input.setEnabled(false);
@@ -357,8 +370,8 @@ export class BrowserGame {
     this.assertLive();
     this.preview = false;
     if (this.player) {
-      if (this.player.status === 'ended') this.seekReplay(0);
-      this.player.resume();
+      this.transport!.resume();
+      this.synchronizeReplay();
     } else this.session.resume();
     this.loop.paused = false;
     this.loop.reset();
@@ -404,10 +417,17 @@ export class BrowserGame {
   }
   loadReplay(data: ReplayData | string): void {
     this.assertLive();
-    const player = new ReplayPlayer(data);
+    const transport = new ReplayTransport(data);
+    const timeline = new ReplayTimeline(data);
+    const player = transport.player;
     if (this.session.recording) this.session.stopRecording();
     this.session.pause();
     this.player = player;
+    this.transport = transport;
+    this.timeline = timeline;
+    this.replayRevision = transport.snapshot().revision;
+    this.liveSpeed ??= this.loop.timeScale;
+    this.loop.timeScale = 1;
     this.preview = false;
     this.replayError = null;
     this.events = [];
@@ -420,11 +440,45 @@ export class BrowserGame {
   }
   seekReplay(tick: number): void {
     this.assertLive();
-    if (!this.player) throw new Error('No replay is loaded');
-    this.player.seek(tick);
-    this.events = [];
-    this.renderer.reset(this.player.getState());
+    this.requireReplay().seek(tick);
+    this.synchronizeReplay();
+  }
+  stepReplayFrames(delta: number): void {
+    this.assertLive();
+    this.requireReplay().stepFrames(delta);
+    this.synchronizeReplay();
+  }
+  setReplayLoop(range: ReplayLoop | null): void {
+    this.assertLive();
+    this.requireReplay().setLoop(range);
+  }
+  beginReplayScrub(): void {
+    this.assertLive();
+    this.requireReplay().beginScrub();
+    this.loop.paused = true;
+    this.audio.reset();
+  }
+  endReplayScrub(cancel = false): void {
+    this.assertLive();
+    this.requireReplay().endScrub(cancel);
+    this.synchronizeReplay();
+    this.loop.paused = this.player!.status !== 'playing';
     this.loop.reset();
+  }
+  get replayTimeline(): ReplayTimelineSnapshot | null {
+    return this.timeline?.snapshot() ?? null;
+  }
+  private requireReplay(): ReplayTransport {
+    if (!this.transport) throw new Error('No replay is loaded');
+    return this.transport;
+  }
+  private synchronizeReplay(): void {
+    if (!this.transport || this.replayRevision === this.transport.snapshot().revision) return;
+    this.replayRevision = this.transport.snapshot().revision;
+    this.events = [];
+    this.renderer.seek(this.transport.player.getState());
+    this.loop.reset();
+    this.loop.paused = this.transport.player.status !== 'playing';
     this.audio.reset();
   }
   stats(): {
@@ -461,6 +515,9 @@ export class BrowserGame {
     this.session.destroy();
     this.container.style.position = this.originalPosition;
     this.events = [];
+    this.player = null;
+    this.transport = null;
+    this.timeline = null;
   }
 }
 

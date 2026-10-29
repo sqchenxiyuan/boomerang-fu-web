@@ -25,6 +25,7 @@ npm run dev
 - 单人对机器人、本地双人、最多四人混合对战、三档机器人难度。
 - AI 观战（2/4 机器人互战）、外部 HTTP AI 协议和 Node 批量加速；0.25–8× 可视模拟与回放。
 - Tone.js 程序化 BGM/分层音效、独立音量；默认自动录制、浏览器本地历史对局选择、下载/导入、暂停与进度跳转，已保存录像刷新后仍可查看。[使用与 API](docs/replay-and-ai.md)。
+- 独立回放工作台：逐帧前后定位、实时拖动、A–B 片段循环、回合跳转、淘汰/道具/格挡事件索引、选手状态与快捷键。纯 TypeScript 播放控制和事件索引可脱离 UI 在 Node 中使用。
 - 移动与惯性、转向、冲刺、近战/空手击退、正面反弹、蓄力投掷、弧线与追踪、回返/接取/召回。
 - 墙体、可破坏箱子、水坑、矩形决胜缩圈；人物和飞镖均可穿过传送门。
 - 默认 180 秒缩圈（菜单可选 30/60 秒），出界后有 3～3.75 秒返回宽限，配有箭头和倒计时。
@@ -54,10 +55,10 @@ npm run dev
 npm run build:sdk
 npm run verify:sdk
 # 在另一个项目安装；也可以使用绝对路径
-npm install ./dist-sdk/boomerang-garden-sdk-0.6.0.tgz
+npm install ./dist-sdk/boomerang-garden-sdk-0.7.0.tgz
 ```
 
-交付的是本地 ESM 包 `@boomerang-garden/sdk@0.6.0`，未发布 npm。`MAPS`、`ORIGINAL_MAPS`、`CUSTOM_MAPS` 提供可选目录；原版地图 ID 以 `original-` 开头。
+交付的是本地 ESM 包 `@boomerang-garden/sdk@0.7.0`，未发布 npm。`MAPS`、`ORIGINAL_MAPS`、`CUSTOM_MAPS` 提供可选目录；原版地图 ID 以 `original-` 开头。
 
 ```js
 import { createBrowserGame } from '@boomerang-garden/sdk/browser';
@@ -101,6 +102,7 @@ npm run test:v3-browser     # 5173：缩圈/死亡实际流程与独立呈现样
 npm run test:v6-node        # 先 build:sdk：AI HTTP、回放、容量与加速测量
 npm run test:v6-browser     # 5173：录像文件、跨运行时回放、倍速、音频、界面
 node scripts/replay-history-browser-verify.mjs # 5173：多局历史、刷新恢复、导入/删除与存储降级
+node scripts/replay-studio-browser-verify.mjs # 5173，先 build:sdk：逐帧/拖动/循环/事件定位与布局
 npm run test:v6-audio       # 5173：离线音频样本、音频隔离与固定步长时钟
 node scripts/v4-browser-verify.mjs # 5173：发镖、配方、键盘道具操作、真实拾取
 node scripts/production-smoke.mjs # 4173：正式游戏 + SDK 演示
@@ -115,6 +117,8 @@ SDK 0.4.1 同步更新普通攻击表现，改动和验证见 [普通攻击动�
 SDK 0.5.0 加入完整原版地图集与环境机制。参见[地图清单](docs/original-map-inventory.md)、[机关证据](docs/original-environment-analysis.md)、[验证记录](docs/original-maps-validation.md)。布局与机制依据安装包静态数据重建，模型、纹理、植被外观和音效为独立简化表现；尚未与原版运行画面逐帧比对，不代表像素级或全部模式复刻。
 
 SDK 0.6.0 加入 Tone.js 音乐/音效、混合录像、AI 互战与 HTTP 协议、倍速及无渲染批量模拟。参见[使用说明](docs/replay-and-ai.md)、[方案比较](docs/audio-replay-ai-plan.md)和[测量与验收](docs/v6-validation.md)。
+
+SDK 0.7.0 提供 `ReplayTransport` 与 `ReplayTimeline`，站点使用独立回放工作台。播放内核不依赖 UI、存储、计时器或 Three.js；录像格式和模拟版本未变，兼容此前保存的 0.6.0 录像。参见[回放分层与控制 API](docs/replay-and-ai.md#回放工作台与分层)。
 
 ## 分层
 

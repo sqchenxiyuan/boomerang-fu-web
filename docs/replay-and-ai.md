@@ -1,4 +1,4 @@
-# 音乐、录像与 AI 对战（SDK 0.6.0）
+# 音乐、录像与 AI 对战（SDK 0.7.0）
 
 ## 浏览器使用
 
@@ -13,6 +13,49 @@
 声音由 Tone.js 15.1.22 合成，首次点击页面后解锁。菜单、对战、决胜和胜利使用不同节奏与配器，挥砍、投掷、反弹、传送、拾取及不同死亡有分层音效。音乐按真实音频时间播放，加速不会变调；密集音效有去重和限流。音乐和音效是新编排，未复用原版录音。
 
 ## 录像与状态恢复
+
+站点回放会打开独立工作台：底部时间轴显示回合与淘汰标记，右侧显示选手比分、淘汰数、持镖/存活与道具状态。事件可按回合、淘汰、道具、格挡筛选；点击事件会暂停并定位到事件发生的 tick。回合下拉菜单保留当前播放/暂停状态。窄屏时事件列表改为横向排列，优先保留竞技场和播放控制。
+
+时间码为 `分:秒:帧`，每秒 60 帧。支持前后 5 秒、前后单帧、首尾定位、0.25–8×、A–B 循环。逐帧操作始终暂停；拖动时间轴实时预览，松开后恢复拖动前的播放状态，拖到结尾保持结束，取消拖动回到原位置。暂停或定位不重播跳过区间的音效。进入回放默认 1×，退出恢复此前游戏速度并打开历史列表。
+
+画面获得焦点后：空格或 K 播放/暂停，←/→ 前后 5 秒，逗号/句号逐帧，Home/End 首尾，[ / ] 设置 A/B 点。输入框和选择框保留原生键盘行为，按钮保留 Enter/空格激活。
+
+## 回放工作台与分层
+
+| 层 | 职责 | 依赖 |
+| --- | --- | --- |
+| `sdk/recording.ts` 的 `ReplayPlayer` | 校验文件、恢复检查点、确定性重演 | 模拟内核 |
+| `sdk/replay-transport.ts` 的 `ReplayTransport` | 暂停、跳转、逐帧、拖动状态、循环范围 | ReplayPlayer，无 DOM/计时器 |
+| `sdk/replay-timeline.ts` 的 `ReplayTimeline` | 独立模拟并增量提取回合与关键事件 | ReplayPlayer，无 DOM/计时器 |
+| `sdk/browser.ts` | RAF 时钟、输入隔离、画面/声音同步、分帧索引 | 上述内核、浏览器与渲染器 |
+| `ui/replay-studio.ts` / `.css` | 控件、事件列表、选手状态、快捷键和布局 | 只读帧数据与命令端口 |
+| `platform/replay-history.ts` / `ui/play-tools.ts` | 本地历史、录制与文件入口 | IndexedDB 与站点 UI |
+
+回放工作台通过 `ReplayStudioPort` 发出命令，通过 `update(frame)` 接收只读模型；它不创建播放器、模拟时钟或数据库。替换 UI 不需要修改回放内核。核心入口包含以下 API，可直接在 Node 使用：
+
+```js
+import { ReplayTransport, ReplayTimeline } from '@boomerang-garden/sdk';
+const transport = new ReplayTransport(data);
+transport.pause();
+transport.seek(600);         // 精确定位；保留暂停状态
+transport.stepFrames(-1);    // 向前回看一帧，并暂停
+transport.setLoop({ start: 300, end: 900 });
+transport.resume();
+transport.advance(60);       // 由宿主时钟供给 tick，内核不启动定时器
+console.log(transport.snapshot(), transport.player.getState());
+
+const timeline = new ReplayTimeline(data); // 与可见播放器完全独立
+while (timeline.snapshot().status === 'indexing') timeline.advance(120);
+console.log(timeline.snapshot().markers);
+```
+
+- `ReplayTransport`：`pause/resume/toggle/seek/stepFrames/advance/setLoop/beginScrub/endScrub(cancel=false)/snapshot`。tick/帧参数必须为整数。`seek` 拒绝越界；`stepFrames` 在边界截断；循环范围是 `[start,end)`，要求 `0 <= start < end <= durationTicks`；`setLoop(null)` 清除循环。`resume` 在结尾从循环起点或 0 重播。`snapshot.revision` 在跳转/循环回绕时递增，用于清除瞬态表现。
+- `ReplayTimeline`：`advance(ticks=120)` 按宿主预算推进；`snapshot()` 返回冻结的 `{status,progress,markers,error,omitted}`。marker 包含 `id/tick/kind/round/mapId/actorId`，淘汰包含 `sourceId/cause`，道具包含 `power`。索引初始位置作为第一个回合入口，之后按真实回合切换生成入口。`status` 为 `indexing/ready/error`；最终哈希不匹配会报告错误，不把索引标为成功。
+- 事件索引从旧录像的动作和检查点重建，不要求重新录制。浏览器按约 3 ms/帧的协作预算分析，期间可播放和操作；长录像显示进度，切换/退出即释放旧索引器。密集录像达到 10000 条后省略后续普通事件并报告数量，继续保留回合与胜利事件；时间轴最多绘制 400 个回合/淘汰/胜利标记，列表可查看全部已索引事件。
+- `BrowserGame` 新增 `stepReplayFrames(delta)`、`setReplayLoop(range|null)`、`beginReplayScrub()`、`endReplayScrub(cancel=false)` 与只读 `replayTimeline`。`BrowserFrame.replay` 增加 `loop/scrubbing/revision`，新增 `replayTimeline`。浏览器逐帧跳转会清除音效/粒子，但同一回合复用 GPU 资源。
+- 包版本为 0.7.0；模拟版本仍为 0.6.0、录像格式仍为 1，旧历史无需迁移。SDK 包不包含工作台 UI 或站点持久化逻辑。
+
+## 基础录制 API
 
 ```js
 import { createSession, ReplayPlayer } from '@boomerang-garden/sdk';

@@ -244,6 +244,7 @@ try {
   assert(await raw.locator('#history-warning').isVisible());
   await raw.locator('#watch-recording').click();
   await raw.waitForFunction(() => !!window.boomerangGarden.playback);
+  await raw.locator('.play-tools summary').click();
   await raw.locator('#delete-recording').click();
   await raw.waitForFunction(() => document.querySelectorAll('.history-entry').length === 0);
   report.checks.push('Compression failure preserves a playable and deletable temporary recording');

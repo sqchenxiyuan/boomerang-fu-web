@@ -29,12 +29,10 @@ export class PlayTools {
   private refreshVersion = 0;
   private busy = false;
   private wasRecording = false;
-  private seeking = false;
   private disposed = false;
   private channel =
     typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('garden-replay-history');
   onReplay = (_data: ReplayData): void => {};
-  onExitReplay = (): void => {};
   constructor(
     host: HTMLElement,
     private game: BrowserGame,
@@ -56,7 +54,6 @@ export class PlayTools {
           <p class="history-note">保存在当前浏览器，刷新后仍可查看。</p>
           <p id="history-warning" role="status" hidden></p>
         </section>
-        <div id="playback-controls" hidden><label>回放进度 <span id="playback-time"></span><input id="playback-seek" aria-label="回放进度" type="range" min="0" max="1" value="0" step="1"></label><div class="tools-buttons"><button id="playback-toggle">暂停回放</button><button id="playback-exit">退出回放</button></div></div>
         <p id="tools-status" role="status"></p>
       </div>`;
     host.append(this.root);
@@ -123,29 +120,6 @@ export class PlayTools {
           this.renderHistory();
         });
     });
-    this.get('playback-toggle').addEventListener('click', () =>
-      game.playback?.status === 'playing' ? game.pause() : game.resume(),
-    );
-    this.get('playback-exit').addEventListener('click', () => this.onExitReplay());
-    const seek = this.get<HTMLInputElement>('playback-seek');
-    seek.addEventListener('pointerdown', () => {
-      this.seeking = true;
-    });
-    seek.addEventListener('input', () => {
-      this.seeking = true;
-      this.get('playback-time').textContent = clock(Number(seek.value));
-    });
-    seek.addEventListener('change', () => {
-      try {
-        game.seekReplay(Number(seek.value));
-      } catch (error) {
-        this.message(this.error(error));
-      }
-      this.seeking = false;
-    });
-    seek.addEventListener('pointercancel', () => {
-      this.seeking = false;
-    });
     this.channel?.addEventListener('message', () => void this.refreshHistory());
     // start() finalizes the preceding recording before it emits its lifecycle event.
     game.session.onEvent((event) => {
@@ -176,6 +150,9 @@ export class PlayTools {
       /* Optional preference. */
     }
   }
+  openHistory(): void {
+    this.root.open = true;
+  }
   /** Synchronous finalization, followed by an asynchronous local archive. */
   captureRecording(): void {
     if (this.game.session.recording) this.archive(this.game.session.stopRecording());
@@ -193,6 +170,7 @@ export class PlayTools {
     const recording = !!this.game.session.recording;
     // BrowserGame validates before replacing the current match or stopping its recording.
     this.onReplay(data);
+    this.root.open = false;
     if (recording) this.archive(this.game.session.getRecording(), false);
     this.wasRecording = false;
   }
@@ -356,22 +334,6 @@ export class PlayTools {
         slider.value = String(Math.round(frame.audio[key] * 100));
     }
     this.get<HTMLSelectElement>('simulation-speed').value = String(frame.speed);
-    this.get('playback-controls').hidden = !frame.replay;
-    if (frame.replay) {
-      const seek = this.get<HTMLInputElement>('playback-seek');
-      seek.max = String(frame.replay.durationTicks);
-      if (!this.seeking) {
-        seek.value = String(frame.replay.tick);
-        this.get('playback-time').textContent =
-          `${clock(frame.replay.tick)} / ${clock(frame.replay.durationTicks)}`;
-      }
-      this.get('playback-toggle').textContent =
-        frame.replay.status === 'playing'
-          ? '暂停回放'
-          : frame.replay.status === 'ended'
-            ? '重新播放'
-            : '继续回放';
-    }
     if (frame.replayError) this.message(`回放已停止：${frame.replayError}`);
   }
 }

@@ -248,6 +248,16 @@ export class GameRenderer {
     this.camera.updateProjectionMatrix();
   }
 
+  /** A discontinuous replay seek clears transient effects without rebuilding same-round GPU assets. */
+  seek(state: GameState): void {
+    this.effects.clear();
+    this.weapons.clear();
+    this.powers.clear();
+    this.boundary.reset();
+    for (const gate of this.arena.portals.values()) gate.userData.flashUntil = 0;
+    this.previousTime = state.time;
+  }
+
   events(events: GameEvent[]): void {
     for (const event of events) {
       this.effects.emit(event);

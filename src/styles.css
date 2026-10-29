@@ -1279,15 +1279,6 @@ kbd {
 #tools-status:empty {
   display: none;
 }
-#playback-controls {
-  display: grid;
-  gap: 10px;
-  border-top: 1px solid #244e3b20;
-  padding-top: 10px;
-}
-#playback-controls[hidden] {
-  display: none;
-}
 @media (max-width: 800px) {
   .play-tools {
     top: 76px;

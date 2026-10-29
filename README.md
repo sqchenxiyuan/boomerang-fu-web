@@ -24,7 +24,7 @@ npm run dev
 - 移动墙与夹击、往返/旋转浮筏、开关与升降门、永久坍塌和踩踏陷阱、湿滑地面、植被与可破坏物。保留山间庭院等 5 张 Web 原创布局。
 - 单人对机器人、本地双人、最多四人混合对战、三档机器人难度。
 - AI 观战（2/4 机器人互战）、外部 HTTP AI 协议和 Node 批量加速；0.25–8× 可视模拟与回放。
-- Tone.js 程序化 BGM/分层音效、独立音量；动作与状态检查点录像、下载/导入、暂停与进度跳转。[使用与 API](docs/replay-and-ai.md)。
+- Tone.js 程序化 BGM/分层音效、独立音量；默认自动录制、浏览器本地历史对局选择、下载/导入、暂停与进度跳转，已保存录像刷新后仍可查看。[使用与 API](docs/replay-and-ai.md)。
 - 移动与惯性、转向、冲刺、近战/空手击退、正面反弹、蓄力投掷、弧线与追踪、回返/接取/召回。
 - 墙体、可破坏箱子、水坑、矩形决胜缩圈；人物和飞镖均可穿过传送门。
 - 默认 180 秒缩圈（菜单可选 30/60 秒），出界后有 3～3.75 秒返回宽限，配有箭头和倒计时。
@@ -100,6 +100,7 @@ npm run test:sdk-browser    # 5173：注入、接管、多实例、销毁
 npm run test:v3-browser     # 5173：缩圈/死亡实际流程与独立呈现样本
 npm run test:v6-node        # 先 build:sdk：AI HTTP、回放、容量与加速测量
 npm run test:v6-browser     # 5173：录像文件、跨运行时回放、倍速、音频、界面
+node scripts/replay-history-browser-verify.mjs # 5173：多局历史、刷新恢复、导入/删除与存储降级
 npm run test:v6-audio       # 5173：离线音频样本、音频隔离与固定步长时钟
 node scripts/v4-browser-verify.mjs # 5173：发镖、配方、键盘道具操作、真实拾取
 node scripts/production-smoke.mjs # 4173：正式游戏 + SDK 演示

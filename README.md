@@ -150,3 +150,9 @@ src/sdk-demo.ts  使用相同公开 API 的接管演示
 Web 保留简化的飞镖动力学、回收、下落惯性与 AI；完整原版地图目录、轮廓与旋转矩形边界已重建，视觉仍使用程序化模型。14 种正式道具已进入模拟规则，但爆炸伤害窗口、武器补发等待、诱饵决策等仍有 Web 适配差异，详见第四阶段报告。隐藏的 TimeImmune、全部角色美术、组队/黄金回旋镖/躲猫猫或联网尚未实现。原版模型、贴图、程序及分析工具不进入站点或 SDK。
 
 `tools/`、`analysis/evidence/`、`analysis/derived/`、`test-results/` 和构建产物默认忽略 Git。原版离线分析使用 ILSpy / UnityPy，它们不是 Web 游戏运行或构建依赖。
+
+## Mini Metro 实验
+
+[小小地铁 · Little Metro](experiments/minimetro/README.md) 是 Mini Metro 核心运输玩法的独立 Web 重建，采用圆润低多边形、粉彩配色和柔和阴影，保留城市地铁题材。包含线路编辑、换乘、跨河资源、四种模式、独立 Node SDK、HTTP Agent，以及可重建决策前现场的操作回放。
+
+进入 `experiments/minimetro` 后运行 `npm ci`、`npm run dev`（5175）；`npm run build` 后可运行 `npm run preview`（4175）。玩法差异与验证边界见[还原范围](experiments/minimetro/FIDELITY.md)，接入方式见 [Agent 文档](experiments/minimetro/AGENT.md)。

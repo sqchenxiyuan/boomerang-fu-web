@@ -574,9 +574,22 @@ function dispatch(runtime: AgentRuntime, method: string, params: Record<string, 
     observations: [runtime.observe(0), runtime.observe(1)],
   });
   switch (method) {
-    case 'reset':
-      runtime.reset(params as never);
+    case 'reset': {
+      // Platform modes: every match-* variant runs as one match (targets and
+      // round limits are settled by the platform), like the MUNDI embed.
+      const mode = String(params.mode);
+      if (
+        !['round', 'match', 'match-seven', 'match-short', 'match-medium', 'match-long'].includes(
+          mode,
+        )
+      )
+        throw new RangeError('mode must be round or match');
+      runtime.reset({
+        ...(params as never as object),
+        mode: mode === 'round' ? 'round' : 'match',
+      } as never);
       return both();
+    }
     case 'advance':
       runtime.step(params.actions as unknown[], DECISION_TICKS);
       return both();

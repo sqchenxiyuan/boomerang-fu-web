@@ -78,6 +78,7 @@ class AgentTurntable {
   private actor = makeActor(0, 'human', 0);
   private raf = 0;
   private start = performance.now();
+  private lastFrame = 0;
   private size = '';
   readonly failed: boolean;
 
@@ -138,7 +139,9 @@ class AgentTurntable {
       const yaw = Math.sin(t * 0.7) * 1.1;
       this.actor.facing = { x: Math.sin(yaw), y: Math.cos(yaw) };
       if (this.view) {
-        updateCharacter(this.view, this.actor, 1, t);
+        const delta = Math.min(0.1, Math.max(0, t - this.lastFrame));
+        this.lastFrame = t;
+        updateCharacter(this.view, this.actor, 1, t, { delta, tick: t });
         this.view.label.visible = false;
         this.view.aim.visible = false;
       }

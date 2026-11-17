@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RULES } from '../core/config';
+import { NATIVE, RULES } from '../core/config';
 import { lerpV } from '../core/math';
 import type { Actor } from '../core/types';
 import { box, cylinder, makeBoomerang, place, shadow, sphere } from './palette';
@@ -12,9 +12,21 @@ import { lookPalette } from '../agents/look';
 import { defaultLook } from '../agents/defaults';
 import { createAgentBody } from './agent-model';
 import { sampleCharacterPose, type MotionContext } from './character-motion';
+import { advanceAnimation, createAnimation, type CharacterAnimation } from './character-animation';
+
+/** TiltActorTowardsCamera and BODY_OFFSET from the reference character view. */
+export const CAMERA_TILT = (25 * Math.PI) / 180;
+export const BODY_OFFSET = 0.4 * NATIVE.scale;
+const TAU = Math.PI * 2;
 
 export interface CharacterView {
   root: THREE.Group;
+  /** TiltActorTowardsCamera frame for the body, floating hands, feet and attachments. */
+  lean?: THREE.Group;
+  /** Clip playback (Godot OriginalCharacterPreview); owned by this view. */
+  animation?: CharacterAnimation;
+  /** Facing at the previous and current simulated tick, for lerp_angle. */
+  turn?: { tick: number; previous: number; current: number };
   /** Facing-only frame for the floating hands and feet (no body squash). */
   rig?: THREE.Group;
   body: THREE.Group;
@@ -71,7 +83,13 @@ export function createCharacter(
     body = new THREE.Group(),
     rig = new THREE.Group();
   const groundShadow = shadow(0.66);
-  root.add(body, rig, groundShadow);
+  // The reference tilts the whole model 25° toward the camera and offsets it by
+  // BODY_OFFSET (0.4 Unity units toward the camera); ground marks stay flat.
+  const lean = new THREE.Group();
+  lean.rotation.x = CAMERA_TILT;
+  lean.position.z = BODY_OFFSET;
+  lean.add(body, rig);
+  root.add(lean, groundShadow);
   body.position.y = 0.72;
   if (look) body.add(createAgentBody(look));
   else body.add(box(0.8, 1.1, 0.5, identity.color));
@@ -118,7 +136,7 @@ export function createCharacter(
   for (const x of [-0.38, 0.38]) place(box(0.1, 1, 1.02, '#d9b273'), x, 0.48, 0, disguise);
   place(box(1.15, 0.12, 1.02, '#dfba7a'), 0, 0.93, 0, disguise);
   disguise.visible = false;
-  root.add(disguise);
+  lean.add(disguise);
   const iceBlock = new THREE.Mesh(
     new THREE.IcosahedronGeometry(1.04, 0),
     new THREE.MeshStandardMaterial({
@@ -133,7 +151,7 @@ export function createCharacter(
   iceBlock.position.y = 0.78;
   iceBlock.scale.set(0.85, 1.1, 0.85);
   iceBlock.visible = false;
-  root.add(iceBlock);
+  lean.add(iceBlock);
   const shield = new THREE.Mesh(
     new THREE.IcosahedronGeometry(1.05, 2),
     new THREE.MeshPhysicalMaterial({
@@ -147,7 +165,7 @@ export function createCharacter(
     }),
   );
   shield.position.y = 0.85;
-  root.add(shield);
+  lean.add(shield);
   const ring = new THREE.Mesh(
     new THREE.RingGeometry(0.64, 0.72, 32),
     new THREE.MeshBasicMaterial({
@@ -180,6 +198,8 @@ export function createCharacter(
   root.add(death.root);
   return {
     root,
+    lean,
+    animation: createAnimation(),
     rig,
     body,
     leftArm: arms[0],
@@ -209,17 +229,44 @@ function applyJoint(
   object.scale.setScalar(j.scale);
 }
 
+export interface CharacterFrame {
+  /** Scaled game seconds since the previous rendered frame (0 while paused or frozen). */
+  delta: number;
+  /** Changes once per simulated tick (the simulation clock). */
+  tick: number;
+  /** Simulation step length of the latest tick, for move_speed_parameter. */
+  tickDt?: number;
+}
+
+const yawOf = (actor: Actor): number => Math.atan2(actor.facing.x, actor.facing.y);
+/** Godot lerp_angle: the shortest way round. */
+export function lerpAngle(from: number, to: number, t: number): number {
+  const difference = ((((to - from) % TAU) + TAU * 1.5) % TAU) - Math.PI;
+  return from + difference * t;
+}
+
 export function updateCharacter(
   view: CharacterView,
   actor: Actor,
   alpha: number,
   time: number,
+  frame: CharacterFrame = { delta: 0, tick: time },
   motion: MotionContext = {},
 ): void {
+  // Position and facing both interpolate between the last two simulated ticks.
   const pos = lerpV(actor.previous, actor.position, alpha);
   view.root.position.set(pos.x, 0, pos.y);
-  const facing = Math.atan2(actor.facing.x, actor.facing.y);
-  const pose = sampleCharacterPose(actor, time, motion, alpha);
+  const yaw = yawOf(actor);
+  const turn = (view.turn ??= { tick: frame.tick, previous: yaw, current: yaw });
+  if (turn.tick !== frame.tick) {
+    turn.previous = turn.current;
+    turn.tick = frame.tick;
+  }
+  turn.current = yaw;
+  const facing = lerpAngle(turn.previous, turn.current, alpha);
+  const animation = (view.animation ??= createAnimation());
+  advanceAnimation(animation, actor, frame.delta, frame.tickDt);
+  const pose = sampleCharacterPose(actor, animation, motion, alpha);
   const b = pose.body;
   // The body moves in the facing frame; its squash never reaches the hands.
   view.body.position.set(

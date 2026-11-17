@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { POWERUPS } from '../core/config';
+import { POWERUPS, RULES } from '../core/config';
 import { introPose, transitionPresentation } from '../core/presentation';
 import { lerpV } from '../core/math';
 import type { Arena, GameEvent, GameState, Pickup } from '../core/types';
@@ -42,6 +42,10 @@ function cloneCharacter(source: CharacterView): CharacterView {
   return {
     ...source,
     root,
+    lean: source.lean && copy(source.lean),
+    // A decoy plays its own clips and turns on its own.
+    animation: undefined,
+    turn: undefined,
     body: copy(source.body),
     rig: source.rig && copy(source.rig),
     leftArm: copy(source.leftArm),
@@ -348,8 +352,28 @@ export class GameRenderer {
     }
   }
 
-  draw(state: GameState, alpha: number, elapsed: number, dt: number, menu: boolean): void {
+  /**
+   * @param dt real seconds since the previous frame (0 while paused)
+   * @param rate simulation playback speed (0.25–8×), so clips follow game time
+   */
+  draw(
+    state: GameState,
+    alpha: number,
+    elapsed: number,
+    dt: number,
+    menu: boolean,
+    rate = 1,
+  ): void {
     const simulationTime = menu ? elapsed : state.time;
+    // A freeze frame holds the whole world: the reference stops its accumulator,
+    // so nothing interpolates and clips do not advance.
+    const frozen = !menu && state.hitStop > 0;
+    if (frozen) alpha = 1;
+    const frame = {
+      delta: menu ? dt : frozen ? 0 : dt * rate * (state.clock?.timeScale ?? 1),
+      tick: simulationTime,
+      tickDt: RULES.dt * (state.clock?.timeScale ?? 1),
+    };
     const arenaKey = `${state.arena.id ?? 'courtyard'}:${state.round}`;
     if (this.arenaSource !== arenaKey) {
       this.scene.remove(this.arena.root);
@@ -381,6 +405,7 @@ export class GameRenderer {
           menu ? { ...actor, facing: { x: -0.15, y: 1 } } : actor,
           alpha,
           simulationTime,
+          frame,
           { throwAge: throwAge.get(actor.id) ?? null },
         );
         const pose =
@@ -444,6 +469,7 @@ export class GameRenderer {
         },
         alpha,
         simulationTime,
+        frame,
       );
       view.root.visible = true;
       view.label.visible = false;

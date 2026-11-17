@@ -274,6 +274,7 @@ export class BrowserGame {
         elapsed,
         paused && !this.preview ? 0 : dt,
         this.preview,
+        this.loop.timeScale,
       );
       if (options.hud !== false) {
         const presentation = transitionPresentation(state);

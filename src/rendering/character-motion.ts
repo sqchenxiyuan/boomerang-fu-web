@@ -1,13 +1,16 @@
 import { NATIVE, RULES } from '../core/config';
-import { clamp, length } from '../core/math';
+import { clamp } from '../core/math';
 import type { Actor } from '../core/types';
 import { meleeAge, sampleMeleePose } from './melee-pose';
+import { CLIP_TIMING, clipTime, type CharacterAnimation } from './character-animation';
 
 /*
  * Procedural, exaggerated character motion with floating hands and feet.
- * Pure and state-driven (no wall clock or history), so pause, rewind and
- * replay seeks agree. Everything is in the actor's facing frame: +z forward,
- * +x the weapon hand, +y up, origin on the ground under the actor.
+ * The base pose comes from the current clip at its clip time, exactly as the
+ * reference plays its idle/walk clips (character-animation.ts keeps the clip
+ * clock, so a speed change alters the playback rate, never the phase). Action
+ * overlays are driven by simulation state. Everything is in the actor's facing
+ * frame: +z forward, +x the weapon hand, +y up, origin on the ground.
  */
 export interface Joint {
   x: number;
@@ -31,8 +34,8 @@ export interface MotionContext {
 
 export const BODY_HEIGHT = 0.82;
 export const THROW_FOLLOW = 0.36;
-const WALK_TOP = NATIVE.actor.walk / NATIVE.actor.drag;
 const TAU = Math.PI * 2;
+export type AnimationSample = Pick<CharacterAnimation, 'clip' | 'time' | 'clock'>;
 const smooth = (t: number): number => {
   const x = clamp(t, 0, 1);
   return x * x * (3 - 2 * x);
@@ -64,48 +67,52 @@ function blend(a: Joint, b: Joint, t: number): Joint {
 
 export function sampleCharacterPose(
   actor: Actor,
-  clock: number,
+  animation: AnimationSample,
   context: MotionContext = {},
   alpha = 1,
 ): CharacterPose {
   // Frozen solid: every joint holds its pose, the floating hands included.
-  const time = (actor.frozenTime ?? 0) > 0 ? 0 : clock;
-  const speed = length(actor.velocity);
-  const run = clamp(speed / WALK_TOP, 0, 1.6);
+  const frozen = (actor.frozenTime ?? 0) > 0;
+  const time = frozen ? 0 : animation.clock;
   const seed = actor.id * 1.7;
-  const cycle =
-    time * (7 + 9 * Math.min(run, 1.2)) * (actor.powers.includes('haste') ? 1.25 : 1) + seed;
-  const breathe = Math.sin(time * 3.1 + seed);
+  const clip = frozen ? 'idle' : animation.clip;
+  const local = frozen ? 0 : clipTime(animation);
+  const walking = clip === 'walk' || clip === 'walk-zero' || clip === 'walk-two';
+  // One idle loop is one breath; one walk loop is two footfalls (left, right).
+  const breath = clip === 'idle' ? Math.sin((TAU * local) / CLIP_TIMING.idle.duration) : 0;
+  const cycle = walking ? (TAU * local) / CLIP_TIMING.walk.duration : 0;
   const step = Math.sin(cycle);
-  // Idle breathing and a hopping run: the body leaves the ground on each step.
+  const stride = walking ? 1 : 0;
+  // Idle breathing and a hopping walk: the body leaves the ground on each step.
   const body = {
-    ...joint(0, BODY_HEIGHT + breathe * 0.025 + Math.abs(step) * 0.19 * Math.min(run, 1), 0),
+    ...joint(0, BODY_HEIGHT + breath * 0.025 + Math.abs(step) * 0.16 * stride, 0),
     sx: 1,
-    sy: 1 + breathe * 0.035,
+    sy: 1 + breath * 0.035,
     sz: 1,
   };
   const contact = 1 - Math.abs(step);
-  if (run > 0.15) {
-    const squash = Math.pow(contact, 6) * 0.14 * Math.min(run, 1);
-    body.sy -= squash;
-    body.pitch = 0.3 * Math.min(run, 1.3);
-    body.roll = step * 0.09 * Math.min(run, 1);
+  if (walking) {
+    body.sy -= Math.pow(contact, 6) * 0.12;
+    body.pitch = 0.28;
+    body.roll = step * 0.09;
   }
-  let left = joint(-0.64, 0.6 + Math.sin(time * 3.1 + seed + 1.3) * 0.045, 0.06);
-  let right = joint(0.64, 0.6 + Math.sin(time * 3.1 + seed + 2.4) * 0.045, 0.06);
-  // Big counter-swinging hands while running; feet stride in arcs.
-  const swing = Math.min(run, 1.2);
-  left.z += -step * 0.52 * swing;
-  right.z += step * 0.52 * swing;
-  left.y += Math.max(0, -step) * 0.2 * swing;
-  right.y += Math.max(0, step) * 0.2 * swing;
-  const footLift = (phase: number): number => Math.max(0, Math.cos(phase)) * 0.2 * Math.min(run, 1);
+  const idleFloat = (offset: number): number =>
+    clip === 'idle' ? Math.sin((TAU * local) / CLIP_TIMING.idle.duration + offset) * 0.045 : 0;
+  let left = joint(-0.64, 0.6 + idleFloat(1.3), 0.06);
+  let right = joint(0.64, 0.6 + idleFloat(2.4), 0.06);
+  // Counter-swinging hands; with two discs both hands carry and swing less.
+  const swing = clip === 'walk-two' ? 0.7 : clip === 'walk-zero' ? 1.15 : 1;
+  left.z += -step * 0.5 * swing * stride;
+  right.z += step * 0.5 * swing * stride;
+  left.y += Math.max(0, -step) * 0.18 * stride;
+  right.y += Math.max(0, step) * 0.18 * stride;
+  const footLift = (phase: number): number => Math.max(0, Math.cos(phase)) * 0.18 * stride;
   let feet: [Joint, Joint] = [
-    joint(-0.25, 0.15 + footLift(cycle), step * 0.4 * Math.min(run, 1.2)),
-    joint(0.25, 0.15 + footLift(cycle + Math.PI), -step * 0.4 * Math.min(run, 1.2)),
+    joint(-0.25, 0.15 + footLift(cycle), step * 0.38 * stride),
+    joint(0.25, 0.15 + footLift(cycle + Math.PI), -step * 0.38 * stride),
   ];
-  feet[0].pitch = -step * 0.5 * Math.min(run, 1);
-  feet[1].pitch = step * 0.5 * Math.min(run, 1);
+  feet[0].pitch = -step * 0.5 * stride;
+  feet[1].pitch = step * 0.5 * stride;
 
   const charging = actor.charge > 0.02 && actor.alive && actor.armed;
   if (charging) {

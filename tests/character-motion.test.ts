@@ -14,7 +14,8 @@ import {
   updateMoveSpeed,
   type CharacterAnimation,
 } from '../src/rendering/character-animation';
-import { lerpAngle } from '../src/rendering/characters';
+import * as THREE from 'three';
+import { BODY_OFFSET, CAMERA_TILT, lerpAngle } from '../src/rendering/characters';
 
 const actor = (patch: Partial<Actor> = {}): Actor => ({
   ...makeActor(0, 'bot', -1),
@@ -182,5 +183,17 @@ describe('display interpolation', () => {
     expect(lerpAngle(3, -3, 0.5)).toBeCloseTo(Math.PI, 2);
     expect(lerpAngle(0.2, 0.6, 0.5)).toBeCloseTo(0.4, 9);
     expect(lerpAngle(-3, 3, 1)).toBeCloseTo(-3 + (6 - 2 * Math.PI), 9);
+  });
+});
+
+describe('reference character tilt', () => {
+  it('leans the model back so its front faces the camera (south, above)', () => {
+    // A model facing the camera has its front along +z (south).
+    const lean = new THREE.Quaternion().setFromEuler(new THREE.Euler(CAMERA_TILT, 0, 0));
+    const top = new THREE.Vector3(0, 1, 0).applyQuaternion(lean);
+    const front = new THREE.Vector3(0, 0, 1).applyQuaternion(lean);
+    expect(top.z).toBeLessThan(-0.4); // head goes north, away from the lens
+    expect(front.y).toBeGreaterThan(0.4); // the face tips up toward the elevated camera
+    expect(BODY_OFFSET).toBeCloseTo(0.16, 9); // and the body sits toward the camera
   });
 });

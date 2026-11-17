@@ -14,8 +14,13 @@ import { createAgentBody } from './agent-model';
 import { sampleCharacterPose, type MotionContext } from './character-motion';
 import { advanceAnimation, createAnimation, type CharacterAnimation } from './character-animation';
 
-/** TiltActorTowardsCamera and BODY_OFFSET from the reference character view. */
-export const CAMERA_TILT = (25 * Math.PI) / 180;
+/**
+ * TiltActorTowardsCamera and BODY_OFFSET from the reference character view. The
+ * reference applies Rx(−25°) with +Z up and the camera to the south, so the top
+ * leans back (north, away from the lens) and the front turns toward the camera;
+ * the body itself shifts 0.4 Unity units south, toward the camera.
+ */
+export const CAMERA_TILT = (-25 * Math.PI) / 180;
 export const BODY_OFFSET = 0.4 * NATIVE.scale;
 const TAU = Math.PI * 2;
 
@@ -83,8 +88,8 @@ export function createCharacter(
     body = new THREE.Group(),
     rig = new THREE.Group();
   const groundShadow = shadow(0.66);
-  // The reference tilts the whole model 25° toward the camera and offsets it by
-  // BODY_OFFSET (0.4 Unity units toward the camera); ground marks stay flat.
+  // The reference leans the whole model back 25° so it faces the camera, and
+  // offsets it by BODY_OFFSET (0.4 Unity units toward the camera); ground marks stay flat.
   const lean = new THREE.Group();
   lean.rotation.x = CAMERA_TILT;
   lean.position.z = BODY_OFFSET;

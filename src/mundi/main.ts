@@ -178,20 +178,40 @@ function drawHud(state: GameState): void {
 let previous = performance.now(),
   elapsed = 0,
   disposed = false;
+/** Frame counters and the last render error, for diagnosis from the platform. */
+const diagnostics = { frames: 0, errors: 0, lastError: '' };
+Object.assign(window, { mundiEmbedDiagnostics: diagnostics });
 function frame(now: number): void {
   if (disposed) return;
+  // Schedule first: one failing frame must never stop presentation.
+  requestAnimationFrame(frame);
   const dt = Math.min(0.1, Math.max(0, (now - previous) / 1000));
   previous = now;
   elapsed += dt;
-  const state = runtime.state;
-  const running = playback === 'playing' && !pacer.paused;
-  const events = runtime.drainEvents();
-  renderer.events(events);
-  audio.update(state, !running, false);
-  if (audioEnabled) audio.play(events);
-  renderer.draw(state, running ? pacer.alpha() : 1, elapsed, running ? dt : 0, false, pacer.speed);
-  drawHud(state);
-  requestAnimationFrame(frame);
+  diagnostics.frames++;
+  try {
+    const state = runtime.state;
+    const running = playback === 'playing' && !pacer.paused;
+    const events = runtime.drainEvents();
+    renderer.events(events);
+    audio.update(state, !running, false);
+    if (audioEnabled) audio.play(events);
+    renderer.draw(
+      state,
+      running ? pacer.alpha() : 1,
+      elapsed,
+      running ? dt : 0,
+      false,
+      pacer.speed,
+    );
+    drawHud(state);
+  } catch (error) {
+    diagnostics.errors++;
+    diagnostics.lastError = String(
+      error instanceof Error ? (error.stack ?? error.message) : error,
+    ).slice(0, 600);
+    if (diagnostics.errors <= 3) console.error('MUNDI embed frame failed', error);
+  }
 }
 
 const view: HostView = {

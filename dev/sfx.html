@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>音效对照 · Godot / Web</title>
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="stylesheet" href="./dev.css" />
+    <style>
+      main {
+        padding: 16px 20px 60px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 22px;
+        margin: 6px 0 16px;
+      }
+      .stats b {
+        font-size: 20px;
+        margin-right: 4px;
+        font-variant-numeric: tabular-nums;
+      }
+      .fmod-status {
+        font-size: 13px;
+      }
+      .notice {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 10px 14px;
+        margin-bottom: 14px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 26px 0 8px;
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        padding: 8px 10px;
+        border-top: 1px solid var(--line);
+      }
+      th {
+        font-weight: 600;
+        font-size: 12.5px;
+        color: var(--muted);
+        border-top: 0;
+        background: color-mix(in srgb, var(--panel) 80%, var(--line));
+      }
+      td.event {
+        width: 34%;
+      }
+      td.event .zh {
+        font-weight: 600;
+      }
+      td.event .src {
+        font-size: 11.5px;
+        color: var(--muted);
+        word-break: break-all;
+      }
+      td.orig {
+        width: 30%;
+      }
+      td.web {
+        width: 36%;
+      }
+      .params {
+        display: grid;
+        grid-template-columns: auto 1fr 3.5em;
+        gap: 2px 8px;
+        align-items: center;
+        margin-top: 6px;
+        font-size: 12px;
+      }
+      .params input {
+        width: 100%;
+      }
+      .web .buttons,
+      .orig .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .note {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      tr.playing td {
+        background: color-mix(in srgb, var(--accent) 9%, transparent);
+      }
+      @media (max-width: 860px) {
+        table,
+        tbody,
+        tr,
+        td {
+          display: block;
+          width: 100% !important;
+        }
+        thead {
+          display: none;
+        }
+        td.orig::before {
+          content: '原版 / Godot';
+          display: block;
+          font-size: 12px;
+          color: var(--muted);
+        }
+        td.web::before {
+          content: 'Web';
+          display: block;
+          font-size: 12px;
+          color: var(--muted);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <h1>音效对照 · Godot 原版 FMOD / Web 合成</h1>
+      <button id="load-fmod" class="primary">加载原版音频</button>
+      <span id="fmod-status" class="fmod-status muted">原版音频未加载</span>
+      <nav><a href="./fx.html">动作与特效展示 →</a><a href="/">返回游戏</a></nav>
+    </header>
+    <main>
+      <div class="notice">
+        原版音频来自 arkevo-games 本地检出里的 FMOD bank（原版游戏的音频，版权归原权利人所有），只由
+        dev server 的
+        <span class="mono">/__godot-audio/</span>
+        临时读取，不进入本仓库，也不进入构建产物。清单中的事件名、触发说明和代码位置提取自 Godot
+        移植版和恢复的原版源码。
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="controls">
+        <div class="chips" id="groups"></div>
+        <select id="status-filter" aria-label="Godot 状态">
+          <option value="all">全部状态</option>
+          <option value="godot">Godot 已接入</option>
+          <option value="original">仅原版（Godot 未接入）</option>
+          <option value="open">开源皮肤自制</option>
+        </select>
+        <select id="web-filter" aria-label="Web 对应">
+          <option value="all">Web：全部</option>
+          <option value="has">Web 有对应</option>
+          <option value="none">Web 无对应</option>
+        </select>
+        <input id="search" type="search" placeholder="搜索事件名 / 说明" />
+        <label class="inline"
+          >原版音量 <input id="fmod-volume" type="range" min="0" max="1" step="0.05" value="0.8"
+        /></label>
+        <label class="inline"
+          >Web 音量 <input id="web-volume" type="range" min="0" max="1" step="0.05" value="0.8"
+        /></label>
+        <button id="stop-all">全部停止</button>
+      </div>
+      <div id="list"></div>
+    </main>
+    <script type="module" src="./sfx.ts"></script>
+  </body>
+</html>

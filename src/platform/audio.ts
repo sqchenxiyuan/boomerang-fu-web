@@ -1,5 +1,6 @@
 import * as Tone from 'tone';
-import type { GameEvent, GameState } from '../core/types';
+import type { Arena, GameEvent, GameState } from '../core/types';
+import { arenaCameraFrame } from '../rendering/arena-camera';
 import { GardenAudioGraph } from './audio-score';
 import type { AudioSettings, MusicScene } from './audio-types';
 export type { AudioSettings } from './audio-types';
@@ -13,6 +14,8 @@ export class AudioEngine {
   private active = true;
   private disposed = false;
   private error: string | null = null;
+  private stageKey = '';
+  private stage = { centerX: 0, halfX: 10 };
   get muted(): boolean {
     return this.settings.muted;
   }
@@ -39,6 +42,7 @@ export class AudioEngine {
         });
         this.graph = new GardenAudioGraph(this.context);
         this.graph.configure(this.settings);
+        this.graph.setStage(this.stage.centerX, this.stage.halfX);
         this.graph.setScene(this.scene, this.active);
       }
       void this.context.resume().catch((error: unknown) => {
@@ -57,7 +61,18 @@ export class AudioEngine {
           ? 'danger'
           : 'play';
     this.active = preview || !paused;
+    this.setStage(state.arena, state.round);
     this.graph?.setScene(this.scene, this.active);
+  }
+  /** Pan against the span the camera frames (same framing as the renderer; world +x is screen right). */
+  private setStage(arena: Arena, round: number): void {
+    // Frame states are fresh clones; key like the renderer, which reframes per map and round.
+    const key = `${arena.id ?? 'courtyard'}:${round}`;
+    if (key === this.stageKey) return;
+    this.stageKey = key;
+    const frame = arenaCameraFrame(arena);
+    this.stage = { centerX: arena.floors ? frame.center.x : 0, halfX: frame.half.x };
+    this.graph?.setStage(this.stage.centerX, this.stage.halfX);
   }
   play(events: readonly GameEvent[]): void {
     this.graph?.play(events);

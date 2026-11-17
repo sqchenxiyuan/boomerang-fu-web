@@ -13,6 +13,8 @@ npm run dev
 
 - 游戏：[http://127.0.0.1:5173/](http://127.0.0.1:5173/)
 - SDK 控制演示：[http://127.0.0.1:5173/sdk-demo.html](http://127.0.0.1:5173/sdk-demo.html)
+- 动作与特效展示（仅 dev）：[http://127.0.0.1:5173/dev/fx.html](http://127.0.0.1:5173/dev/fx.html)，25 个脚本化场景（走动、冲刺、对砍、弹镖、缴械、各类击败与道具等），可切换速度、像素风、镜头跟随和音效；`tests/fx-scenarios.test.ts` 保证每个场景都触发它展示的事件。
+- 音效对照（仅 dev）：[http://127.0.0.1:5173/dev/sfx.html](http://127.0.0.1:5173/dev/sfx.html)，列出 Godot 移植版与原版源码引用的 153 个 FMOD 事件及 Web 对应音效，可逐条试听。原版音频从本地 `../arkevo-games/games/boomerangfu/web/audio`（或 `GODOT_AUDIO_DIR`）由 dev server 读取，不进入仓库和构建产物。
 
 线上试玩：[GitHub Pages](https://sqchenxiyuan.github.io/boomerang-fu-web/)；[线上 SDK 演示](https://sqchenxiyuan.github.io/boomerang-fu-web/sdk-demo.html)。
 

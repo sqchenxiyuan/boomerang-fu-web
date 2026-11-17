@@ -14,6 +14,7 @@ import {
   ORIGINAL_CAMERA_BACK,
 } from './arena-camera';
 import type { ArenaCameraFrame } from './arena-camera';
+import { CameraRig } from './camera-rig';
 import { createCharacter, updateCharacter } from './characters';
 import { THROW_FOLLOW } from './character-motion';
 import type { CharacterView } from './characters';
@@ -210,6 +211,11 @@ export class GameRenderer {
   private weapons = new WeaponsView();
   private powers = new PowersView();
   private boundary = new BoundaryView();
+  /** Godot Camera3D framing: follow the live players, discs and safe area during play. */
+  readonly cameraRig = new CameraRig();
+  /** false keeps the whole arena framed (the pre-rig behaviour). */
+  dynamicCamera = true;
+  private followBlend = 0;
   private resizeObserver: ResizeObserver;
   private width = 1;
   private height = 1;
@@ -278,6 +284,7 @@ export class GameRenderer {
 
   reset(state: GameState): void {
     this.arenaSource = '';
+    this.cameraRig.reset();
     // Decoys borrow their owner's GPU assets; only the owner disposes them.
     for (const view of this.decoys.values()) this.scene.remove(view.root);
     this.decoys.clear();
@@ -333,6 +340,7 @@ export class GameRenderer {
   }
 
   events(events: GameEvent[]): void {
+    this.cameraRig.observe(events);
     for (const event of events) {
       this.effects.emit(event);
       this.weapons.observe(event);
@@ -565,15 +573,38 @@ export class GameRenderer {
       : Math.hypot(26, 27) * Math.max(1, 1.65 / aspect);
     const cameraUp = state.arena.floors ? ORIGINAL_CAMERA_UP : 26,
       cameraBack = state.arena.floors ? ORIGINAL_CAMERA_BACK : 27;
+    // The rig frames a fraction of the full-arena view around its focus; fully
+    // zoomed out it matches the fixed framing exactly.
+    const follow = !menu && this.dynamicCamera;
+    if (follow)
+      this.cameraRig.update(state, {
+        dt: dt * rate,
+        scaledDt: frame.delta,
+        frozen,
+        aspect,
+        alpha,
+      });
+    const zoom = follow ? this.cameraRig.ratio : 1;
     const scale =
-      (distance / Math.hypot(cameraUp, cameraBack)) * (menu ? 1 : presentation.cameraScale);
+      ((distance * zoom) / Math.hypot(cameraUp, cameraBack)) *
+      (menu ? 1 : presentation.cameraScale);
     const fog = this.scene.fog as THREE.Fog;
     fog.near = original ? distance + 20 : 60;
     fog.far = original ? distance + 80 : 105;
     const menuOffset = menu && aspect > 1.4 ? -2.1 : 0;
     const center = original ? this.cameraFrame.center : { x: 0, y: 0 };
-    this.cameraTarget.x += (center.x + menuOffset - this.cameraTarget.x) * Math.min(1, dt * 3);
-    this.cameraTarget.z += (center.y - this.cameraTarget.z) * Math.min(1, dt * 3);
+    if (follow) {
+      // The rig already eases its focus (rate 5). Only blend for 0.5 s after the
+      // fixed/menu framing hands over, then lock on so no second lag is added.
+      this.followBlend = Math.min(1, this.followBlend + dt * 2);
+      const k = this.followBlend < 1 ? Math.min(1, dt * 6) : 1;
+      this.cameraTarget.x += (this.cameraRig.focus.x - this.cameraTarget.x) * k;
+      this.cameraTarget.z += (this.cameraRig.focus.y - this.cameraTarget.z) * k;
+    } else {
+      this.followBlend = 0;
+      this.cameraTarget.x += (center.x + menuOffset - this.cameraTarget.x) * Math.min(1, dt * 3);
+      this.cameraTarget.z += (center.y - this.cameraTarget.z) * Math.min(1, dt * 3);
+    }
     this.camera.position.set(
       this.cameraTarget.x,
       cameraUp * scale,

@@ -509,6 +509,18 @@ export function throwDisc(state: GameState, actor: Actor): boolean {
   return true;
 }
 
+/**
+ * External-agent aim (the MUNDI bridge sets rotation before each frame). Facing
+ * snaps to the aim while the actor is alive, standing and not stunned; the
+ * normal turn then eases back toward the last movement, and throws still follow
+ * that movement, exactly as Actor rotation and Player.ThrowDisc do.
+ */
+export function applyAim(actor: Actor, aim: Vec2): void {
+  if (length(aim) <= 0.01 || !actor.alive || actor.fall || actor.stun > 0) return;
+  actor.facing = normalize(aim);
+  actor.turning = true;
+}
+
 /** Player.lastInputMove: current input, else a turn still in progress, else facing. */
 function intendedDirection(actor: Actor, movement: Vec2): Vec2 {
   if (length(movement) > 0) return normalize(movement);

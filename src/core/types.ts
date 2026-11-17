@@ -27,6 +27,8 @@ export interface MatchOptions {
   powerupPool?: PowerupKind[];
   /** Local practice loadout, granted through the normal rules at match start. */
   startingPowers?: PowerupKind[];
+  /** Per-round map sequence; round n plays entry (n − 1) mod length. Overrides mapRotation. */
+  mapPlaylist?: MapId[];
 }
 export interface Command {
   move: Vec2;
@@ -34,6 +36,8 @@ export interface Command {
   attack: boolean;
   throwHeld: boolean;
   throwReleased: boolean;
+  /** External-agent facing (arkena.game.v1 aimX/aimY): snaps facing before the frame. */
+  aim?: Vec2;
 }
 export const idleCommand = (): Command => ({
   move: { x: 0, y: 0 },

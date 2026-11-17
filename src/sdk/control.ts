@@ -110,6 +110,7 @@ export function matchOptions(
     'suddenDeathTime',
     'powerupPool',
     'startingPowers',
+    'mapPlaylist',
   ];
   for (const [key, value] of Object.entries(supplied)) {
     if (!keys.includes(key)) throw new TypeError(`Unknown match option: ${key}`);
@@ -142,6 +143,14 @@ export function matchOptions(
   if (!MAPS.some((map) => map.id === options.mapId)) throw new RangeError('Unknown mapId');
   if (options.mapRotation !== 'fixed' && options.mapRotation !== 'cycle')
     throw new RangeError('Unknown mapRotation');
+  if (options.mapPlaylist !== undefined) {
+    const playlist = options.mapPlaylist;
+    if (!Array.isArray(playlist) || playlist.length < 1 || playlist.length > 64)
+      throw new RangeError('mapPlaylist must be an array of 1 to 64 maps');
+    if (playlist.some((id) => !MAPS.some((map) => map.id === id)))
+      throw new RangeError('mapPlaylist contains an unknown map');
+    options.mapPlaylist = [...playlist];
+  }
   // Copy inherited lists too: start({ seed }) must not retain an earlier caller's
   // array, and validating an override must never mutate the current match.
   for (const name of ['powerupPool', 'startingPowers'] as const) {

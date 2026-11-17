@@ -126,6 +126,7 @@ export function createState(options: MatchOptions = defaultOptions()): GameState
         (scoring === 'kills' ? NATIVE.killGoal(actors.length) : RULES.scoreGoal),
       powerupPool: options.powerupPool ? [...options.powerupPool] : undefined,
       startingPowers: options.startingPowers ? [...options.startingPowers] : undefined,
+      mapPlaylist: options.mapPlaylist ? [...options.mapPlaylist] : undefined,
       bots: botCount,
       suddenDeathTime: options.suddenDeathTime ?? RULES.suddenDeathStart,
     },
@@ -160,7 +161,12 @@ export function createState(options: MatchOptions = defaultOptions()): GameState
 
 export function resetRound(state: GameState): void {
   state.arena = createArena(
-    selectRoundMap(state.options.mapId, state.options.mapRotation, state.round),
+    selectRoundMap(
+      state.options.mapId,
+      state.options.mapRotation,
+      state.round,
+      state.options.mapPlaylist,
+    ),
   );
   state.phase = 'countdown';
   state.phaseTime = 0;

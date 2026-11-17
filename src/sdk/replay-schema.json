@@ -40,7 +40,8 @@
             "mapRotation": { "ref": "MapRotation" },
             "suddenDeathTime": { "type": "number" },
             "powerupPool": { "array": { "ref": "PowerupKind" } },
-            "startingPowers": { "array": { "ref": "PowerupKind" } }
+            "startingPowers": { "array": { "ref": "PowerupKind" } },
+            "mapPlaylist": { "array": { "ref": "MapId" } }
           },
           "optional": [
             "scoring",
@@ -48,7 +49,8 @@
             "mapRotation",
             "suddenDeathTime",
             "powerupPool",
-            "startingPowers"
+            "startingPowers",
+            "mapPlaylist"
           ]
         }
       },
@@ -930,7 +932,8 @@
         "mapRotation": { "ref": "MapRotation" },
         "suddenDeathTime": { "type": "number" },
         "powerupPool": { "array": { "ref": "PowerupKind" } },
-        "startingPowers": { "array": { "ref": "PowerupKind" } }
+        "startingPowers": { "array": { "ref": "PowerupKind" } },
+        "mapPlaylist": { "array": { "ref": "MapId" } }
       },
       "optional": [
         "scoreGoal",
@@ -939,7 +942,8 @@
         "mapRotation",
         "suddenDeathTime",
         "powerupPool",
-        "startingPowers"
+        "startingPowers",
+        "mapPlaylist"
       ]
     },
     "Difficulty": {

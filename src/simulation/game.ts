@@ -3,7 +3,13 @@ import { PRESENTATION, ROUND_END_DURATION, introDuration } from '../core/present
 import { Random, v } from '../core/math';
 import { idleCommand } from '../core/types';
 import type { Actor, Command, GameEvent, GameState, MatchOptions } from '../core/types';
-import { tickActorDisguise, tickActorInput, tickActorMotion, tickActorTimers } from './actors';
+import {
+  applyAim,
+  tickActorDisguise,
+  tickActorInput,
+  tickActorMotion,
+  tickActorTimers,
+} from './actors';
 import { resolveMelee, separateActors } from './combat';
 import { grantPowerup, tickPowerups } from './powerups';
 import { discOverlapPhase, tickDiscRespawns, tickDiscs } from './projectiles';
@@ -104,6 +110,11 @@ export class Game {
         resetRound(state);
       }
       return;
+    }
+    // External aim is applied before the frame, even during a freeze frame.
+    for (const actor of state.actors) {
+      const aim = commands.get(actor.id)?.aim;
+      if (aim) applyAim(actor, aim);
     }
     // A freeze frame that is active when the frame begins holds the whole frame.
     if (state.hitStop > 0) {

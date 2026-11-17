@@ -237,7 +237,11 @@ export function parseReplay(input: string | unknown): ReplayData {
           Math.hypot(command.move.x, command.move.y) > 1.00001 ||
           ['attack', 'dash', 'throwHeld', 'throwReleased'].some(
             (key) => typeof command[key] !== 'boolean',
-          )
+          ) ||
+          (command.aim !== undefined &&
+            (typeof command.aim?.x !== 'number' ||
+              typeof command.aim?.y !== 'number' ||
+              Math.hypot(command.aim.x, command.aim.y) > 1.00001))
         )
           throw new TypeError('Invalid recorded command');
       }

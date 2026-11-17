@@ -58,7 +58,10 @@ export function selectRoundMap(
   first: MapId = 'courtyard',
   rotation: MapRotation = 'fixed',
   round = 1,
+  playlist?: readonly MapId[],
 ): MapId {
+  if (playlist?.length)
+    return mapInfo(playlist[(Math.max(1, Math.floor(round)) - 1) % playlist.length]).id;
   mapInfo(first);
   if (rotation === 'fixed' || first === 'original-tutorial') return first;
   const collection = first.startsWith('original-')

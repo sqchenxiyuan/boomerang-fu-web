@@ -25,6 +25,7 @@ npm run dev
 - 单人对机器人、本地双人、最多四人混合对战、四档机器人难度（含“极限”）。
 - Agent 工坊：在菜单里画一个自己的 Agent（画板、对称、填色、预制生物、描述关键词），画像会体素化成方块头，三维转台实时预览，可以分配给 1P/2P 出战。做法移植自 MUNDI 的 Agent 形象工坊，见 [Agent 工坊](docs/agent-atelier.md)。
 - 角色手脚悬浮，跑动、蓄力、投掷、挥砍、冲刺、眩晕都有夸张的程序化动作；菜单里可切换像素风画面（低分辨率、色阶、描边）；机器人会预判飞镖轨迹，用侧移、冲刺或挥砍弹开来闪避，难度越高越难打中。见 [角色动作、像素风画面与机器人闪避](docs/motion-pixel-ai.md)。
+- 无头 Agent 模式：与 MUNDI 的 Godot 适配器同一套 `arkena.game.v1` 观察、动作和 QuickJS 策略沙箱，同一份 `decide(observation, memory)` 两边都能跑。`npm run agent -- test/batch/compare/replay/serve` 做本地对战、批量评测、配对比较、录像校验，或作为子进程环境接入其他语言；对局可导入回放工作台观看。见 [无头 Agent 模式](docs/agent-headless.md)。
 - AI 观战（2/4 机器人互战）、外部 HTTP AI 协议和 Node 批量加速；0.25–8× 可视模拟与回放。
 - Tone.js 程序化 BGM/分层音效、独立音量；默认自动录制、浏览器本地历史对局选择、下载/导入、暂停与进度跳转，已保存录像刷新后仍可查看。[使用与 API](docs/replay-and-ai.md)。
 - 独立回放工作台：逐帧前后定位、实时拖动、A–B 片段循环、回合跳转、淘汰/道具/格挡事件索引、选手状态与快捷键。纯 TypeScript 播放控制和事件索引可脱离 UI 在 Node 中使用。

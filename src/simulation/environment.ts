@@ -818,6 +818,17 @@ export function tickEnvironment(state: GameState, random: Random, dt: number): v
   }
 }
 
+/** Is a point inside an uncut plant patch (the reference `is_wading`)? */
+export function inPlants(state: GameState, point: Vec2): boolean {
+  return mechanisms(state).some(
+    (mechanism) =>
+      mechanism.kind === 'plant' &&
+      mechanism.phase !== 'cut' &&
+      mechanism.active !== false &&
+      touches(mechanism, point),
+  );
+}
+
 function cutPlant(state: GameState, mechanism: EnvironmentMechanism): void {
   if (mechanism.phase === 'cut') return;
   mechanism.phase = 'cut';

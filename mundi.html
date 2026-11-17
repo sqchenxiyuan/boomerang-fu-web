@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Boomerang Fu · MUNDI</title>
+  </head>
+  <body>
+    <main id="game" aria-label="Boomerang Fu 对局画面">
+      <div class="hud" aria-live="polite">
+        <div class="scores">
+          <span class="score" id="score-0"></span>
+          <span class="round" id="round"></span>
+          <span class="score" id="score-1"></span>
+        </div>
+        <div class="notice" id="notice" hidden></div>
+        <div class="center" id="center" hidden></div>
+        <div class="wipe" id="wipe" hidden></div>
+      </div>
+      <p id="status" role="status">正在载入游戏…</p>
+    </main>
+    <script type="module" src="/src/mundi/main.ts"></script>
+  </body>
+</html>

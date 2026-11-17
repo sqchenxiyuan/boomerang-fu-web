@@ -154,6 +154,17 @@ export class GardenAudioGraph {
     this.step = 0;
     this.director.reset();
   }
+  /** Send the limited mix to an extra native node (a recorder) as well. */
+  tap(node: AudioNode): void {
+    Tone.connect(this.limiter, node as unknown as Tone.InputNode);
+  }
+  untap(node: AudioNode): void {
+    try {
+      this.limiter.disconnect(node as unknown as Tone.InputNode);
+    } catch {
+      /* already disconnected */
+    }
+  }
   /** Per rendered frame: state-driven effects (footsteps, loops, landings). */
   observe(state: GameState, dt: number): void {
     if (this.settings.muted || this.settings.sfx === 0) {

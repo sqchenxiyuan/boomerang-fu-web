@@ -3,7 +3,15 @@ import { ORIGINAL_MAP_RECORDS } from '../core/original-maps';
 import { traceObstacles } from '../core/collision';
 import { add, clampLength, distance, length, mul, sub, v } from '../core/math';
 import type { Vec2 } from '../core/math';
-import type { Actor, Command, Disc, GameState, MatchOptions, PowerupKind } from '../core/types';
+import type {
+  Actor,
+  Command,
+  Disc,
+  GameEvent,
+  GameState,
+  MatchOptions,
+  PowerupKind,
+} from '../core/types';
 import { MatchRecorder, type ReplayData } from '../sdk/recording';
 import { aimPower } from '../simulation/actors';
 import { isInBoundary } from '../simulation/boundary';
@@ -84,7 +92,11 @@ export interface RuntimeOptions {
   /** Also record a native web replay (playable in the browser replay studio). */
   record?: boolean;
   recordLabel?: string;
+  /** Keep simulation events for a presentation layer (see `drainEvents`). */
+  events?: boolean;
 }
+/** Longest ending presentation after a result, in fixed frames (4 s). */
+export const PRESENT_MAX_FRAMES = 240;
 interface Route {
   tick: number;
   points: Vec2[];
@@ -101,6 +113,7 @@ export class AgentRuntime {
   #held: [boolean, boolean] = [false, false];
   #routes = new Map<number, Route>();
   #recorder: MatchRecorder | null = null;
+  #events: GameEvent[] = [];
   #disposed = false;
   readonly options: RuntimeOptions;
 
@@ -154,6 +167,7 @@ export class AgentRuntime {
     this.#reason = '';
     this.#held = [false, false];
     this.#routes.clear();
+    this.#events = [];
     this.#recorder = this.options.record
       ? new MatchRecorder(this.#game, {
           label: this.options.recordLabel ?? 'Agent 对局',
@@ -192,10 +206,42 @@ export class AgentRuntime {
       });
       this.#recorder?.step(commands);
       game.step(commands);
-      game.drainEvents();
+      this.#keep(game.drainEvents());
       this.#recorder?.capture(game);
     }
     return this.snapshot();
+  }
+
+  /**
+   * Presentation only, after a result: run up to `frames` idle frames of the
+   * round-end / match-end sequence so the final pose and banners play out.
+   * The tick, scores and result stay as reported; nothing is recorded. Stops
+   * (`presented: false`) once the game leaves the ending, e.g. a new round.
+   */
+  present(frames: number): { frames: number; presented: boolean } {
+    const game = this.#require();
+    // A platform-settled result (score reached, next round already begun) has
+    // nothing left to show; neither does a run that has not ended.
+    if (!this.#done) return { frames: 0, presented: false };
+    const ending = () => game.state.phase === 'roundEnd' || game.state.phase === 'matchEnd';
+    let count = 0;
+    const idle = new Map<number, Command>();
+    while (count < Math.max(0, Math.min(PRESENT_MAX_FRAMES, frames)) && ending()) {
+      game.step(idle);
+      this.#keep(game.drainEvents());
+      count++;
+    }
+    return { frames: count, presented: ending() };
+  }
+
+  /** Events since the last call (only with `events: true`). */
+  drainEvents(): GameEvent[] {
+    return this.#events.splice(0);
+  }
+
+  #keep(events: GameEvent[]): void {
+    // Bounded: a presentation that stops draining must not grow without limit.
+    if (this.options.events && this.#events.length < 4096) this.#events.push(...events);
   }
 
   snapshot(): AgentFrame {

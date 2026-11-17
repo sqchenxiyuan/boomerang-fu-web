@@ -86,6 +86,33 @@ export class AudioEngine {
     this.lastTime = null;
     this.graph?.reset();
   }
+  /**
+   * A live copy of the final mix (after the limiter) as a MediaStream, for a
+   * video recorder. Unlocks the context; null if audio cannot start.
+   */
+  capture(): { stream: MediaStream; release(): void } | null {
+    this.unlock();
+    if (!this.context || !this.graph) return null;
+    const raw = this.context.rawContext as unknown as AudioContext;
+    if (typeof raw.createMediaStreamDestination !== 'function') return null;
+    const destination = raw.createMediaStreamDestination();
+    // Keep the track clocked even during silence, so recorders never stall.
+    const silence = raw.createConstantSource();
+    silence.offset.value = 0;
+    silence.connect(destination);
+    silence.start();
+    const graph = this.graph;
+    graph.tap(destination);
+    return {
+      stream: destination.stream,
+      release: () => {
+        graph.untap(destination);
+        silence.stop();
+        silence.disconnect();
+        destination.stream.getTracks().forEach((track) => track.stop());
+      },
+    };
+  }
   toggle(): boolean {
     this.configure({ muted: !this.muted });
     return this.muted;

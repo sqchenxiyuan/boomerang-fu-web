@@ -1,0 +1,374 @@
+/* Agent atelier: a modal over the menu, matching the garden card language. */
+.atelier {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: #24433566;
+  backdrop-filter: blur(6px);
+}
+.atelier-card {
+  width: min(1180px, 100%);
+  max-height: calc(100dvh - 36px);
+  overflow: auto;
+  background: #f9f7ebfa;
+  border: 1px solid #fff9ed;
+  border-radius: 22px;
+  box-shadow: 0 18px 70px #244d3933;
+  padding: 20px 22px 16px;
+  color: var(--ink);
+  scrollbar-width: thin;
+}
+.atelier-head {
+  display: flex;
+  align-items: end;
+  gap: 18px;
+}
+.atelier-head h2 {
+  margin: 6px 0 0;
+  font-size: 26px;
+  font-weight: 850;
+  letter-spacing: -0.8px;
+}
+.atelier-name {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-left: auto;
+  font-size: 10px;
+  color: #7c8674;
+}
+.atelier-name input,
+.atelier-traits {
+  font: inherit;
+  font-size: 13px;
+  background: #fffdf3;
+  border: 1px solid #dedfcf;
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: #2f4c3a;
+  width: 190px;
+}
+.atelier-close {
+  background: #eef0e2;
+  color: #4b6350;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 15px;
+}
+.atelier-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(300px, 1.45fr) minmax(220px, 0.85fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+.atelier-panel {
+  background: #fffdf4;
+  border: 1px solid #e6e6d6;
+  border-radius: 16px;
+  padding: 14px;
+  min-width: 0;
+}
+.atelier-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #849076;
+}
+.atelier-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#agent-turntable {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  border-radius: 12px;
+  background: linear-gradient(#e4efe0, #cfe2cf);
+}
+.atelier-fallback,
+.atelier-tip {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #6f7e6c;
+}
+.atelier-hue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #6f7e6c;
+}
+input[type='color'] {
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #d7d9c8;
+  border-radius: 7px;
+  background: #fffdf3;
+  cursor: pointer;
+}
+.atelier-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+.chip-group {
+  display: flex;
+  gap: 4px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: #eef0e2;
+  color: #47604d;
+  border: 1px solid #e0e3d2;
+  border-radius: 8px;
+  padding: 6px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  min-height: 30px;
+}
+.chip.on {
+  background: var(--green);
+  color: #fff8e2;
+  border-color: #1b4835;
+}
+.chip:disabled {
+  opacity: 0.45;
+}
+.chip.size i {
+  display: block;
+  border-radius: 50%;
+  background: currentColor;
+}
+.chip.wide {
+  width: 100%;
+  margin-top: 10px;
+}
+.atelier-swatches,
+.atelier-backdrops {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: 10px 0;
+}
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid #fffdf4;
+  box-shadow: 0 0 0 1px #d4d6c5;
+  padding: 0;
+}
+.swatch.small {
+  width: 18px;
+  height: 18px;
+}
+.swatch.on {
+  box-shadow: 0 0 0 2px var(--green);
+}
+.atelier-canvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #dfe1d0;
+  touch-action: none;
+}
+.agent-pad {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+.atelier-backdrops .atelier-label:last-child {
+  margin-left: auto;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.atelier-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.link {
+  background: none;
+  color: #8a6a2f;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0;
+}
+.atelier-traits {
+  width: 100%;
+  margin: 10px 0;
+  font-size: 12px;
+}
+.atelier-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.atelier-preset-grid canvas {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px solid #e0e2d2;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.atelier-preset-grid canvas:hover,
+.atelier-preset-grid canvas:focus-visible {
+  transform: translateY(-2px);
+  outline: 2px solid var(--gold);
+}
+.atelier-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.atelier-gallery {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  max-width: 100%;
+  flex: 1 1 360px;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+.gallery-item {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 62px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #eef0e2;
+  border: 1px solid #e0e3d2;
+  font-size: 9px;
+  color: #4b6350;
+}
+.gallery-item img {
+  width: 48px;
+  height: 48px;
+  border-radius: 7px;
+  background: var(--agent-bg, #f3f5f2);
+  object-fit: contain;
+}
+.gallery-item span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gallery-item.on {
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px var(--green);
+}
+.gallery-item.new {
+  justify-content: center;
+  min-height: 70px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.atelier-status {
+  margin: 0;
+  font-size: 11px;
+  color: #6f7e6c;
+  min-width: 140px;
+}
+.atelier-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.primary-button.compact {
+  width: auto;
+  gap: 14px;
+  padding: 10px 16px;
+  font-size: 12px;
+}
+@media (max-width: 920px) {
+  .atelier {
+    padding: 8px;
+  }
+  .atelier-grid {
+    grid-template-columns: 1fr;
+  }
+  .atelier-head {
+    flex-wrap: wrap;
+  }
+  .atelier-name {
+    margin-left: 0;
+  }
+  #agent-turntable {
+    aspect-ratio: 16 / 10;
+  }
+  .atelier-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* Menu entry: chosen agents per player slot. */
+.agent-slot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 15px 0 4px;
+  padding: 9px 10px;
+  background: #fffdf3;
+  border: 1px solid #e3e5d5;
+  border-radius: 12px;
+}
+.agent-slot-thumb {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: var(--agent-bg, #eef0e2);
+  object-fit: contain;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+}
+.agent-slot-row .agent-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.agent-slot-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #7c8674;
+}
+.agent-slot-row select {
+  flex: 1;
+  min-width: 0;
+  background: #fffdf3;
+  border: 1px solid #dedfcf;
+  border-radius: 7px;
+  padding: 5px 6px;
+  font-size: 11px;
+  color: #3b523d;
+}
+.agent-slot-row .chip {
+  flex: none;
+}

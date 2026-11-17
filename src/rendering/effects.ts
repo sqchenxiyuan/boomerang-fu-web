@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { POWERUPS, ROSTER } from '../core/config';
+import { actorIdentity } from '../agents/registry';
 import type { Arena, GameEvent, GameState } from '../core/types';
 import { Random } from '../core/math';
 import { sampleDeathParticles, sampleDeathRings, sampleDeathSplats } from './death-visuals';
@@ -214,8 +215,10 @@ export class Effects {
         const age = Math.max(0, state.time - death.time),
           profile = ROSTER[actor.id] ?? ROSTER[0];
         this.shake = Math.max(this.shake, 0.12 * Math.exp(-age * 7) * (age < 1.2 ? 1 : 0));
-        const juice =
-          profile.kind === 'milk'
+        const identity = actorIdentity(actor.id);
+        const juice = identity.look
+          ? identity.color
+          : profile.kind === 'milk'
             ? '#fffbea'
             : profile.kind === 'melon'
               ? '#ed8179'

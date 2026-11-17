@@ -7,6 +7,9 @@ import { createDeathModel, type DeathModel } from './death-models';
 import { sampleDeathPose, sampleFallPose } from './death-visuals';
 import { boundaryWarning } from '../core/feedback';
 import { meleeAge, sampleMeleePose } from './melee-pose';
+import { actorIdentity, type ActorIdentity } from '../agents/registry';
+import { lookPalette } from '../agents/look';
+import { AGENT_LAYOUT, createAgentBody } from './agent-model';
 
 export interface CharacterView {
   root: THREE.Group;
@@ -53,14 +56,22 @@ function makeLabel(text: string, color: string): THREE.Sprite {
   return sprite;
 }
 
-export function createCharacter(actor: Actor): CharacterView {
+export function createCharacter(
+  actor: Actor,
+  identity: ActorIdentity = actorIdentity(actor.id),
+): CharacterView {
   const profile = ROSTER[actor.id];
+  // A custom agent (presentation only) replaces the fruit body, face and colours.
+  const look = identity.look,
+    agentColors = look ? lookPalette(look.hue) : null;
   const root = new THREE.Group(),
     body = new THREE.Group();
   const groundShadow = shadow(0.66);
   root.add(body, groundShadow);
   body.position.y = 0.72;
-  if (profile.kind === 'melon') {
+  if (look) {
+    body.add(createAgentBody(look));
+  } else if (profile.kind === 'melon') {
     const shape = new THREE.Shape();
     shape.moveTo(-0.7, -0.27);
     shape.lineTo(0, 0.92);
@@ -162,7 +173,7 @@ export function createCharacter(actor: Actor): CharacterView {
         : profile.kind === 'eggplant'
           ? 0.49
           : 0.59;
-  for (const x of [-0.18, 0.18]) {
+  for (const x of look ? [] : [-0.18, 0.18]) {
     const eye = sphere(0.07, '#203e37', 1);
     eye.scale.set(0.8, 1.25, 0.5);
     place(eye, x, 0.13, faceZ, body);
@@ -171,22 +182,25 @@ export function createCharacter(actor: Actor): CharacterView {
     blush.scale.set(1.2, 0.5, 0.1);
     place(blush, x * 1.7, 0.015, faceZ - 0.01, body);
   }
-  const smile = new THREE.Mesh(
-    new THREE.TorusGeometry(0.075, 0.014, 4, 12, Math.PI),
-    material('#34443a'),
-  );
-  smile.rotation.z = Math.PI;
-  place(smile, 0, 0.025, faceZ + 0.015, body);
+  if (!look) {
+    const smile = new THREE.Mesh(
+      new THREE.TorusGeometry(0.075, 0.014, 4, 12, Math.PI),
+      material('#34443a'),
+    );
+    smile.rotation.z = Math.PI;
+    place(smile, 0, 0.025, faceZ + 0.015, body);
+  }
   const arms: THREE.Group[] = [],
     hands: THREE.Group[] = [],
     limbs: THREE.Mesh[] = [];
   for (const side of [-1, 1]) {
     const arm = new THREE.Group();
-    place(arm, side * 0.58, -0.08, 0, body);
-    const limb = cylinder(0.075, 0.075, 1, '#344e3c', 6);
+    if (look) place(arm, side * AGENT_LAYOUT.shoulder.x, AGENT_LAYOUT.shoulder.y, 0, body);
+    else place(arm, side * 0.58, -0.08, 0, body);
+    const limb = cylinder(0.075, 0.075, 1, agentColors?.dark ?? '#344e3c', 6);
     arm.add(limb);
     const hand = new THREE.Group();
-    hand.add(sphere(0.12, '#fff0ca'));
+    hand.add(sphere(0.12, agentColors?.light ?? '#fff0ca'));
     arm.add(hand);
     hands.push(hand);
     limbs.push(limb);
@@ -196,7 +210,7 @@ export function createCharacter(actor: Actor): CharacterView {
   for (const x of [-0.24, 0.24]) {
     const foot = new THREE.Group();
     place(foot, x, 0.16, 0, root);
-    const shoe = sphere(0.18, '#314b3c');
+    const shoe = sphere(0.18, agentColors?.dark ?? '#314b3c');
     shoe.scale.set(0.85, 0.6, 1.25);
     foot.add(shoe);
     feet.push(foot);
@@ -248,7 +262,7 @@ export function createCharacter(actor: Actor): CharacterView {
   const ring = new THREE.Mesh(
     new THREE.RingGeometry(0.64, 0.72, 32),
     new THREE.MeshBasicMaterial({
-      color: profile.color,
+      color: identity.color,
       transparent: true,
       opacity: 0.9,
       side: THREE.DoubleSide,
@@ -269,11 +283,11 @@ export function createCharacter(actor: Actor): CharacterView {
   }
   root.add(aim);
   const label = makeLabel(
-    actor.controller === 'human' ? `${actor.humanIndex + 1}P · ${profile.name}` : profile.name,
-    profile.color,
+    actor.controller === 'human' ? `${actor.humanIndex + 1}P · ${identity.name}` : identity.name,
+    identity.color,
   );
   root.add(label);
-  const death = createDeathModel(actor);
+  const death = createDeathModel(actor, identity);
   root.add(death.root);
   return {
     root,

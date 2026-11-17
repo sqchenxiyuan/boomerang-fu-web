@@ -7,6 +7,7 @@ import { View } from './ui/view';
 import { PlayTools } from './ui/play-tools';
 import { ReplayStudio } from './ui/replay-studio';
 import './ui/replay-studio.css';
+import { assignAgents, clearAgents } from './agents/registry';
 
 /** The playable site is a client of the same SDK shipped to external callers. */
 class Application {
@@ -58,13 +59,15 @@ class Application {
       },
     });
     this.tools.onReplay = (data) => {
+      // Recordings carry no appearance; replays use the default roster.
+      clearAgents();
       this.runtime.loadReplay(data);
       this.replayStudio.reset();
       this.screen = 'playing';
       this.view.setMode('playing');
     };
     root.addEventListener('pointerdown', () => this.runtime.unlockAudio(), { once: true });
-    this.runtime.showPreview(this.options);
+    this.showPreview(this.options);
     this.runtime.session.onEvent((event) => {
       if (event.type === 'lifecycle' && event.action === 'destroy') this.replayStudio.destroy();
       if (event.type !== 'lifecycle' || event.action === 'destroy' || this.screen === 'menu')
@@ -80,13 +83,16 @@ class Application {
     });
     this.view.onStart = (options) => this.start(options);
     this.view.onPreviewMap = (mapId) => {
-      if (this.screen === 'menu') this.runtime.showPreview({ ...defaultOptions(), mapId });
+      if (this.screen === 'menu') this.showPreview({ ...defaultOptions(), mapId });
+    };
+    this.view.onAgentsChanged = () => {
+      if (this.screen === 'menu') this.showPreview(this.options);
     };
     this.view.onPause = () => this.runtime.pause();
     this.view.onResume = () => this.runtime.resume();
     this.view.onMenu = () => {
       this.screen = 'menu';
-      this.runtime.showPreview(this.options);
+      this.showPreview(this.options);
       this.view.setMode('menu');
     };
     this.view.onRestart = () =>
@@ -117,7 +123,14 @@ class Application {
     window.addEventListener('pagehide', () => this.runtime.destroy(), { once: true });
   }
 
+  /** The menu backdrop shows the chosen agents too. */
+  private showPreview(options: MatchOptions): void {
+    assignAgents(this.view.agentAssignments());
+    this.runtime.showPreview(options);
+  }
+
   private start(options: MatchOptions): void {
+    assignAgents(this.view.agentAssignments(options.mode));
     this.options = options;
     this.screen = 'playing';
     this.view.setMode('playing');

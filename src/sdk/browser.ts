@@ -15,7 +15,7 @@ import { FixedLoop } from '../platform/loop';
 import { transitionPresentation } from '../core/presentation';
 import { boundaryNotice, eliminationLabel } from '../core/feedback';
 import { mapInfo } from '../core/arena';
-import { ROSTER } from '../core/config';
+import { actorName } from '../agents/registry';
 
 function setText(element: HTMLElement, text: string): void {
   if (element.textContent !== text) element.textContent = text;
@@ -287,7 +287,7 @@ export class BrowserGame {
         }
         setText(
           this.score,
-          `${state.actors.map((a) => `${ROSTER[a.id].name}  ${a.score}${a.alive ? '' : ` (${eliminationLabel(a)})`}`).join('    ·    ')}\n${mapInfo(state.arena.id).name} · 第 ${state.round} 回合`,
+          `${state.actors.map((a) => `${actorName(a.id)}  ${a.score}${a.alive ? '' : ` (${eliminationLabel(a)})`}`).join('    ·    ')}\n${mapInfo(state.arena.id).name} · 第 ${state.round} 回合`,
         );
         const notice = this.preview ? '' : boundaryNotice(state);
         setHidden(this.notice, !notice);
@@ -297,7 +297,7 @@ export class BrowserGame {
           paused && !this.preview
             ? '已暂停'
             : state.phase === 'matchEnd'
-              ? `${ROSTER[state.matchWinnerId ?? 0].name}获胜！`
+              ? `${actorName(state.matchWinnerId ?? 0)}获胜！`
               : presentation.label,
         );
       }

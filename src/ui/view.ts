@@ -1,4 +1,10 @@
-import { POWERUPS, ROSTER, RULES } from '../core/config';
+import { POWERUPS, RULES } from '../core/config';
+import { actorColor, actorName, actorToken } from '../agents/registry';
+import { loadLibrary, saveLibrary, type AgentLibrary, type AgentLook } from '../agents/look';
+import { Atelier } from './atelier';
+
+/** Agent names are user-entered; escape them before any HTML insertion. */
+const esc = (text: string): string => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 import { MAPS, ORIGINAL_MAPS, mapInfo } from '../core/arena';
 import { PRESENTATION, transitionPresentation } from '../core/presentation';
 import { boundaryNotice, eliminationLabel } from '../core/feedback';
@@ -50,6 +56,11 @@ export class View {
   onRestart = (): void => {};
   onSound = (): void => {};
   onFullscreen = (): void => {};
+  /** The chosen agents or the saved library changed. */
+  onAgentsChanged = (): void => {};
+  private library: AgentLibrary = loadLibrary();
+  private atelier: Atelier | null = null;
+  private menuMode: MatchOptions['mode'] = 'solo';
   private root: HTMLElement;
   private menu: HTMLElement;
   private pause: HTMLElement;
@@ -79,6 +90,14 @@ export class View {
         <h1 id="menu-title">小小花园，<br>大大<span>回旋。</span></h1>
         <p class="intro">扔出去，接回来。<br>和食物伙伴过上几招，击倒最多的人赢。</p>
         <div class="mode-selector" role="group" aria-label="游戏模式"><button class="mode selected" data-mode="solo" aria-pressed="true">单人挑战 <span>VS 机器人</span></button><button class="mode" data-mode="local" aria-pressed="false">同屏双人 <span>和朋友一起</span></button><button class="mode" data-mode="bots" aria-pressed="false">AI 观战 <span>机器人互战</span></button></div>
+        <div class="agent-slot-row" id="agent-slot-row">
+          <span class="agent-slot-thumb" id="agent-thumb" aria-hidden="true">🍉</span>
+          <div class="agent-slots">
+            <label><span id="agent-slot-0-name">1P 形象</span><select id="agent-slot-0" aria-label="1P 出战形象"></select></label>
+            <label id="agent-slot-1-label" hidden>2P 形象<select id="agent-slot-1" aria-label="2P 出战形象"></select></label>
+          </div>
+          <button class="chip" id="open-atelier" aria-label="打开 Agent 工坊">✎ 捏 Agent</button>
+        </div>
         <div class="settings-row"><label>机器人<select id="bots" aria-label="机器人数量"><option value="1">1 位对手</option><option value="3">3 位对手</option></select></label><label>难度<select id="difficulty" aria-label="机器人难度"><option value="easy">轻松</option><option value="normal" selected>标准</option><option value="hard">挑战</option><option value="impossible">极限</option></select></label></div>
         <div class="settings-row map-settings"><label>地图<select id="map" aria-label="地图">${mapOptions()}</select></label><label>回合换图<select id="rotation" aria-label="回合换图"><option value="fixed">固定地图</option><option value="cycle">依次轮换</option></select></label></div>
         <p class="map-description" id="map-description">${mapInfo('original-enclosed').description}</p>
@@ -138,6 +157,9 @@ export class View {
     root.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) =>
       button.addEventListener('click', () => {
         selectedMode = button.dataset.mode as MatchOptions['mode'];
+        this.menuMode = selectedMode;
+        this.renderAgentSlots();
+        this.onAgentsChanged();
         root.querySelectorAll('[data-mode]').forEach((b) => {
           b.classList.toggle('selected', b === button);
           b.setAttribute('aria-pressed', String(b === button));
@@ -174,6 +196,33 @@ export class View {
       });
     };
     this.get('start').addEventListener('click', () => start());
+    for (const slot of [0, 1])
+      this.get<HTMLSelectElement>(`agent-slot-${slot}`).addEventListener('change', (event) => {
+        const value = (event.target as HTMLSelectElement).value;
+        this.library = {
+          ...this.library,
+          slots: this.library.slots.map((id, i) => (i === slot ? value || null : id)),
+        };
+        saveLibrary(this.library);
+        this.renderAgentSlots();
+        this.onAgentsChanged();
+      });
+    this.get('open-atelier').addEventListener('click', () => {
+      this.atelier ??= new Atelier(root, {
+        library: () => this.library,
+        commit: (library, use) => {
+          this.library = use
+            ? { ...library, slots: library.slots.map((id, i) => (i === 0 ? use : id)) }
+            : library;
+          const persisted = saveLibrary(this.library);
+          this.renderAgentSlots();
+          this.onAgentsChanged();
+          return persisted;
+        },
+      });
+      this.atelier.open(this.library.slots[0] ?? undefined);
+    });
+    this.renderAgentSlots();
     this.get('scoring').addEventListener('change', () => {
       this.text(
         'goal-label',
@@ -207,6 +256,42 @@ export class View {
 
   private get<T extends HTMLElement = HTMLElement>(id: string): T {
     return this.root.querySelector<T>(`#${id}`)!;
+  }
+
+  /** Custom agents by actor id: 1P is actor 0 (also in AI spectating), 2P is actor 1. */
+  agentAssignments(mode: MatchOptions['mode'] = this.menuMode): Map<number, AgentLook | null> {
+    const find = (id: string | null) =>
+      (id && this.library.agents.find((agent) => agent.id === id)) || null;
+    const assignments = new Map<number, AgentLook | null>([[0, find(this.library.slots[0])]]);
+    if (mode === 'local') assignments.set(1, find(this.library.slots[1]));
+    return assignments;
+  }
+
+  private renderAgentSlots(): void {
+    const agents = this.library.agents;
+    for (const slot of [0, 1]) {
+      const select = this.get<HTMLSelectElement>(`agent-slot-${slot}`);
+      const fallback = slot === 0 ? '默认 · 瓜瓜' : '默认 · 茄子';
+      select.replaceChildren(
+        new Option(fallback, ''),
+        ...agents.map((agent) => new Option(agent.name, agent.id)),
+      );
+      select.value = this.library.slots[slot] ?? '';
+    }
+    this.get('agent-slot-1-label').hidden = this.menuMode !== 'local';
+    this.text('agent-slot-0-name', this.menuMode === 'bots' ? '参战 Agent' : '1P 形象');
+    const chosen = agents.find((agent) => agent.id === this.library.slots[0]);
+    const thumb = this.get('agent-thumb');
+    thumb.replaceChildren();
+    thumb.style.removeProperty('--agent-bg');
+    if (chosen) {
+      const img = document.createElement('img');
+      img.src = chosen.img;
+      img.alt = '';
+      img.className = 'agent-slot-thumb';
+      thumb.style.setProperty('--agent-bg', chosen.bg);
+      thumb.appendChild(img);
+    } else thumb.textContent = '🍉';
   }
 
   private text(id: string, value: string): void {
@@ -253,7 +338,7 @@ export class View {
     for (const event of events) {
       if (event.type === 'pickup' && event.power) {
         this.get('toast').textContent =
-          `${ROSTER[event.actorId].name} 获得${POWERUPS[event.power].name} · ${POWERUPS[event.power].description}`;
+          `${actorName(event.actorId)} 获得${POWERUPS[event.power].name} · ${POWERUPS[event.power].description}`;
         this.toastUntil = elapsed + 2.7;
         this.get('toast').hidden = false;
       }
@@ -296,7 +381,7 @@ export class View {
       this.scoreboard.innerHTML = state.actors
         .map(
           (actor) =>
-            `<div class="score-card ${actor.alive ? '' : 'eliminated'}" style="--player-color:${ROSTER[actor.id].color}"><div class="player-token">${actor.id === 0 ? '瓜' : actor.id === 1 ? '茄' : actor.id === 2 ? '橙' : '奶'}</div><div class="score-name">${ROSTER[actor.id].name}<small>${eliminationLabel(actor) || (actor.controller === 'human' ? `${actor.humanIndex + 1}P` : 'BOT')}</small></div><strong>${actor.score}</strong><div class="score-dots${state.options.scoreGoal > 8 ? ' dense' : ''}">${Array.from({ length: state.options.scoreGoal }, (_, i) => `<i class="${i < actor.score ? 'filled' : ''}"></i>`).join('')}</div></div>`,
+            `<div class="score-card ${actor.alive ? '' : 'eliminated'}" style="--player-color:${actorColor(actor.id)}"><div class="player-token">${esc(actorToken(actor.id))}</div><div class="score-name">${esc(actorName(actor.id))}<small>${eliminationLabel(actor) || (actor.controller === 'human' ? `${actor.humanIndex + 1}P` : 'BOT')}</small></div><strong>${actor.score}</strong><div class="score-dots${state.options.scoreGoal > 8 ? ' dense' : ''}">${Array.from({ length: state.options.scoreGoal }, (_, i) => `<i class="${i < actor.score ? 'filled' : ''}"></i>`).join('')}</div></div>`,
         )
         .join('<span class="vs">·</span>');
     }
@@ -349,7 +434,7 @@ export class View {
                               : actor.recalling
                                 ? '召回中…'
                                 : '按住投掷键召回';
-          return `<div class="ability-card" style="--player-color:${ROSTER[actor.id].color}"><div class="ability-top"><span class="small-token">${actor.humanIndex + 1}P</span><b>${weapon}</b><span class="power-icons">${actor.powers.map((p) => `<i style="--power:${POWERUPS[p].color}" title="${POWERUPS[p].description}">${POWERUPS[p].short}</i>`).join('')}</span></div><div class="ability-meters"><span>冲刺 <i><em style="width:${ready ? 100 : clamp(1 - actor.dashCooldown / (RULES.dashCooldown * (actor.powers.includes('haste') ? 0.6 : 1)), 0, 1) * 100}%"></em></i><small>${ready ? '就绪' : '恢复'}</small></span><span>蓄力 <i><em class="charge-fill" style="width:${(actor.charge / RULES.chargeTime) * 100}%"></em></i></span></div></div>`;
+          return `<div class="ability-card" style="--player-color:${actorColor(actor.id)}"><div class="ability-top"><span class="small-token">${actor.humanIndex + 1}P</span><b>${weapon}</b><span class="power-icons">${actor.powers.map((p) => `<i style="--power:${POWERUPS[p].color}" title="${POWERUPS[p].description}">${POWERUPS[p].short}</i>`).join('')}</span></div><div class="ability-meters"><span>冲刺 <i><em style="width:${ready ? 100 : clamp(1 - actor.dashCooldown / (RULES.dashCooldown * (actor.powers.includes('haste') ? 0.6 : 1)), 0, 1) * 100}%"></em></i><small>${ready ? '就绪' : '恢复'}</small></span><span>蓄力 <i><em class="charge-fill" style="width:${(actor.charge / RULES.chargeTime) * 100}%"></em></i></span></div></div>`;
         })
         .join('');
     }
@@ -359,10 +444,10 @@ export class View {
         `<div class="countdown"><small>第 ${state.round} 回合 · ${mapInfo(state.arena.id).name}</small><strong>${presentation.label}</strong><span>${presentation.stage === 'ready' ? '开始后 1.2 秒自动发镖' : '伙伴们正在入场'}</span></div>`,
       );
     } else if (state.phase === 'roundEnd') {
-      const winner = state.winnerId === null ? null : ROSTER[state.winnerId];
+      const winner = state.winnerId === null ? null : { name: esc(actorName(state.winnerId)) };
       this.html(
         this.center,
-        `<div class="round-banner"><span class="eyebrow">${presentation.showScores ? 'ROUND SCORES' : winner ? 'ROUND SURVIVED' : 'WHAT A ROUND'}</span><h2>${winner ? `${winner.name}赢下这一回合` : '无人存活 · 平局'}</h2><p>${presentation.showScores ? state.actors.map((a) => `${ROSTER[a.id].name} ${a.score}`).join(' · ') : winner ? '＋1 分' : '本回合不计分'}<span>下一回合马上开始</span></p></div>`,
+        `<div class="round-banner"><span class="eyebrow">${presentation.showScores ? 'ROUND SCORES' : winner ? 'ROUND SURVIVED' : 'WHAT A ROUND'}</span><h2>${winner ? `${winner.name}赢下这一回合` : '无人存活 · 平局'}</h2><p>${presentation.showScores ? state.actors.map((a) => `${esc(actorName(a.id))} ${a.score}`).join(' · ') : winner ? '＋1 分' : '本回合不计分'}<span>下一回合马上开始</span></p></div>`,
       );
     } else if (presentation.stage === 'go')
       this.html(this.center, '<div class="go-text">开始！</div>');
@@ -374,7 +459,7 @@ export class View {
     }
     if (!replay && state.phase === 'matchEnd' && this.mode !== 'ended') {
       const winner = state.actors.find((a) => a.id === state.matchWinnerId)!;
-      this.get('result-title').textContent = `${ROSTER[winner.id].name}，花园冠军！`;
+      this.get('result-title').textContent = `${actorName(winner.id)}，花园冠军！`;
       this.get('result-subtitle').textContent =
         state.options.mode === 'bots'
           ? 'AI 对战结束。可以保存录像、回看精彩瞬间或开始下一局。'
@@ -385,7 +470,7 @@ export class View {
         .sort((a, b) => b.score - a.score)
         .map(
           (a) =>
-            `<div class="final-score"><span><i style="background:${ROSTER[a.id].color}"></i>${ROSTER[a.id].name}<small>${a.controller === 'human' ? `${a.humanIndex + 1}P` : 'BOT'}</small></span><b>${a.score}<small> 分</small></b></div>`,
+            `<div class="final-score"><span><i style="background:${actorColor(a.id)}"></i>${esc(actorName(a.id))}<small>${a.controller === 'human' ? `${a.humanIndex + 1}P` : 'BOT'}</small></span><b>${a.score}<small> 分</small></b></div>`,
         )
         .join('');
       this.setMode('ended');

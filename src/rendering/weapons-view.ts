@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { ROSTER, RULES } from '../core/config';
+import { RULES } from '../core/config';
+import { actorColor } from '../agents/registry';
 import type { Disc, GameEvent, GameState } from '../core/types';
 import { InstanceBatch } from './batches';
 import { meleeAge } from './melee-pose';
@@ -24,7 +25,7 @@ export function discEffectColor(disc: Disc): string {
   if (powers.includes('teleport')) return '#c3a4ff';
   if (powers.includes('controlled')) return '#9dfff0';
   if (disc.explosive) return '#ffc189';
-  return ROSTER[disc.damageOwnerId]?.color ?? '#fff2c5';
+  return disc.damageOwnerId >= 0 ? actorColor(disc.damageOwnerId) : '#fff2c5';
 }
 
 /** Persistent trail history belongs to this renderer, never to authoritative
@@ -164,7 +165,7 @@ export class WeaponsView {
             0.66 + charge * 0.12,
             0.66 + charge * 0.12,
             1,
-            ROSTER[actor.id].color,
+            actorColor(actor.id),
             charge * 0.22,
             -Math.PI / 2,
           );

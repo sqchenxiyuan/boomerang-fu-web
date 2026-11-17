@@ -1,5 +1,6 @@
 import type { GameState } from '../core/types';
-import { POWERUPS, ROSTER } from '../core/config';
+import { POWERUPS } from '../core/config';
+import { actorColor, actorName as identityName } from '../agents/registry';
 import { mapInfo } from '../core/arena';
 import type { ReplayLoop, ReplayTransportSnapshot } from '../sdk/replay-transport';
 import type { ReplayMarker, ReplayTimelineSnapshot } from '../sdk/replay-timeline';
@@ -26,7 +27,7 @@ const timecode = (tick: number): string => {
   const seconds = Math.floor(tick / 60);
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}:${String(tick % 60).padStart(2, '0')}`;
 };
-const actorName = (id: number): string => ROSTER[id]?.name ?? '环境';
+const actorName = (id: number): string => identityName(id);
 function markerLabel(marker: Readonly<ReplayMarker>): string {
   switch (marker.kind) {
     case 'round':
@@ -409,7 +410,7 @@ export class ReplayStudio {
         ...frame.state.actors.map((actor) => {
           const card = document.createElement('div');
           card.className = `replay-player${actor.alive ? '' : ' is-out'}`;
-          card.style.setProperty('--actor-color', ROSTER[actor.id].color);
+          card.style.setProperty('--actor-color', actorColor(actor.id));
           const top = document.createElement('div'),
             name = document.createElement('b'),
             score = document.createElement('strong'),

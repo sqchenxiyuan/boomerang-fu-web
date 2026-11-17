@@ -7,8 +7,24 @@ import type { Actor, Command, GameState } from '../core/types';
 import { advancePath, findFloorEscape, findPath, threatenedFloor } from './navigation';
 import type { NavigationWaypoint } from './navigation';
 import { clampToBoundary, isInBoundary } from './boundary';
+import { canRescueFall } from './hazards';
+
+/** Web planning interval per difficulty; Impossible follows the reference's fastest band. */
+const THINK: Record<string, number> = { easy: 0.35, normal: 0.2, hard: 0.1, impossible: 0.07 };
+/** PlayerAI.SetDifficulty reaction times (seconds): delay before reacting to a new threat. */
+const REACTION: Record<string, readonly number[]> = {
+  easy: [0.6, 0.7, 0.85],
+  normal: [0.41, 0.52, 0.63],
+  hard: [0.1, 0.25, 0.35],
+  impossible: [0.07, 0.13, 0.2],
+};
+/** Web adaptation: how often a bot uses its one mid-air dash rescue. */
+const RESCUE: Record<string, number> = { easy: 0.4, normal: 0.75, hard: 0.95, impossible: 1 };
 
 interface Brain {
+  rescueRoll?: number;
+  /** Simulation time at which the current incoming disc may be answered. */
+  reactAt?: number;
   thinkIn: number;
   move: Vec2;
   chargeFor: number;
@@ -52,6 +68,25 @@ export class BotController {
     }
     const command = idleCommand();
     if (!actor.alive) return command;
+    // A fresh fall gets one roll; a successful bot dashes back toward solid ground.
+    if (actor.fall) {
+      brain.rescueRoll ??= random.next();
+      if (
+        brain.rescueRoll < (RESCUE[state.options.difficulty] ?? 0.75) &&
+        canRescueFall(actor) &&
+        actor.dashCooldown <= 0
+      ) {
+        const back =
+          length(actor.velocity) > 0.05
+            ? mul(normalize(actor.velocity), -1)
+            : mul(actor.facing, -1);
+        const escape = findFloorEscape(state.arena, actor.position, back);
+        command.move = escape ? normalize(sub(escape, actor.position)) : back;
+        command.dash = true;
+      }
+      return command;
+    }
+    brain.rescueRoll = undefined;
     if ((actor.frozenTime ?? 0) > 0) {
       command.attack = (actor.freezeChipCooldown ?? 0) <= dt;
       return command;
@@ -132,8 +167,7 @@ export class BotController {
       d = length(delta),
       towards = normalize(delta);
     const sight = lineOfSight(state.arena, actor.position, enemy.position);
-    const reaction =
-      state.options.difficulty === 'easy' ? 0.35 : state.options.difficulty === 'hard' ? 0.1 : 0.2;
+    const reaction = THINK[state.options.difficulty] ?? THINK.normal;
 
     if (brain.thinkIn <= 0) {
       brain.thinkIn = reaction;
@@ -227,7 +261,11 @@ export class BotController {
           disc.damageOwnerId !== actor.id &&
           segmentCircle(disc.position, mul(disc.velocity, 0.3), actor.position, 1),
       );
-      if (danger) {
+      if (!danger) brain.reactAt = undefined;
+      else
+        brain.reactAt ??=
+          state.time + random.pick([...(REACTION[state.options.difficulty] ?? REACTION.normal)]);
+      if (danger && state.time >= (brain.reactAt ?? 0)) {
         const perpendicular = normalize(v(-danger.velocity.y, danger.velocity.x));
         const candidates = [perpendicular, mul(perpendicular, -1)];
         const dodge = candidates.find(

@@ -263,7 +263,7 @@ describe('SDK lifecycle and isolation', () => {
   });
 
   it('clears external samples between real completed rounds without altering score or lives', () => {
-    const value = session({ mapRotation: 'cycle' });
+    const value = session({ mapRotation: 'cycle', scoring: 'survival' });
     equipped(value);
     const events = observe(value);
     const p0 = value.acquire(0);
@@ -273,7 +273,8 @@ describe('SDK lifecycle and isolation', () => {
     until(value, (state) => state.actors[1].position.x > state.arena.halfWidth - 1.3);
     p0.submit({ throw: true }, 600);
     p1.submit({ move: { x: 1, y: 0 }, dash: true }, 600);
-    const ended = until(value, (state) => state.phase === 'roundEnd', 180);
+    // The death's slow motion stretches the 1.45 s confirmation in rendered frames.
+    const ended = until(value, (state) => state.phase === 'roundEnd', 400);
     expect(ended.actors[0].score).toBe(1);
     expect(ended.actors[1].alive).toBe(false);
     const next = until(value, (state) => state.round === 2);

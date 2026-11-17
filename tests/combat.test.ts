@@ -4,7 +4,21 @@ import { v } from '../src/core/math';
 import { idleCommand } from '../src/core/types';
 import { createState, defaultOptions } from '../src/simulation/state';
 import { damageActor, explode, resolveMelee } from '../src/simulation/combat';
-import { throwDisc, tickDiscs } from '../src/simulation/projectiles';
+import {
+  discOverlapPhase,
+  throwDisc,
+  tickDiscRespawns,
+  tickDiscs,
+} from '../src/simulation/projectiles';
+import type { GameState } from '../src/core/types';
+
+/** Discs move, then the native trigger phase runs, as in one fixed step. */
+function stepDiscs(state: GameState, frames = 1): void {
+  for (let i = 0; i < frames; i++) {
+    tickDiscs(state, RULES.dt);
+    discOverlapPhase(state);
+  }
+}
 import { tickActor } from '../src/simulation/actors';
 import { grantPowerup } from '../src/simulation/powerups';
 
@@ -95,7 +109,12 @@ describe('damage and actions', () => {
     resolveMelee(state);
     expect(target.alive).toBe(true);
     expect(target.armed).toBe(false);
-    expect(state.discs[0].state).toBe('dropped');
+    expect(target.stun).toBeCloseTo(0.8);
+    // Player.DropDisc: the knocked-out weapon slides freely and is not a projectile.
+    expect(state.discs[0].startedDropped).toBe(true);
+    expect(state.discs[0].projectile).toBe(false);
+    expect(state.discs[0].movement).toBe('free');
+    expect(target.killerType).toBe('Push');
   });
   it('an explosion respects cover and can hit its owner', () => {
     const state = fixture();
@@ -111,24 +130,33 @@ describe('damage and actions', () => {
 });
 
 describe('weapon flight lifecycle', () => {
-  it('hits a target continuously at very high speed', () => {
+  it('a fully charged throw is limited to its raised speed and still hits continuously', () => {
     const state = fixture();
+    state.actors[0].charge = 1;
     throwDisc(state, state.actors[0]);
-    state.discs[0].velocity = v(900, 0);
-    tickDiscs(state, RULES.dt);
+    const disc = state.discs[0];
+    // Disc.Init raises the speed limit twice for a full charge: 45 → 67.5 → 101.25.
+    expect(disc.speedLimit).toBeCloseTo(101.25 * 0.4, 6);
+    disc.velocity = v(900, 0);
+    let frames = 0;
+    while (state.actors[1].alive && frames++ < 30) stepDiscs(state);
     expect(state.actors[1].alive).toBe(false);
+    expect(frames).toBeLessThan(15);
   });
   it('a wall is resolved before a target behind it', () => {
     const state = fixture();
     state.arena.obstacles = [
       { id: 'cover', kind: 'stone', position: v(), half: v(0.3, 2), broken: false },
     ];
+    state.actors[0].charge = 1;
     throwDisc(state, state.actors[0]);
-    state.discs[0].velocity = v(900, 0);
-    tickDiscs(state, RULES.dt);
+    let frames = 0;
+    while (state.discs[0].bounces === 0 && frames++ < 60) stepDiscs(state);
+    stepDiscs(state, 2);
     expect(state.actors[1].alive).toBe(true);
     expect(state.discs[0].bounces).toBeGreaterThan(0);
     expect(state.discs[0].position.x).toBeLessThan(0);
+    expect(state.discs[0].velocity.x).toBeLessThan(0);
   });
   it('front melee deflects a disc, changes attribution and preserves one weapon', () => {
     const state = fixture(),
@@ -137,12 +165,18 @@ describe('weapon flight lifecycle', () => {
     defender.attackTime = 0.2;
     defender.attackArmed = true;
     throwDisc(state, state.actors[0]);
-    for (let i = 0; i < 8; i++) tickDiscs(state, RULES.dt);
+    for (let i = 0; i < 8 && !state.events.some((e) => e.feedback === 'parry'); i++)
+      stepDiscs(state);
     expect(defender.alive).toBe(true);
     expect(state.discs).toHaveLength(1);
-    expect(state.discs[0].damageOwnerId).toBe(1);
+    // Another player's disc is batted away: it keeps its owner but stops homing.
     expect(state.discs[0].ownerId).toBe(0);
-    expect(state.events.some((e) => e.type === 'deflect')).toBe(true);
+    expect(state.discs[0].lastDeflector).toBe(1);
+    expect(state.discs[0].movement).toBe('free');
+    expect(state.discs[0].canHome).toBe(false);
+    expect(state.hitStop).toBeCloseTo(0.25);
+    expect(defender.attackTime).toBe(0);
+    expect(state.events.some((e) => e.type === 'deflect' && e.feedback === 'parry')).toBe(true);
   });
   it('normal flight returns, catches and restores the original inventory', () => {
     const state = fixture();
@@ -157,11 +191,14 @@ describe('weapon flight lifecycle', () => {
     const state = fixture();
     state.actors[1].position = v(0, 7);
     throwDisc(state, state.actors[0]);
-    state.discs[0].position = v(0, 0);
+    Object.assign(state.discs[0], { position: v(0, 0), velocity: v(), stored: v() });
+    state.discs[0].movement = 'dropped';
     state.discs[0].state = 'dropped';
+    state.discs[0].projectile = false;
     state.discs[0].age = 1;
-    state.actors[0].recalling = true;
-    for (let i = 0; i < 90; i++) tickDiscs(state, RULES.dt);
+    // Player.Retrieve: the pull eases in as retrieveCharge grows by dt / 4.
+    state.actors[0].retrieveCharge = 0.5;
+    for (let i = 0; i < 90; i++) stepDiscs(state);
     expect(state.discs).toHaveLength(0);
     expect(state.actors[0].armed).toBe(true);
   });
@@ -201,10 +238,16 @@ describe('weapon flight lifecycle', () => {
     state.actors[1].position = v(0, 7);
     state.actors[0].powers = ['explosive'];
     throwDisc(state, state.actors[0]);
-    for (let i = 0; i < 120; i++) tickDiscs(state, RULES.dt);
+    for (let i = 0; i < 90; i++) {
+      stepDiscs(state);
+      tickDiscRespawns(state, RULES.dt);
+    }
     expect(state.events.filter((e) => e.type === 'explosion')).toHaveLength(1);
+    expect(state.discs).toHaveLength(0);
+    // Grenade.Explode → RequestRespawn(1.75): the weapon returns later, not at once.
+    expect(state.actors[0].armed).toBe(false);
+    for (let i = 0; i < 110; i++) tickDiscRespawns(state, RULES.dt);
     expect(state.actors[0].alive).toBe(true);
     expect(state.actors[0].armed).toBe(true);
-    expect(state.discs).toHaveLength(0);
   });
 });

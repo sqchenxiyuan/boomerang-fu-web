@@ -143,7 +143,8 @@ describe('power-aware input and movement', () => {
     expect(actor.position.x).toBeGreaterThan(6);
     expect(actor.phaseOrigin).toBeUndefined();
     step({ move: v(-1, 0) }, 120);
-    expect(actor.position.x).toBeGreaterThan(6.4);
+    // Ordinary collision holds the actor's 0.66 × 1.33 radius outside the wall face.
+    expect(actor.position.x).toBeGreaterThan(6 + RULES.playerRadius - 0.01);
   });
 
   it('teleports while holding a second disc and during ordinary dash cooldown, without detonating the grenade', () => {

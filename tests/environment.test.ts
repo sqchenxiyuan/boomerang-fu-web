@@ -517,7 +517,7 @@ describe('moving support and collision', () => {
     activateEnvironment(state, wall.id, 1);
     tick();
     expect(actor.alive).toBe(true);
-    expect(actor.position.x).toBeGreaterThan(2.6);
+    expect(actor.position.x).toBeGreaterThan(2.2 + RULES.playerRadius - 0.01);
     expect(obstacleDistance(state.arena.obstacles[0], actor.position)).toBeGreaterThanOrEqual(
       RULES.playerRadius,
     );

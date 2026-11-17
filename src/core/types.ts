@@ -5,7 +5,9 @@ export type * from './environment-types';
 
 export type PowerupKind = keyof typeof POWERUPS;
 export type Phase = 'menu' | 'countdown' | 'playing' | 'roundEnd' | 'matchEnd';
-export type Difficulty = 'easy' | 'normal' | 'hard';
+export type Difficulty = 'easy' | 'normal' | 'hard' | 'impossible';
+/** 'kills' is the reference DeathMatch + Kills rule; 'survival' is the legacy Web rule. */
+export type Scoring = 'kills' | 'survival';
 export type LegacyMapId = 'courtyard' | 'canal' | 'market' | 'switchback' | 'portals';
 export type MapId = LegacyMapId | `original-${string}`;
 export type MapRotation = 'fixed' | 'cycle';
@@ -14,7 +16,9 @@ export interface MatchOptions {
   bots: number;
   difficulty: Difficulty;
   seed: number;
-  scoreGoal: number;
+  /** Omitted: kill scoring uses 14 (two players) or 16, survival scoring uses 5. */
+  scoreGoal?: number;
+  scoring?: Scoring;
   mapId?: MapId;
   mapRotation?: MapRotation;
   /** Seconds of active play before sudden death; packaged default is 180. */
@@ -90,8 +94,10 @@ export interface Actor {
   fall?: { kind: 'water' | 'cliff'; elapsed: number; duration: number };
   fallsSaved?: number;
   outOfBounds?: { remaining: number; duration: number };
+  /** Net score: points − suicides (kill scoring) or survived rounds (survival scoring). */
   score: number;
   kills: number;
+  suicides?: number;
   armed: boolean;
   heldDiscs?: number;
   reverseTime?: number;
@@ -135,7 +141,63 @@ export interface Actor {
   bufferedDash: number;
   bufferedAttack: number;
   portalCooldown?: number;
+  /** Reference Actor state. Optional so older SDK snapshots stay readable. */
+  stored?: Vec2;
+  lastMove?: Vec2;
+  pushTime?: number;
+  pushDuration?: number;
+  pushStrength?: number;
+  pushDirection?: Vec2;
+  stunDirection?: Vec2;
+  /** Player.attacksLeft / disarmsLeft / coolingAttack. */
+  attacksLeft?: number;
+  disarmsLeft?: number;
+  coolingAttack?: boolean;
+  /** Player.retrieveCharge, 0..1.4; `recalling` mirrors retrieveCharge > 0. */
+  retrieveCharge?: number;
+  /** Actor.isDisarmed: thrown weapon lost to free flight; walks at the unarmed speed. */
+  disarmed?: boolean;
+  /** Frames left in Actor.deflectedDiscs / deflectedMelees, keyed by entity id. */
+  deflectedDiscs?: Record<number, number>;
+  deflectedMelees?: Record<number, number>;
+  meleeContacts?: number[];
+  disarmContacts?: number[];
+  blockContacts?: number[];
+  justVulnerable?: boolean;
+  /** PlayerInput's eight-entry failed-action buffer, oldest first, in scaled seconds. */
+  inputBuffer?: { kind: 'attack' | 'throw' | 'dash'; age: number }[];
+  /** Rotation is still easing toward `lastMove` after the input stopped. */
+  turning?: boolean;
+  /** Actor.isAiming latch (aim timer reached .1 s). */
+  aiming?: boolean;
+  /** Throw button state seen by the latest input frame (Player.inputHeld). */
+  inputHeld?: boolean;
+  /** Player.killerID / killerType / killer timer. */
+  killerId?: number;
+  killerType?: KillerType;
+  killerTimer?: number;
+  streak?: { count: number; last: number };
+  /** Player.RequestRespawn jobs: seconds until a replacement disc arrives. */
+  discRespawns?: number[];
 }
+export type KillerType =
+  | 'Suicide'
+  | 'Disc'
+  | 'Melee'
+  | 'Push'
+  | 'Explosion'
+  | 'Telefrag'
+  | 'MovingObstacle'
+  | 'Fire'
+  | 'Freeze'
+  | 'Boundary';
+export type DiscMovement =
+  | 'throwing'
+  | 'returning'
+  | 'free'
+  | 'dropped'
+  | 'squished'
+  | 'controlled';
 
 export interface Disc {
   id: number;
@@ -161,6 +223,50 @@ export interface Disc {
   lastDeflector: number;
   dead: boolean;
   portalCooldown?: number;
+  /** Reference Disc state machine; `state` is its coarse legacy projection. */
+  movement?: DiscMovement;
+  stored?: Vec2;
+  speedLimit?: number;
+  throwTimer?: number;
+  throwDuration?: number;
+  throwStrength?: number;
+  throwDirection?: Vec2;
+  spinAngle?: number;
+  spinTimer?: number;
+  spinning?: boolean;
+  returnTimer?: number;
+  returnDirection?: Vec2;
+  freeStrength?: number;
+  homingRadius?: number;
+  canHome?: boolean;
+  canReturn?: boolean;
+  canBeControlled?: boolean;
+  controlledFactor?: number;
+  canCollideWithOwner?: boolean;
+  startedDropped?: boolean;
+  deflectedTimer?: number;
+  pickable?: boolean;
+  colliderDisabled?: number;
+  /** Actors currently overlapping each trigger, for enter-only callbacks. */
+  damageContacts?: number[];
+  shieldContacts?: number[];
+  meleeContacts?: number[];
+  /** Owner died: seconds until the disc becomes public. */
+  publicTimer?: number;
+  /** Projectile layer: false once a disc settles, or while it was knocked loose. */
+  projectile?: boolean;
+}
+
+/** TimeKeeper: freeze frames and eased slow motion, advanced in unscaled time. */
+export interface ClockState {
+  timeScale: number;
+  slowScale: number;
+  slowTimer: number;
+  slowIn: number;
+  slowHold: number;
+  slowOut: number;
+  slowMo: boolean;
+  locked: boolean;
 }
 
 export type Obstacle = {
@@ -294,13 +400,16 @@ export interface GameEvent {
     | 'burn'
     | 'disguise'
     | 'decoy'
-    | 'environment';
+    | 'environment'
+    | 'clash'
+    | 'streak';
   mechanismId?: string;
   position: Vec2;
   actorId: number;
   value?: number;
   power?: PowerupKind;
-  feedback?: 'parry' | 'clash' | 'disarm';
+  feedback?: 'parry' | 'clash' | 'disarm' | 'block';
+  charged?: boolean;
   cause?: DeathCause;
   direction?: Vec2;
   variant?: DeathState['variant'];
@@ -330,7 +439,14 @@ export interface GameState {
   roundFinishTimer: number | null;
   /** @deprecated Display-only radius derived from the current rectangle. */
   safeRadius: number;
+  /** Remaining freeze-frame time in unscaled seconds (TimeKeeper.Freeze). */
   hitStop: number;
+  /** Absent in older snapshots: time then runs at scale 1. */
+  clock?: ClockState;
+  /** Kill scoring: a second player reached the goal in the same round. */
+  tieBreaker?: boolean;
+  /** Kill scoring: the match is decided; the round finishes its resolve delay first. */
+  pendingWinnerId?: number;
   weaponsGranted: boolean;
-  options: MatchOptions;
+  options: MatchOptions & { scoreGoal: number };
 }

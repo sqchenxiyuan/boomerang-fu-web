@@ -104,6 +104,7 @@ export function matchOptions(
     'difficulty',
     'seed',
     'scoreGoal',
+    'scoring',
     'mapId',
     'mapRotation',
     'suddenDeathTime',
@@ -115,8 +116,14 @@ export function matchOptions(
     if (value !== undefined) Object.assign(options, { [key]: value });
   }
   if (!['solo', 'local', 'bots'].includes(options.mode)) throw new RangeError('Unknown match mode');
-  if (!['easy', 'normal', 'hard'].includes(options.difficulty))
+  if (!['easy', 'normal', 'hard', 'impossible'].includes(options.difficulty))
     throw new RangeError('Unknown difficulty');
+  if (
+    options.scoring !== undefined &&
+    options.scoring !== 'kills' &&
+    options.scoring !== 'survival'
+  )
+    throw new RangeError('Unknown scoring');
   integer(
     options.bots,
     options.mode === 'bots' ? 2 : options.mode === 'solo' ? 1 : 0,
@@ -124,7 +131,7 @@ export function matchOptions(
     'bots',
   );
   integer(options.seed, 0, 0xffffffff, 'seed');
-  integer(options.scoreGoal, 1, 100, 'scoreGoal');
+  if (options.scoreGoal !== undefined) integer(options.scoreGoal, 1, 100, 'scoreGoal');
   if (
     options.suddenDeathTime !== undefined &&
     (typeof options.suddenDeathTime !== 'number' ||

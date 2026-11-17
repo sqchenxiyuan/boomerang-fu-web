@@ -525,6 +525,13 @@ h1 span {
 .score-dots i.filled {
   background: var(--player-color);
 }
+/* Kill scoring goals are 14–16 points; keep the row inside the card. */
+.score-dots.dense {
+  gap: 2px;
+}
+.score-dots.dense i {
+  width: 4px;
+}
 .vs {
   color: #6e8c6d;
   font-size: 18px;

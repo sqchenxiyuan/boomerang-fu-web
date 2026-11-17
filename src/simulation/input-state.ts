@@ -13,7 +13,11 @@ export function clearActorInput(actor: Actor): boolean {
     actor.facingHistory?.length !== 0 ||
     actor.aimMoveLag !== 0 ||
     actor.bufferedDash !== 0 ||
-    actor.bufferedAttack !== 0;
+    actor.bufferedAttack !== 0 ||
+    (actor.retrieveCharge ?? 0) !== 0 ||
+    (actor.inputBuffer?.length ?? 0) !== 0 ||
+    actor.aiming === true ||
+    actor.inputHeld === true;
   actor.charge = 0;
   actor.recalling = false;
   actor.controlling = false;
@@ -23,5 +27,9 @@ export function clearActorInput(actor: Actor): boolean {
   actor.aimMoveLag = 0;
   actor.bufferedDash = 0;
   actor.bufferedAttack = 0;
+  actor.retrieveCharge = 0;
+  actor.inputBuffer = [];
+  actor.aiming = false;
+  actor.inputHeld = false;
   return changed;
 }

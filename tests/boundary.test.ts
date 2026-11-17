@@ -16,7 +16,8 @@ import { Game } from '../src/simulation/game';
 import { createState, defaultOptions, resetRound } from '../src/simulation/state';
 
 function fixture() {
-  const state = createState();
+  // Survival resolution tests use the legacy survival rule explicitly.
+  const state = createState({ ...defaultOptions(), scoring: 'survival' });
   state.phase = 'playing';
   state.arena.obstacles = [];
   state.arena.pits = [];
@@ -222,6 +223,8 @@ describe('survival resolution', () => {
     expect(actor.fall).toBeUndefined();
     expect(actor.fallsSaved).toBe(1);
     expect(actor.dashTime).toBeGreaterThan(0);
+    // PlayerInput runs after FixedUpdate: the rescue dash moves on the next step.
+    tickActor(state, actor, { ...idleCommand(), move: v(-1, 0) }, RULES.dt);
     expect(actor.position.x).toBeLessThan(state.arena.halfWidth);
     actor.position = v(state.arena.halfWidth + 0.1, 0);
     actor.velocity = v();
@@ -257,16 +260,22 @@ describe('survival resolution', () => {
     expect(game.state.actors.every((actor) => actor.score === 0)).toBe(true);
   });
 
-  it('continues simulation for the original 1.45 second confirmation before scoring', () => {
+  it('continues simulation for the original 1.45 scaled-second confirmation before scoring', () => {
     const game = new Game();
     game.state = fixture();
+    const start = game.state.time;
     damageActor(game.state, game.state.actors[1], 0, v(1, 0));
-    for (let i = 0; i < 86; i++) game.step();
-    expect(game.state.phase).toBe('playing');
-    expect(game.state.actors[0].score).toBe(0);
-    game.step();
+    // The kill starts TimeKeeper slow motion, so the wait spans more rendered frames.
+    let frames = 0;
+    while (game.state.phase === 'playing' && frames < 600) {
+      expect(game.state.actors[0].score).toBe(0);
+      game.step();
+      frames++;
+    }
     expect(game.state.phase).toBe('roundEnd');
     expect(game.state.actors[0].score).toBe(1);
+    expect(frames).toBeGreaterThan(87);
+    expect(game.state.time - start).toBeCloseTo(1.45, 1);
   });
 
   it('allows a delayed explosion to turn the would-be win into a draw', () => {

@@ -1,9 +1,169 @@
 // Timings come from static CIL evidence; the 0.4 spatial scale is a Web design choice.
 // See docs/mechanics-and-feel.md for formulas, resource limits and remaining differences.
 const WORLD_SCALE = 0.4;
+/**
+ * Gameplay constants taken from the reference Godot simulation (Unity units, Y-up).
+ * Web coordinates are Unity × WORLD_SCALE with Y mirrored, so every distance,
+ * speed and force below is multiplied by WORLD_SCALE where it is consumed.
+ * Durations are seconds and never scaled. See docs/godot-parity.md.
+ */
+const U = WORLD_SCALE;
+export const NATIVE = {
+  /** Unity → Web distance factor. */
+  scale: U,
+  /** Actor CircleCollider2D 0.66 × prefab scale 1.33. */
+  actorRadius: 0.66 * 1.33 * U,
+  /** Weapon/pickup/shield trigger radii, each × prefab scale 1.33. */
+  damageRadius: 0.75 * 1.33 * U,
+  pickupRadius: 1.1 * 1.33 * U,
+  shieldRadius: 1.4 * 1.33 * U,
+  actor: {
+    speedLimit: 40 * U,
+    drag: 11,
+    wetDrag: 1,
+    frozenDrag: 2,
+    wetSlide: 0.25,
+    walk: 200 * U,
+    walkDisarmed: 230 * U,
+    hasteFactor: 1.4,
+    controlledWalk: 0.1 * U,
+    aimMoveLagRate: 2,
+    turnRate: 12,
+    dashDuration: 0.2,
+    dashCooldown: 0.55,
+    dashForce: 660 * U,
+    dashImpulseFactor: 1.5,
+    lungeDuration: 0.1125,
+    lungeForce: 800 * U,
+    lungeImpulseFactor: 0.66,
+    lungeCooldown: 0.5,
+    meleeDuration: 0.2,
+    attackCooldown: 0.66,
+    blockCooldown: 0.66 * 1.2,
+    blockBudgetCooldown: 0.15,
+    catchCooldown: 0.1,
+    fastCatchCooldown: 0.05,
+    pushbackStrength: 500,
+    pushbackImpulse: 2.5,
+    disarmLungeFactor: 0.85,
+    /** Actor.radius - 0.01 is used for overlap queries. */
+    overlapInset: 0.01 * U,
+  },
+  disc: {
+    mass: 0.6,
+    drag: 2.8,
+    bounciness: 0.8,
+    speedLimit: 45 * U,
+    throwSpeed: 190 * U,
+    returnStrength: 190 * U,
+    throwDuration: 0.45,
+    throwVelocityFactor: 9,
+    chargeDurationCut: 0.15,
+    miniThrowDuration: 0.3378,
+    homingKeyboard: 11 * U,
+    homingGamepad: 7 * U,
+    homingDot: 0.75,
+    queryRadius: 0.5 * U,
+    colliderRadius: 0.7125 * U,
+    minOwnerDistance: 4.5 * U,
+    spawnOffset: 0.75 * U,
+    controlledForce: 110 * U,
+    controlledRange: 30 * U,
+    freeDecay: 20,
+    freeSettle: 10 * U,
+    publicSpeed: 8 * U,
+    retrieveWakeSpeed: 22.5 * U,
+    retrieveRate: 0.25,
+    retrieveMax: 1.4,
+    deflectProtection: 0.15,
+    parryBoost: 2000 * U,
+    droppedParryBoost: 24 * U,
+    colliderDisable: 0.02,
+    /** Disc.BecomePublic waits a frame, then one second (half for mini discs). */
+    publicDelay: 1,
+    miniPublicDelay: 0.5,
+  },
+  combat: {
+    /** Protection sets count fixed frames. */
+    protectionFrames: 10,
+    meleeBlockPush: 24 * U,
+    meleeBlockPushFactor: 1.5,
+    meleeBlockPushTime: 0.4,
+    meleeBlockStun: 0.4,
+    meleeBlockFreeze: 0.2,
+    parryFreeze: 0.25,
+    parryPushTime: 0.3,
+    parryStun: 0.8,
+    disarmPush: 30 * U,
+    disarmStunArmed: 0.8,
+    disarmStunEmpty: 0.5,
+    disarmDropSpeed: 1.5,
+    shieldMeleePush: 60 * U,
+    shieldMeleePushTime: 0.3,
+    shieldMeleeStun: 0.325,
+    shieldChargedPushTime: 0.2,
+    shieldChargedStun: 0.75,
+    shieldPushTime: 0.4,
+    shieldStun: 0.2,
+    explosionShieldPush: 40 * U,
+    explosionShieldPushTime: 0.5,
+    explosionShieldStun: 0.6,
+    actorDashPush: 660 * 0.5 * U,
+    actorDashPushTime: 0.19,
+    actorDashStun: 0.4,
+    actorBumpTime: 0.2,
+    actorDashBumpStun: 0.66,
+    killerDisc: 1.5,
+    killerPush: 2,
+    streakWindow: 1.2,
+  },
+  /** TimeKeeper.SlowMoEffect calls with their source arguments. */
+  slowMo: {
+    scale: 0.2,
+    death: { hold: 0.5, lerpIn: 0.5 },
+    chargedParry: { hold: 0.3 },
+    armedDisarm: { hold: 0.25 },
+    chargedShield: { hold: 0.25 },
+    discClash: { hold: 0.1, lerpIn: 0.075, scale: 0.5 },
+    matchEnd: { hold: 10, lerpIn: 0.5, scale: 0.015 },
+    streakFreeze: 0.2,
+  },
+  /** SettingsManager.PrepareMatchLength, Medium. */
+  killGoal: (players: number): number => (players < 3 ? 14 : 16),
+} as const;
+
+/**
+ * Melee and disarm trigger polygons from the character prefab, in Web units, local
+ * to the actor: +y is facing, +x is the actor's right hand ((-facing.y, facing.x)).
+ */
+export const MELEE_SHAPE: readonly { x: number; y: number }[] = [
+  { x: -0.82043, y: 0.78899 },
+  { x: -0.44804, y: 1.20365 },
+  { x: 0.02132, y: 1.3453 },
+  { x: 0.48515, y: 1.21906 },
+  { x: 0.81928, y: 0.83824 },
+  { x: 0.94699, y: 0.32159 },
+  { x: 0.8785, y: 0.04215 },
+  { x: -0.8803, y: 0.04034 },
+  { x: -0.92567, y: 0.28676 },
+];
+export const MELEE_CENTER = 0.12768;
+export const DISARM_SHAPE: readonly { x: number; y: number }[] = [
+  { x: -0.629, y: 0.50135 },
+  { x: -0.3435, y: 0.75233 },
+  { x: 0.01635, y: 0.83806 },
+  { x: 0.37195, y: 0.76166 },
+  { x: 0.62812, y: 0.53116 },
+  { x: 0.72602, y: 0.21845 },
+  { x: 0.67352, y: 0.04931 },
+  { x: -0.6749, y: 0.04822 },
+  { x: -0.70968, y: 0.19737 },
+];
+export const DISARM_CENTER = 0.10108;
+
 export const RULES = {
   dt: 1 / 60,
-  playerRadius: 0.47,
+  playerRadius: NATIVE.actorRadius,
   worldScale: WORLD_SCALE,
   walkForce: 200 * WORLD_SCALE,
   unarmedWalkForce: 230 * WORLD_SCALE,
@@ -28,10 +188,11 @@ export const RULES = {
   aimMoveRecovery: 0.5,
   chargeTime: 1,
   chargeCurveDuration: 0.9,
-  discRadius: 0.22,
-  discSpeed: 18,
+  /** Disc wall-query radius; overlaps use NATIVE.disc.colliderRadius. */
+  discRadius: NATIVE.disc.queryRadius,
+  discSpeed: NATIVE.disc.speedLimit,
   discOutbound: 0.45,
-  discReturnSpeed: 15,
+  discReturnSpeed: NATIVE.disc.speedLimit,
   explosionRadius: 12 * WORLD_SCALE,
   explosionFuse: 1.33,
   countdown: 2.8,
@@ -42,6 +203,7 @@ export const RULES = {
   outOfBoundsDuration: 3,
   shrinkingOutOfBoundsDuration: 3.75,
   roundResolveDelay: 0.15 + 1.3,
+  /** Survival scoring default; kill scoring uses NATIVE.killGoal. */
   scoreGoal: 5,
   powerupInterval: 7,
   powerupLimit: 3,

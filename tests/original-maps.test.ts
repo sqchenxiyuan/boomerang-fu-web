@@ -99,6 +99,8 @@ describe('original map simulation smoke', () => {
         mapId: id,
         bots: 3,
         seed: 8751,
+        // A map smoke test: survival scoring always produces a round result.
+        scoring: 'survival',
         scoreGoal: 1,
         suddenDeathTime: 15,
       });

@@ -5,6 +5,7 @@ import { boundaryNotice, eliminationLabel } from '../core/feedback';
 import { clamp } from '../core/math';
 import type {
   Difficulty,
+  Scoring,
   GameEvent,
   GameState,
   MatchOptions,
@@ -76,14 +77,14 @@ export class View {
       <section class="menu-card" id="menu" aria-labelledby="menu-title">
         <div class="eyebrow"><span class="live-dot"></span> COURTYARD CLUB · 01</div>
         <h1 id="menu-title">小小花园，<br>大大<span>回旋。</span></h1>
-        <p class="intro">扔出去，接回来。<br>和食物伙伴过上几招，最后站着的人赢。</p>
+        <p class="intro">扔出去，接回来。<br>和食物伙伴过上几招，击倒最多的人赢。</p>
         <div class="mode-selector" role="group" aria-label="游戏模式"><button class="mode selected" data-mode="solo" aria-pressed="true">单人挑战 <span>VS 机器人</span></button><button class="mode" data-mode="local" aria-pressed="false">同屏双人 <span>和朋友一起</span></button><button class="mode" data-mode="bots" aria-pressed="false">AI 观战 <span>机器人互战</span></button></div>
-        <div class="settings-row"><label>机器人<select id="bots" aria-label="机器人数量"><option value="1">1 位对手</option><option value="3">3 位对手</option></select></label><label>难度<select id="difficulty" aria-label="机器人难度"><option value="easy">轻松</option><option value="normal" selected>标准</option><option value="hard">挑战</option></select></label></div>
+        <div class="settings-row"><label>机器人<select id="bots" aria-label="机器人数量"><option value="1">1 位对手</option><option value="3">3 位对手</option></select></label><label>难度<select id="difficulty" aria-label="机器人难度"><option value="easy">轻松</option><option value="normal" selected>标准</option><option value="hard">挑战</option><option value="impossible">极限</option></select></label></div>
         <div class="settings-row map-settings"><label>地图<select id="map" aria-label="地图">${mapOptions()}</select></label><label>回合换图<select id="rotation" aria-label="回合换图"><option value="fixed">固定地图</option><option value="cycle">依次轮换</option></select></label></div>
         <p class="map-description" id="map-description">${mapInfo('original-enclosed').description}</p>
-        <div class="settings-row"><label>决胜缩圈<select id="sudden-death" aria-label="决胜缩圈时间"><option value="180">180 秒 · 原版节奏</option><option value="60">60 秒</option><option value="30">30 秒 · 快速体验</option></select></label></div>
+        <div class="settings-row"><label>决胜缩圈<select id="sudden-death" aria-label="决胜缩圈时间"><option value="180">180 秒 · 原版节奏</option><option value="60">60 秒</option><option value="30">30 秒 · 快速体验</option></select></label><label>计分<select id="scoring" aria-label="计分方式"><option value="kills" selected>击倒计分 · 原版</option><option value="survival">存活计分 · 先得 5 分</option></select></label></div>
         <button class="primary-button" id="start">进入花园 <span>↗</span></button>
-        <div class="match-meta"><span>先得 5 分</span><span>${ORIGINAL_MAPS.filter((map) => !map.tutorial).length} 张原版地图</span><span>支持手柄</span></div>
+        <div class="match-meta"><span id="goal-label">双人先得 14 分 · 多人 16 分</span><span>${ORIGINAL_MAPS.filter((map) => !map.tutorial).length} 张原版地图</span><span>支持手柄</span></div>
         <details class="instructions"><summary>第一次玩？看看操作 <span>＋</span></summary><div class="instruction-content">
           <p><b>1P</b> ${key('W A S D')} 移动 · ${key('J')} 近战 · ${key('K')} 投掷 · ${key('L / 空格')} 冲刺</p>
           <p><b>2P</b> ${key('↑ ↓ ← →')} 移动 · ${key(',')} 近战 · ${key('.')} 投掷 · ${key('/')} 冲刺；也支持小键盘 1 / 2 / 3。</p>
@@ -162,7 +163,9 @@ export class View {
         bots: Number(this.get<HTMLSelectElement>('bots').value),
         difficulty: this.get<HTMLSelectElement>('difficulty').value as Difficulty,
         seed: crypto.getRandomValues(new Uint32Array(1))[0],
-        scoreGoal: 5,
+        // Kill scoring derives Medium's goal from the player count; survival keeps five.
+        scoring: this.get<HTMLSelectElement>('scoring').value as Scoring,
+        scoreGoal: this.get<HTMLSelectElement>('scoring').value === 'survival' ? 5 : undefined,
         mapId: this.get<HTMLSelectElement>('map').value as MapId,
         mapRotation: this.get<HTMLSelectElement>('rotation').value as MapRotation,
         suddenDeathTime: Number(this.get<HTMLSelectElement>('sudden-death').value),
@@ -171,6 +174,14 @@ export class View {
       });
     };
     this.get('start').addEventListener('click', () => start());
+    this.get('scoring').addEventListener('change', () => {
+      this.text(
+        'goal-label',
+        this.get<HTMLSelectElement>('scoring').value === 'survival'
+          ? '存活一回合得 1 分 · 先得 5 分'
+          : '双人先得 14 分 · 多人 16 分',
+      );
+    });
     this.get('practice-start').addEventListener('click', () => start(true));
     this.get('map').addEventListener('change', () => {
       const id = this.get<HTMLSelectElement>('map').value as MapId;
@@ -285,7 +296,7 @@ export class View {
       this.scoreboard.innerHTML = state.actors
         .map(
           (actor) =>
-            `<div class="score-card ${actor.alive ? '' : 'eliminated'}" style="--player-color:${ROSTER[actor.id].color}"><div class="player-token">${actor.id === 0 ? '瓜' : actor.id === 1 ? '茄' : actor.id === 2 ? '橙' : '奶'}</div><div class="score-name">${ROSTER[actor.id].name}<small>${eliminationLabel(actor) || (actor.controller === 'human' ? `${actor.humanIndex + 1}P` : 'BOT')}</small></div><strong>${actor.score}</strong><div class="score-dots">${Array.from({ length: state.options.scoreGoal }, (_, i) => `<i class="${i < actor.score ? 'filled' : ''}"></i>`).join('')}</div></div>`,
+            `<div class="score-card ${actor.alive ? '' : 'eliminated'}" style="--player-color:${ROSTER[actor.id].color}"><div class="player-token">${actor.id === 0 ? '瓜' : actor.id === 1 ? '茄' : actor.id === 2 ? '橙' : '奶'}</div><div class="score-name">${ROSTER[actor.id].name}<small>${eliminationLabel(actor) || (actor.controller === 'human' ? `${actor.humanIndex + 1}P` : 'BOT')}</small></div><strong>${actor.score}</strong><div class="score-dots${state.options.scoreGoal > 8 ? ' dense' : ''}">${Array.from({ length: state.options.scoreGoal }, (_, i) => `<i class="${i < actor.score ? 'filled' : ''}"></i>`).join('')}</div></div>`,
         )
         .join('<span class="vs">·</span>');
     }

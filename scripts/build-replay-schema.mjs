@@ -73,6 +73,19 @@ function schema(node) {
     if (ts.isStringLiteral(node.literal)) return { enum: [node.literal.text] };
   }
   if (ts.isUnionTypeNode(node)) return { any: node.types.map(schema) };
+  if (ts.isIntersectionTypeNode(node)) {
+    // Object intersections merge their fields; a field is optional only if no part requires it.
+    const parts = node.types.map((type) => {
+      const part = schema(type);
+      return part.ref ? definitions[part.ref] : part;
+    });
+    if (!parts.every((part) => part?.fields)) throw new Error('Unsupported intersection');
+    const fields = Object.assign({}, ...parts.map((part) => part.fields));
+    const optional = Object.keys(fields).filter((key) =>
+      parts.every((part) => !(key in part.fields) || part.optional.includes(key)),
+    );
+    return { fields, optional };
+  }
   if (ts.isArrayTypeNode(node)) return { array: schema(node.elementType) };
   if (ts.isTypeLiteralNode(node)) return object(node.members);
   if (ts.isIndexedAccessTypeNode(node)) {

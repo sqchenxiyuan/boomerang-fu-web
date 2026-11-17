@@ -58,15 +58,19 @@ describe('movement derived from static force and drag rules', () => {
   it('integrates the cosine dash force instead of assigning a linear speed each frame', () => {
     const { actor, step } = fixture();
     step({ dash: true, move: v(1, 0) });
-    expect(actor.velocity.x).toBeCloseTo(23.19333333, 6);
-    step({}, 11);
+    // FixedUpdate walks first; PlayerInput then adds the 1.5 × speedLimit dash impulse.
+    expect(actor.velocity.x).toBeCloseTo(1.08888889 + 40 * 1.5 * 0.4, 6);
+    step({}, 12);
     expect(actor.dashTime).toBe(0);
-    expect(actor.position.x).toBeCloseTo(3.63477469, 6);
-    step({}, 21);
-    expect(actor.position.x).toBeCloseTo(4.42572594, 6);
+    expect(actor.position.x).toBeCloseTo(3.72664961, 6);
+    step({}, 20);
+    expect(actor.position.x).toBeCloseTo(4.52203036, 6);
     expect(actor.dashCooldown).toBeGreaterThan(0);
+    // Actor.CooldownDash re-enables walking after this step's walk force.
     step({ move: v(0, 1) });
     expect(actor.dashCooldown).toBe(0);
+    expect(actor.velocity.y).toBe(0);
+    step({ move: v(0, 1) });
     expect(actor.velocity.y).toBeGreaterThan(1);
   });
 });
@@ -143,7 +147,8 @@ describe('action recovery, input windows and priority', () => {
     cancelling.step({ dash: true });
     cancelling.step({ attack: true, move: v(0, 1) });
     expect(cancelling.actor.dashTime).toBe(0);
-    expect(cancelling.actor.attackTime).toBe(RULES.attackDuration);
+    // The melee timer already ran once in this frame's Update.
+    expect(cancelling.actor.attackTime).toBeCloseTo(RULES.attackDuration - RULES.dt, 9);
     expect(cancelling.actor.facing).toEqual(v(1, 0));
   });
 });
@@ -162,21 +167,25 @@ describe('aiming movement', () => {
 
   it('removes movement force after the aim threshold but still lets the player turn', () => {
     const { actor, step } = fixture();
-    step({ move: v(1, 0), throwHeld: true }, 6);
+    // Six 1/60 s steps sum to just under .1 s, so aiming latches on the seventh.
+    step({ move: v(1, 0), throwHeld: true }, 7);
     const velocityAtThreshold = actor.velocity.x;
     step({ move: v(0, 1), throwHeld: true }, 12);
     expect(actor.velocity.x).toBeLessThan(velocityAtThreshold * 0.1);
     expect(actor.velocity.y).toBe(0);
     expect(actor.facing.y).toBeGreaterThan(0.99);
-    expect(actor.charge).toBeCloseTo(0.3);
+    expect(actor.charge).toBeCloseTo(19 / 60);
   });
 
   it('eases movement back for 500 ms after aiming and allows dash to cancel aiming', () => {
     const recovering = fixture();
     recovering.step({ move: v(1, 0), throwHeld: true }, 30);
     recovering.step({ move: v(1, 0), throwReleased: true });
-    expect(recovering.actor.aimMoveLag).toBeCloseTo(1 - 1 / 30);
+    // Actor.StopAiming sets the lag in Update; the next FixedUpdate starts easing it out.
+    expect(recovering.actor.aimMoveLag).toBe(1);
     expect(recovering.actor.velocity.x).toBeLessThan(0.1);
+    recovering.step({ move: v(1, 0) });
+    expect(recovering.actor.aimMoveLag).toBeCloseTo(1 - 1 / 30);
     recovering.step({ move: v(1, 0) }, 29);
     expect(recovering.actor.aimMoveLag).toBeCloseTo(0);
     const cancelling = fixture();

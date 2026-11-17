@@ -45,6 +45,8 @@ describe('action recording with simulation checkpoints', () => {
       mapId: 'courtyard',
       mapRotation: 'cycle',
       seed: 8751,
+      // Survival scoring keeps this recording multi-round; kill scoring ends sooner.
+      scoring: 'survival',
       scoreGoal: 2,
       suddenDeathTime: 5,
     });

@@ -24,10 +24,35 @@
         "roundFinishTimer": { "any": [{ "type": "number" }, { "enum": [null] }] },
         "safeRadius": { "type": "number" },
         "hitStop": { "type": "number" },
+        "clock": { "ref": "ClockState" },
+        "tieBreaker": { "type": "boolean" },
+        "pendingWinnerId": { "type": "number" },
         "weaponsGranted": { "type": "boolean" },
-        "options": { "ref": "MatchOptions" }
+        "options": {
+          "fields": {
+            "mode": { "any": [{ "enum": ["solo"] }, { "enum": ["local"] }, { "enum": ["bots"] }] },
+            "bots": { "type": "number" },
+            "difficulty": { "ref": "Difficulty" },
+            "seed": { "type": "number" },
+            "scoreGoal": { "type": "number" },
+            "scoring": { "ref": "Scoring" },
+            "mapId": { "ref": "MapId" },
+            "mapRotation": { "ref": "MapRotation" },
+            "suddenDeathTime": { "type": "number" },
+            "powerupPool": { "array": { "ref": "PowerupKind" } },
+            "startingPowers": { "array": { "ref": "PowerupKind" } }
+          },
+          "optional": [
+            "scoring",
+            "mapId",
+            "mapRotation",
+            "suddenDeathTime",
+            "powerupPool",
+            "startingPowers"
+          ]
+        }
       },
-      "optional": []
+      "optional": ["clock", "tieBreaker", "pendingWinnerId"]
     },
     "Phase": {
       "any": [
@@ -66,6 +91,7 @@
         },
         "score": { "type": "number" },
         "kills": { "type": "number" },
+        "suicides": { "type": "number" },
         "armed": { "type": "boolean" },
         "heldDiscs": { "type": "number" },
         "reverseTime": { "type": "number" },
@@ -108,13 +134,54 @@
         "shield": { "type": "boolean" },
         "bufferedDash": { "type": "number" },
         "bufferedAttack": { "type": "number" },
-        "portalCooldown": { "type": "number" }
+        "portalCooldown": { "type": "number" },
+        "stored": { "ref": "Vec2" },
+        "lastMove": { "ref": "Vec2" },
+        "pushTime": { "type": "number" },
+        "pushDuration": { "type": "number" },
+        "pushStrength": { "type": "number" },
+        "pushDirection": { "ref": "Vec2" },
+        "stunDirection": { "ref": "Vec2" },
+        "attacksLeft": { "type": "number" },
+        "disarmsLeft": { "type": "number" },
+        "coolingAttack": { "type": "boolean" },
+        "retrieveCharge": { "type": "number" },
+        "disarmed": { "type": "boolean" },
+        "deflectedDiscs": { "record": { "type": "number" } },
+        "deflectedMelees": { "record": { "type": "number" } },
+        "meleeContacts": { "array": { "type": "number" } },
+        "disarmContacts": { "array": { "type": "number" } },
+        "blockContacts": { "array": { "type": "number" } },
+        "justVulnerable": { "type": "boolean" },
+        "inputBuffer": {
+          "array": {
+            "fields": {
+              "kind": {
+                "any": [{ "enum": ["attack"] }, { "enum": ["throw"] }, { "enum": ["dash"] }]
+              },
+              "age": { "type": "number" }
+            },
+            "optional": []
+          }
+        },
+        "turning": { "type": "boolean" },
+        "aiming": { "type": "boolean" },
+        "inputHeld": { "type": "boolean" },
+        "killerId": { "type": "number" },
+        "killerType": { "ref": "KillerType" },
+        "killerTimer": { "type": "number" },
+        "streak": {
+          "fields": { "count": { "type": "number" }, "last": { "type": "number" } },
+          "optional": []
+        },
+        "discRespawns": { "array": { "type": "number" } }
       },
       "optional": [
         "death",
         "fall",
         "fallsSaved",
         "outOfBounds",
+        "suicides",
         "heldDiscs",
         "reverseTime",
         "frozenTime",
@@ -136,7 +203,34 @@
         "movingFloorId",
         "decoyCreated",
         "freezeChipCooldown",
-        "portalCooldown"
+        "portalCooldown",
+        "stored",
+        "lastMove",
+        "pushTime",
+        "pushDuration",
+        "pushStrength",
+        "pushDirection",
+        "stunDirection",
+        "attacksLeft",
+        "disarmsLeft",
+        "coolingAttack",
+        "retrieveCharge",
+        "disarmed",
+        "deflectedDiscs",
+        "deflectedMelees",
+        "meleeContacts",
+        "disarmContacts",
+        "blockContacts",
+        "justVulnerable",
+        "inputBuffer",
+        "turning",
+        "aiming",
+        "inputHeld",
+        "killerId",
+        "killerType",
+        "killerTimer",
+        "streak",
+        "discRespawns"
       ]
     },
     "Vec2": { "fields": { "x": { "type": "number" }, "y": { "type": "number" } }, "optional": [] },
@@ -188,6 +282,20 @@
         "decoy"
       ]
     },
+    "KillerType": {
+      "any": [
+        { "enum": ["Suicide"] },
+        { "enum": ["Disc"] },
+        { "enum": ["Melee"] },
+        { "enum": ["Push"] },
+        { "enum": ["Explosion"] },
+        { "enum": ["Telefrag"] },
+        { "enum": ["MovingObstacle"] },
+        { "enum": ["Fire"] },
+        { "enum": ["Freeze"] },
+        { "enum": ["Boundary"] }
+      ]
+    },
     "Disc": {
       "fields": {
         "id": { "type": "number" },
@@ -213,9 +321,81 @@
         "grace": { "type": "number" },
         "lastDeflector": { "type": "number" },
         "dead": { "type": "boolean" },
-        "portalCooldown": { "type": "number" }
+        "portalCooldown": { "type": "number" },
+        "movement": { "ref": "DiscMovement" },
+        "stored": { "ref": "Vec2" },
+        "speedLimit": { "type": "number" },
+        "throwTimer": { "type": "number" },
+        "throwDuration": { "type": "number" },
+        "throwStrength": { "type": "number" },
+        "throwDirection": { "ref": "Vec2" },
+        "spinAngle": { "type": "number" },
+        "spinTimer": { "type": "number" },
+        "spinning": { "type": "boolean" },
+        "returnTimer": { "type": "number" },
+        "returnDirection": { "ref": "Vec2" },
+        "freeStrength": { "type": "number" },
+        "homingRadius": { "type": "number" },
+        "canHome": { "type": "boolean" },
+        "canReturn": { "type": "boolean" },
+        "canBeControlled": { "type": "boolean" },
+        "controlledFactor": { "type": "number" },
+        "canCollideWithOwner": { "type": "boolean" },
+        "startedDropped": { "type": "boolean" },
+        "deflectedTimer": { "type": "number" },
+        "pickable": { "type": "boolean" },
+        "colliderDisabled": { "type": "number" },
+        "damageContacts": { "array": { "type": "number" } },
+        "shieldContacts": { "array": { "type": "number" } },
+        "meleeContacts": { "array": { "type": "number" } },
+        "publicTimer": { "type": "number" },
+        "projectile": { "type": "boolean" }
       },
-      "optional": ["powers", "mini", "groupId", "trailTime", "portalCooldown"]
+      "optional": [
+        "powers",
+        "mini",
+        "groupId",
+        "trailTime",
+        "portalCooldown",
+        "movement",
+        "stored",
+        "speedLimit",
+        "throwTimer",
+        "throwDuration",
+        "throwStrength",
+        "throwDirection",
+        "spinAngle",
+        "spinTimer",
+        "spinning",
+        "returnTimer",
+        "returnDirection",
+        "freeStrength",
+        "homingRadius",
+        "canHome",
+        "canReturn",
+        "canBeControlled",
+        "controlledFactor",
+        "canCollideWithOwner",
+        "startedDropped",
+        "deflectedTimer",
+        "pickable",
+        "colliderDisabled",
+        "damageContacts",
+        "shieldContacts",
+        "meleeContacts",
+        "publicTimer",
+        "projectile"
+      ]
+    },
+    "DiscMovement": {
+      "any": [
+        { "enum": ["throwing"] },
+        { "enum": ["returning"] },
+        { "enum": ["free"] },
+        { "enum": ["dropped"] },
+        { "enum": ["squished"] },
+        { "enum": ["controlled"] }
+      ]
     },
     "Pickup": {
       "fields": {
@@ -656,7 +836,9 @@
             { "enum": ["burn"] },
             { "enum": ["disguise"] },
             { "enum": ["decoy"] },
-            { "enum": ["environment"] }
+            { "enum": ["environment"] },
+            { "enum": ["clash"] },
+            { "enum": ["streak"] }
           ]
         },
         "mechanismId": { "type": "string" },
@@ -665,8 +847,14 @@
         "value": { "type": "number" },
         "power": { "ref": "PowerupKind" },
         "feedback": {
-          "any": [{ "enum": ["parry"] }, { "enum": ["clash"] }, { "enum": ["disarm"] }]
+          "any": [
+            { "enum": ["parry"] },
+            { "enum": ["clash"] },
+            { "enum": ["disarm"] },
+            { "enum": ["block"] }
+          ]
         },
+        "charged": { "type": "boolean" },
         "cause": { "ref": "DeathCause" },
         "direction": { "ref": "Vec2" },
         "variant": {
@@ -687,6 +875,7 @@
         "value",
         "power",
         "feedback",
+        "charged",
         "cause",
         "direction",
         "variant",
@@ -716,6 +905,19 @@
       },
       "optional": ["angle", "allowOutside"]
     },
+    "ClockState": {
+      "fields": {
+        "timeScale": { "type": "number" },
+        "slowScale": { "type": "number" },
+        "slowTimer": { "type": "number" },
+        "slowIn": { "type": "number" },
+        "slowHold": { "type": "number" },
+        "slowOut": { "type": "number" },
+        "slowMo": { "type": "boolean" },
+        "locked": { "type": "boolean" }
+      },
+      "optional": []
+    },
     "MatchOptions": {
       "fields": {
         "mode": { "any": [{ "enum": ["solo"] }, { "enum": ["local"] }, { "enum": ["bots"] }] },
@@ -723,15 +925,32 @@
         "difficulty": { "ref": "Difficulty" },
         "seed": { "type": "number" },
         "scoreGoal": { "type": "number" },
+        "scoring": { "ref": "Scoring" },
         "mapId": { "ref": "MapId" },
         "mapRotation": { "ref": "MapRotation" },
         "suddenDeathTime": { "type": "number" },
         "powerupPool": { "array": { "ref": "PowerupKind" } },
         "startingPowers": { "array": { "ref": "PowerupKind" } }
       },
-      "optional": ["mapId", "mapRotation", "suddenDeathTime", "powerupPool", "startingPowers"]
+      "optional": [
+        "scoreGoal",
+        "scoring",
+        "mapId",
+        "mapRotation",
+        "suddenDeathTime",
+        "powerupPool",
+        "startingPowers"
+      ]
     },
-    "Difficulty": { "any": [{ "enum": ["easy"] }, { "enum": ["normal"] }, { "enum": ["hard"] }] },
+    "Difficulty": {
+      "any": [
+        { "enum": ["easy"] },
+        { "enum": ["normal"] },
+        { "enum": ["hard"] },
+        { "enum": ["impossible"] }
+      ]
+    },
+    "Scoring": { "any": [{ "enum": ["kills"] }, { "enum": ["survival"] }] },
     "MapRotation": { "any": [{ "enum": ["fixed"] }, { "enum": ["cycle"] }] }
   }
 }

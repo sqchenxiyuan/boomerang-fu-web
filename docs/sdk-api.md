@@ -1,6 +1,6 @@
 # Boomerang Garden SDK API
 
-本文对应本地 ESM 包 **`@boomerang-garden/sdk` 0.7.0**。SDK 把固定步长模拟、人物控制来源和浏览器呈现分开；运行不需要 Boomerang Fu 的安装目录或原版素材。
+本文对应本地 ESM 包 **`@boomerang-garden/sdk` 0.8.0**。SDK 把固定步长模拟、人物控制来源和浏览器呈现分开；运行不需要 Boomerang Fu 的安装目录或原版素材。
 
 公开类型以 `src/sdk/types.ts`、`src/sdk/browser.ts` 及打包后的 `.d.ts` 为准。示例采用公开包入口，不依赖开发调试接口。
 
@@ -15,7 +15,7 @@ npm run build:sdk
 在使用 SDK 的项目里安装生成的 tarball，路径按实际位置调整：
 
 ```sh
-npm install /path/to/dist-sdk/boomerang-garden-sdk-0.7.0.tgz
+npm install /path/to/dist-sdk/boomerang-garden-sdk-0.8.0.tgz
 ```
 
 这不是 npm 在线发布。包提供以下入口：
@@ -92,9 +92,10 @@ node node_modules/@boomerang-garden/sdk/examples/node-bots.mjs
 | ----------------- | -------------------- | ---------------------------------------------------------------------------- |
 | `mode`            | `'solo'`             | `'solo'` 初始 1 个人工角色；`'local'` 初始 2 个人工角色                      |
 | `bots`            | `1`                  | 整数；solo 为 1–3，local 为 0–2；总人数最多 4                                |
-| `difficulty`      | `'normal'`           | `'easy'`、`'normal'`、`'hard'`                                               |
+| `difficulty`      | `'normal'`           | `'easy'`、`'normal'`、`'hard'`、`'impossible'`                               |
 | `seed`            | `1261`               | 0–4,294,967,295 的整数                                                       |
-| `scoreGoal`       | `5`                  | 1–100 的整数                                                                 |
+| `scoring`         | `'kills'`            | `'kills'` 击倒计分（自杀扣分）；`'survival'` 回合存活者得分                  |
+| `scoreGoal`       | 省略                 | 1–100 的整数；省略时击倒计分双人 14、多人 16，存活计分 5                     |
 | `mapId`           | `'courtyard'`        | 从导出的 `MAPS` 选择；含 58 个 `original-*` 场地与原有 5 个 ID            |
 | `mapRotation`     | `'fixed'`            | `'fixed'` 固定；`'cycle'` 从所选地图开始，在原版或 Web 原创集合内轮换，跳过教程 |
 | `suddenDeathTime` | `180`                | 有限非负秒数；超过该时刻且仍有两名以上存活角色时开始缩圈，`0` 表示开场即触发 |

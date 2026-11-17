@@ -1,16 +1,17 @@
 import { createArena, selectRoundMap } from '../core/arena';
-import { RULES } from '../core/config';
+import { NATIVE, RULES } from '../core/config';
 import { normalize, sub, v } from '../core/math';
 import type { Actor, GameState, MatchOptions } from '../core/types';
 import { createBoundary } from './boundary';
 import { depenetrate } from '../core/collision';
+import { createClock } from './clock';
 
 export const defaultOptions = (): MatchOptions => ({
   mode: 'solo',
   bots: 1,
   difficulty: 'normal',
   seed: 1261,
-  scoreGoal: RULES.scoreGoal,
+  scoring: 'kills',
   mapId: 'courtyard',
   mapRotation: 'fixed',
   suddenDeathTime: RULES.suddenDeathStart,
@@ -77,6 +78,32 @@ export function makeActor(id: number, controller: Actor['controller'], humanInde
     shield: false,
     bufferedDash: 0,
     bufferedAttack: 0,
+    suicides: 0,
+    stored: v(),
+    lastMove: v(0, -1),
+    pushTime: 0,
+    pushDuration: 0,
+    pushStrength: 0,
+    pushDirection: v(),
+    attacksLeft: 1,
+    disarmsLeft: 1,
+    coolingAttack: false,
+    retrieveCharge: 0,
+    disarmed: false,
+    deflectedDiscs: {},
+    deflectedMelees: {},
+    meleeContacts: [],
+    disarmContacts: [],
+    blockContacts: [],
+    justVulnerable: false,
+    inputBuffer: [],
+    aiming: false,
+    inputHeld: false,
+    killerId: id,
+    killerType: 'Suicide',
+    killerTimer: 0,
+    streak: { count: 0, last: -1e9 },
+    discRespawns: [],
   };
 }
 
@@ -89,9 +116,14 @@ export function createState(options: MatchOptions = defaultOptions()): GameState
   const actors = Array.from({ length: humanCount + botCount }, (_, i) =>
     makeActor(i, i < humanCount ? 'human' : 'bot', i < humanCount ? i : -1),
   );
+  const scoring = options.scoring ?? 'kills';
   const state: GameState = {
     options: {
       ...options,
+      scoring,
+      scoreGoal:
+        options.scoreGoal ??
+        (scoring === 'kills' ? NATIVE.killGoal(actors.length) : RULES.scoreGoal),
       powerupPool: options.powerupPool ? [...options.powerupPool] : undefined,
       startingPowers: options.startingPowers ? [...options.startingPowers] : undefined,
       bots: botCount,
@@ -118,6 +150,8 @@ export function createState(options: MatchOptions = defaultOptions()): GameState
     roundFinishTimer: null,
     safeRadius: 100,
     hitStop: 0,
+    clock: createClock(),
+    tieBreaker: false,
     weaponsGranted: false,
   };
   resetRound(state);
@@ -136,6 +170,7 @@ export function resetRound(state: GameState): void {
   state.roundFinishTimer = null;
   state.safeRadius = Math.min(state.boundary.halfSize.x, state.boundary.halfSize.y);
   state.hitStop = 0;
+  state.clock = createClock();
   state.weaponsGranted = false;
   state.winnerId = null;
   state.discs = [];
@@ -152,6 +187,8 @@ export function resetRound(state: GameState): void {
     Object.assign(actor, fresh, {
       score: actor.score,
       kills: actor.kills,
+      suicides: actor.suicides ?? 0,
+      streak: actor.streak ?? { count: 0, last: -1e9 },
       powers: [...actor.powers],
       shield: actor.powers.includes('shield'),
       armed: false,
@@ -160,6 +197,7 @@ export function resetRound(state: GameState): void {
       position: { ...position },
       previous: { ...position },
       facing: normalize(sub(v(), position)),
+      lastMove: normalize(sub(v(), position)),
     });
   }
   state.events.push({ type: 'round', position: v(), actorId: -1, value: state.round });

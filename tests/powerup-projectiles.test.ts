@@ -6,7 +6,8 @@ import { createState, defaultOptions, resetRound } from '../src/simulation/state
 import { explode } from '../src/simulation/combat';
 import { grantPowerup } from '../src/simulation/powerups';
 import { heldDiscs, recoverDisc, setHeldDiscs } from '../src/simulation/inventory';
-import { throwDisc, tickDiscs } from '../src/simulation/projectiles';
+import { throwDisc, tickDiscRespawns, tickDiscs } from '../src/simulation/projectiles';
+import { tickActorTimers } from '../src/simulation/actors';
 import type { PowerupKind } from '../src/core/types';
 
 function scene(powers: PowerupKind[] = []) {
@@ -45,10 +46,11 @@ describe('V4 inventory and combined projectile powers', () => {
   it('two independent throws and catches cannot create a third weapon', () => {
     const { state, actor } = scene(['extra']);
     expect(heldDiscs(actor)).toBe(2);
+    // Throwing spends Player.attacksLeft; Update refreshes it from the held count.
     throwDisc(state, actor);
-    actor.attackCooldown = 0;
+    tickActorTimers(actor, RULES.dt);
     throwDisc(state, actor);
-    actor.attackCooldown = 0;
+    tickActorTimers(actor, RULES.dt);
     expect(throwDisc(state, actor)).toBe(false);
     expect(state.discs).toHaveLength(2);
     recoverDisc(state, state.discs[1], true);
@@ -67,12 +69,18 @@ describe('V4 inventory and combined projectile powers', () => {
     (powers, count) => {
       const { state, actor } = scene(powers);
       throwDisc(state, actor);
-      for (let i = 0; i < 28; i++) tickDiscs(state, RULES.dt);
+      // Disc.EndThrow bursts after the .45 s throw force.
+      for (let i = 0; i < 40 && state.discs.length === 1; i++) tickDiscs(state, RULES.dt);
       expect(state.discs).toHaveLength(count);
       expect(state.discs.every((d) => d.mini && !d.powers?.includes('multi'))).toBe(true);
       for (const disc of state.discs.slice(0, -1)) recoverDisc(state, disc, true);
       expect(actor.armed).toBe(false);
       recoverDisc(state, state.discs.at(-1)!, true);
+      if (powers.includes('explosive')) {
+        // Grenade fragments are spent; the weapon respawns 3.25 s after the burst.
+        expect(actor.armed).toBe(false);
+        for (let i = 0; i < 200; i++) tickDiscRespawns(state, RULES.dt);
+      }
       expect(heldDiscs(actor)).toBe(1);
     },
   );
@@ -92,9 +100,11 @@ describe('V4 inventory and combined projectile powers', () => {
   it('controlled input steers a flying disc and release permits its return', () => {
     const { state, actor } = scene(['controlled']);
     throwDisc(state, actor);
-    actor.controlling = true;
+    // Holding throw with empty hands builds retrieveCharge, which takes control.
+    actor.retrieveCharge = 0.5;
     actor.controlDirection = v(0, 1);
     for (let i = 0; i < 30; i++) tickDiscs(state, RULES.dt);
+    expect(state.discs[0].movement).toBe('controlled');
     expect(state.discs[0].state).toBe('outbound');
     expect(state.discs[0].velocity.y).toBeGreaterThan(16);
     for (let i = 0; i < 90; i++) tickDiscs(state, RULES.dt);
@@ -103,9 +113,9 @@ describe('V4 inventory and combined projectile powers', () => {
         state.discs[0].position.x - actor.position.x,
         state.discs[0].position.y - actor.position.y,
       ),
-    ).toBeLessThan(12.5);
-    actor.controlling = false;
-    actor.recalling = true;
+      // Disc.CalculateControlled softly cancels outward speed between 30 and 34 Unity units.
+    ).toBeLessThan(34 * 0.4 + 0.05);
+    actor.retrieveCharge = 0;
     for (let i = 0; i < 480; i++) tickDiscs(state, RULES.dt);
     expect(state.discs).toHaveLength(0);
     expect(heldDiscs(actor)).toBe(1);

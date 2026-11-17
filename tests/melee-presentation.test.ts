@@ -17,8 +17,9 @@ describe('melee presentation follows simulation clocks', () => {
     const { session, input, actor } = match();
     input.submit({ attack: true }, 1);
     session.step();
-    expect(meleeAge(actor())).toBe(0);
-    session.step(11);
+    // The melee timer already advanced once in the frame that started the swing.
+    expect(meleeAge(actor())).toBeCloseTo(RULES.dt);
+    session.step(10);
     const before = meleeAge(actor())!;
     session.step();
     expect(actor().attackTime).toBe(0);
@@ -37,7 +38,8 @@ describe('melee presentation follows simulation clocks', () => {
     input.submit({ throw: false }, 1);
     session.step();
     expect(actor().attackSerial).toBe(1);
-    expect(actor().attackCooldown).toBeGreaterThan(0);
+    // Throwing spends the attack budget without starting a melee cooldown.
+    expect(session.getState().discs).toHaveLength(1);
     expect(meleeAge(actor())).toBeNull();
     session.destroy();
   });

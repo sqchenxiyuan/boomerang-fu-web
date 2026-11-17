@@ -25,7 +25,7 @@ describe('authoritative presentation and map flow', () => {
     expect(game.state.actors.every((a) => a.armed)).toBe(true);
   });
 
-  it('weapon impact freezes the world after resolving the tick, then scores only once and rotates under cover', () => {
+  it('a melee kill scores at once, slows time for the confirmation and rotates under cover', () => {
     const game = new Game({ ...defaultOptions(), mode: 'local', bots: 0, mapRotation: 'cycle' });
     const state = game.state;
     state.phase = 'playing';
@@ -37,22 +37,20 @@ describe('authoritative presentation and map flow', () => {
     a.position = a.previous = v(-2, 0);
     b.position = b.previous = v(-0.5, 0);
     a.facing = v(1, 0);
+    // PlayerInput starts the swing; the next FixedUpdate's trigger phase cuts.
     game.step(new Map([[0, { ...idleCommand(), attack: true }]]));
-    expect(b.alive).toBe(false);
-    expect(a.score).toBe(0);
-    expect(state.phase).toBe('playing');
-    expect(state.hitStop).toBeCloseTo(0.1);
-    const time = state.time;
-    const phaseTime = state.phaseTime;
-    const finishTimer = state.roundFinishTimer;
-    for (let i = 0; i < 6; i++) game.step();
-    expect(state.time).toBe(time);
-    expect(state.phaseTime).toBe(phaseTime);
-    expect(state.roundFinishTimer).toBe(finishTimer);
-    for (let i = 0; i < Math.round(RULES.roundResolveDelay / RULES.dt) - 1; i++) game.step();
-    expect(a.score).toBe(0);
-    expect(state.phase).toBe('playing');
     game.step();
+    expect(b.alive).toBe(false);
+    expect(a.score).toBe(1);
+    expect(state.phase).toBe('playing');
+    // CombatWorld.Kill → TimeKeeper.SlowMoEffect(.5, .5): no freeze, an eased slowdown.
+    expect(state.hitStop).toBe(0);
+    const time = state.time;
+    for (let i = 0; i < 30; i++) game.step();
+    expect(state.time - time).toBeLessThan(30 * RULES.dt * 0.75);
+    expect(state.clock?.timeScale).toBeLessThan(0.5);
+    let frames = 0;
+    while (state.phase === 'playing' && frames++ < 600) game.step();
     expect(a.score).toBe(1);
     expect(state.phase).toBe('roundEnd');
     expect(state.phaseTime).toBe(0);

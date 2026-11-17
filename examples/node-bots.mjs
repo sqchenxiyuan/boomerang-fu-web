@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import { createSession } from '@boomerang-garden/sdk';
 
 // This example uses only the public SDK. It needs no browser, canvas or game installation.
-const session = createSession({ mapId: 'portals', mapRotation: 'cycle', seed: 295, bots: 1 });
+// Kill scoring (the default) with a short five-point goal keeps the example quick.
+const session = createSession({
+  mapId: 'portals',
+  mapRotation: 'cycle',
+  seed: 295,
+  bots: 1,
+  scoreGoal: 5,
+});
 session.useBot(0);
 session.useBot(1);
 const events = {};
@@ -16,7 +23,8 @@ while (session.getState().phase !== 'matchEnd' && ticks < 60 * 700) {
 }
 const state = session.getState();
 assert.equal(state.phase, 'matchEnd', 'Bots must finish by playing a complete match.');
-assert.ok(state.actors.some((actor) => actor.score === 5));
+const winner = state.actors.find((actor) => actor.id === state.matchWinnerId);
+assert.ok(winner && winner.score >= state.options.scoreGoal);
 assert.ok(events.throw > 0 && events.death >= 5);
 const result = {
   ok: true,

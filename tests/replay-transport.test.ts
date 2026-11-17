@@ -13,6 +13,7 @@ beforeAll(() => {
     seed: 8751,
     mapId: 'courtyard',
     mapRotation: 'cycle',
+    scoring: 'survival',
     scoreGoal: 2,
     suddenDeathTime: 5,
   });

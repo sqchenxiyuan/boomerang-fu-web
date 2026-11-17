@@ -179,6 +179,8 @@ function sharedMaterial(): THREE.MeshStandardMaterial {
 
 function voxelMesh(blocks: readonly Block[]): THREE.Mesh {
   const mesh = new THREE.Mesh(blocksGeometry(blocks), sharedMaterial());
+  // Already a block model with a pixel face; the voxel style keeps it as drawn.
+  mesh.userData.voxel = 'keep';
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;

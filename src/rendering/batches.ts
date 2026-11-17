@@ -53,6 +53,19 @@ export class InstanceBatch {
     this.mesh.castShadow = false;
   }
 
+  /** Swap the instanced shape (pixel style) while keeping instances and buffers. */
+  useGeometry(geometry: THREE.BufferGeometry): void {
+    if (this.disposed) {
+      geometry.dispose();
+      return;
+    }
+    geometry.setAttribute('instanceAlpha', this.alpha);
+    const previous = this.mesh.geometry;
+    this.mesh.geometry = geometry;
+    previous.deleteAttribute('instanceAlpha');
+    previous.dispose();
+  }
+
   begin(): void {
     this.used = 0;
     this.dropped = 0;

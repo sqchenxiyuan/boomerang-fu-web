@@ -58,7 +58,7 @@ export interface AtelierHost {
 function disposeTree(root: THREE.Object3D): void {
   root.traverse((object) => {
     if (object instanceof THREE.Mesh) {
-      object.geometry.dispose();
+      if (!object.geometry.userData.shared) object.geometry.dispose();
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       for (const mat of materials) if (!mat.userData.shared) mat.dispose();
     }

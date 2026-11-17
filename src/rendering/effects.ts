@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { POWERUPS, ROSTER } from '../core/config';
+import { POWERUPS } from '../core/config';
 import { actorIdentity } from '../agents/registry';
 import type { Arena, GameEvent, GameState } from '../core/types';
 import { Random } from '../core/math';
@@ -51,6 +51,15 @@ export class Effects {
   private splatsBatch = new InstanceBatch(new THREE.CircleGeometry(1, 12), 32);
   private disposed = false;
   shake = 0;
+
+  /** Pixel style: cube particles and eight-sided rings and splats. */
+  setPixel(pixel: boolean): void {
+    this.particlesBatch.useGeometry(
+      pixel ? new THREE.BoxGeometry(1.3, 1.3, 1.3) : new THREE.IcosahedronGeometry(1, 0),
+    );
+    this.ringsBatch.useGeometry(new THREE.RingGeometry(0.89, 1, pixel ? 8 : 32));
+    this.splatsBatch.useGeometry(new THREE.CircleGeometry(1, pixel ? 8 : 12));
+  }
 
   constructor() {
     this.particlesBatch.mesh.name = 'effect-particles';
@@ -212,17 +221,9 @@ export class Effects {
       for (const actor of state.actors) {
         const death = actor.death;
         if (actor.alive || !death) continue;
-        const age = Math.max(0, state.time - death.time),
-          profile = ROSTER[actor.id] ?? ROSTER[0];
+        const age = Math.max(0, state.time - death.time);
         this.shake = Math.max(this.shake, 0.12 * Math.exp(-age * 7) * (age < 1.2 ? 1 : 0));
-        const identity = actorIdentity(actor.id);
-        const juice = identity.look
-          ? identity.color
-          : profile.kind === 'milk'
-            ? '#fffbea'
-            : profile.kind === 'melon'
-              ? '#ed8179'
-              : profile.color;
+        const juice = actorIdentity(actor.id).color;
         for (const p of sampleDeathParticles(death, state.time)) {
           const color =
             p.kind === 'water'

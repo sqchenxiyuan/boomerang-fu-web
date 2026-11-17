@@ -36,6 +36,9 @@ export class WeaponsView {
   private ribbon = new InstanceBatch(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), 768);
   private rings = new InstanceBatch(new THREE.RingGeometry(0.86, 1, 32), 96);
   private arcs = new MeleeTrail();
+  setPixel(pixel: boolean): void {
+    this.rings.useGeometry(new THREE.RingGeometry(0.86, 1, pixel ? 8 : 32));
+  }
   private lastTime = -1;
   private round = -1;
   private disposed = false;

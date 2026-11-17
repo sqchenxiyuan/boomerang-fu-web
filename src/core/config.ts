@@ -210,11 +210,12 @@ export const RULES = {
   maxHazardZones: 4096,
 } as const;
 
+/** Default fighters: four creatures from the Agent atelier presets (seeded `presetDraw`). */
 export const ROSTER = [
-  { name: '瓜瓜', subtitle: 'WATERMELON', color: '#ed7d70', accent: '#3a936a', kind: 'melon' },
-  { name: '茄子', subtitle: 'EGGPLANT', color: '#ab8de0', accent: '#7660b0', kind: 'eggplant' },
-  { name: '小橙', subtitle: 'ORANGE', color: '#f2b34e', accent: '#e69632', kind: 'orange' },
-  { name: '牛奶', subtitle: 'MILK', color: '#82bada', accent: '#4a92b4', kind: 'milk' },
+  { name: '红豆', subtitle: 'RED BEAN', color: '#dc3846', seed: 2732843523 },
+  { name: '紫影', subtitle: 'SHADOW', color: '#8e38dc', seed: 3113770578 },
+  { name: '芝士', subtitle: 'CHEESE', color: '#dcd638', seed: 2732843525 },
+  { name: '薄荷', subtitle: 'MINT', color: '#38d1dc', seed: 3113770607 },
 ] as const;
 export const POWERUPS = {
   shield: { name: '护盾', short: '盾', color: '#7ddedb', description: '挡住一次伤害' },

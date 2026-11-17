@@ -2,12 +2,13 @@ import * as THREE from 'three';
 import { POWERUPS } from '../core/config';
 import { introPose, transitionPresentation } from '../core/presentation';
 import { lerpV } from '../core/math';
-import type { GameEvent, GameState, Pickup } from '../core/types';
+import type { Arena, GameEvent, GameState, Pickup } from '../core/types';
 import { createArenaView } from './arena-view';
 import type { ArenaView } from './arena-view';
 import { flashOriginalGate, mergeOriginalStatics, updateOriginalArena } from './original-arena';
 import {
   arenaCameraDistance,
+  arenaCameraFootprint,
   arenaCameraFrame,
   ORIGINAL_CAMERA_UP,
   ORIGINAL_CAMERA_BACK,
@@ -15,10 +16,13 @@ import {
 import type { ArenaCameraFrame } from './arena-camera';
 import { createCharacter, updateCharacter } from './characters';
 import { THROW_FOLLOW } from './character-motion';
-import { OVERLAY_LAYER, createPixelPass, type PixelPass } from './pixel-pass';
+import type { CharacterView } from './characters';
+import { pixelWaterTexture, voxelizeMesh, voxelizeStatic, voxelizeTree } from './voxelize';
 
 export type VisualStyle = 'standard' | 'pixel';
-import type { CharacterView } from './characters';
+/** Voxel edge in world units: scenery, and small props (hands, discs, pickups). */
+const ARENA_VOXEL = 0.1;
+const PART_VOXEL = 0.05;
 import { Effects } from './effects';
 import { BoundaryView } from './boundary-view';
 import { box, cylinder, makeBoomerang, material, place, shadow } from './palette';
@@ -63,10 +67,11 @@ function cloneCharacter(source: CharacterView): CharacterView {
   };
 }
 
-function buildArena(state: GameState): ArenaView {
+function buildArena(state: GameState, pixel = false, aspect = 16 / 9): ArenaView {
   const arena = createArenaView(state.arena);
   if (state.arena.floors) {
     mergeOriginalStatics(arena, state.arena);
+    if (pixel) pixelateArena(arena, state.arena, aspect);
     return arena;
   }
   const animated = new Set<THREE.Object3D>([
@@ -79,13 +84,63 @@ function buildArena(state: GameState): ArenaView {
   ]);
   mergeStaticMeshes(arena.root, animated);
   for (const obstacle of arena.obstacles.values()) mergeStaticMeshes(obstacle);
+  if (pixel) pixelateArena(arena, state.arena, aspect);
   return arena;
+}
+
+/**
+ * Pixel style: immutable scenery becomes one world-aligned voxel mesh, every
+ * movable floor, wall, gate and switch is voxelised in place (so mechanisms,
+ * tints and visibility keep working), plants share one voxel bush, and the water
+ * gets a nearest-filtered pixel texture.
+ */
+function pixelateArena(view: ArenaView, arena: Arena, aspect: number): void {
+  const bounds = arenaCameraFootprint(arena, Math.max(16 / 9, aspect));
+  // Full detail over the play area; the wider surroundings use coarser cubes.
+  const frame = arenaCameraFrame(arena);
+  const centre = arena.floors ? frame.center : { x: 0, y: 0 },
+    half = arena.floors ? frame.half : { x: arena.halfWidth, y: arena.halfHeight };
+  const detail = new THREE.Box3(
+    new THREE.Vector3(centre.x - half.x - 2.5, -2, centre.y - half.y - 2.5),
+    new THREE.Vector3(centre.x + half.x + 2.5, 8, centre.y + half.y + 2.5),
+  );
+  const exclude = new Set<THREE.Object3D>([view.water]);
+  if (view.plants) {
+    voxelizeMesh(view.plants.mesh, ARENA_VOXEL);
+    exclude.add(view.plants.mesh);
+  }
+  if (arena.floors) {
+    const fixed = view.root.getObjectByName('original-static-batches');
+    if (fixed) {
+      voxelizeStatic(fixed, ARENA_VOXEL, new Set(), { bounds, detail });
+      exclude.add(fixed);
+    }
+  } else {
+    const animated = [
+      ...view.flags,
+      ...view.portals.values(),
+      ...view.obstacles.values(),
+      ...view.floors.values(),
+      ...view.mechanisms.values(),
+    ];
+    voxelizeStatic(view.root, ARENA_VOXEL, new Set([...exclude, ...animated]), {
+      bounds,
+      detail,
+    });
+  }
+  voxelizeTree(view.root, ARENA_VOXEL, (object) => exclude.has(object));
+  if (arena.hazard !== 'cliff') {
+    const water = view.water.material as THREE.MeshStandardMaterial;
+    water.map = pixelWaterTexture();
+    water.needsUpdate = true;
+  }
 }
 
 function disposeVisual(root: THREE.Object3D): void {
   root.traverse((object) => {
     if (object instanceof THREE.Mesh) {
-      object.geometry.dispose();
+      // Shared geometries (boomerang, cached voxel parts) outlive any one view.
+      if (!object.geometry.userData.shared) object.geometry.dispose();
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       for (const mat of materials) if (!mat.userData.shared) mat.dispose();
       if (object instanceof THREE.InstancedMesh) object.dispose();
@@ -102,7 +157,7 @@ function disposeVisual(root: THREE.Object3D): void {
   });
 }
 
-function createPickup(pickup: Pickup): THREE.Group {
+function createPickup(pickup: Pickup, pixel = false): THREE.Group {
   const group = new THREE.Group(),
     color = POWERUPS[pickup.kind].color;
   const book = new THREE.Group();
@@ -132,6 +187,7 @@ function createPickup(pickup: Pickup): THREE.Group {
   ring.position.y = 0.05;
   group.add(ring);
   group.position.set(pickup.position.x, 0, pickup.position.y);
+  if (pixel) voxelizeTree(group, PART_VOXEL);
   return group;
 }
 
@@ -176,8 +232,6 @@ export class GameRenderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.12;
-    // Name labels live on the overlay layer so pixel art can keep them crisp.
-    this.camera.layers.enable(OVERLAY_LAYER);
     this.scene.background = new THREE.Color('#a7c8bb');
     this.scene.fog = new THREE.Fog('#a7c8bb', 60, 105);
     this.scene.add(new THREE.HemisphereLight('#fff8df', '#769f96', 1.9));
@@ -223,16 +277,7 @@ export class GameRenderer {
     // Decoys borrow their owner's GPU assets; only the owner disposes them.
     for (const view of this.decoys.values()) this.scene.remove(view.root);
     this.decoys.clear();
-    for (const view of this.characters.values()) {
-      this.scene.remove(view.root);
-      disposeVisual(view.root);
-    }
-    this.characters.clear();
-    for (const actor of state.actors) {
-      const view = createCharacter(actor);
-      this.characters.set(actor.id, view);
-      this.scene.add(view.root);
-    }
+    this.buildCharacters(state);
     for (const group of this.discs.values()) this.releaseDisc(group);
     for (const group of this.pickups.values()) {
       this.scene.remove(group);
@@ -245,6 +290,24 @@ export class GameRenderer {
     this.powers.clear();
     this.boundary.reset();
     this.previousTime = state.time;
+  }
+
+  private buildCharacters(state: GameState): void {
+    for (const view of this.decoys.values()) this.scene.remove(view.root);
+    this.decoys.clear();
+    for (const view of this.characters.values()) {
+      this.scene.remove(view.root);
+      disposeVisual(view.root);
+    }
+    this.characters.clear();
+    for (const actor of state.actors) {
+      const view = createCharacter(actor);
+      // Hands, feet, held boomerangs and death props; the agent body is already blocks.
+      if (this.pixel) voxelizeTree(view.root, PART_VOXEL);
+      this.characters.set(actor.id, view);
+      this.scene.add(view.root);
+    }
+    this.rebuildCharacters = false;
   }
 
   private resize(width: number, height: number): void {
@@ -291,7 +354,7 @@ export class GameRenderer {
     if (this.arenaSource !== arenaKey) {
       this.scene.remove(this.arena.root);
       disposeVisual(this.arena.root);
-      this.arena = buildArena(state);
+      this.arena = buildArena(state, this.pixel, this.width / this.height);
       this.cameraFrame = arenaCameraFrame(state.arena);
       this.cameraTarget.set(this.cameraFrame.center.x, 0, this.cameraFrame.center.y);
       this.scene.add(this.arena.root);
@@ -301,6 +364,7 @@ export class GameRenderer {
       this.powers.clear();
       this.boundary.reset();
     }
+    if (this.rebuildCharacters) this.buildCharacters(state);
     const presentation = transitionPresentation(state);
     if (state.arena.floors) updateOriginalArena(this.arena, state.arena, simulationTime, alpha);
     const entranceOrder = [...state.actors].sort((a, b) => b.score - a.score || a.id - b.id);
@@ -402,6 +466,7 @@ export class GameRenderer {
         if (!object) {
           object = new THREE.Group();
           object.add(makeBoomerang(), shadow(0.4, 0.13));
+          if (this.pixel) voxelizeTree(object, PART_VOXEL);
         }
         object.visible = true;
         this.scene.add(object);
@@ -432,7 +497,7 @@ export class GameRenderer {
     for (const pickup of state.pickups) {
       let object = this.pickups.get(pickup.id);
       if (!object) {
-        object = createPickup(pickup);
+        object = createPickup(pickup, this.pixel);
         this.pickups.set(pickup.id, object);
         this.scene.add(object);
       }
@@ -518,23 +583,35 @@ export class GameRenderer {
       this.camera.position.z += Math.cos(simulationTime * 71) * this.effects.shake;
     }
     this.camera.lookAt(this.cameraTarget.x, 0, this.cameraTarget.z);
-    if (this.pixelPass) this.pixelPass.render(this.scene, this.camera);
-    else this.renderer.render(this.scene, this.camera);
+    this.renderer.render(this.scene, this.camera);
   }
 
-  private pixelPass: PixelPass | null = null;
+  private pixel = false;
+  private rebuildCharacters = false;
   get visualStyle(): VisualStyle {
-    return this.pixelPass ? 'pixel' : 'standard';
+    return this.pixel ? 'pixel' : 'standard';
   }
-  /** Pixel art renders at a quarter resolution with posterised colour and outlines. */
+  /** Pixel art swaps every model for its voxel version; the frame stays full resolution. */
   setVisualStyle(style: VisualStyle): void {
-    if (style === this.visualStyle) return;
-    this.pixelPass?.dispose();
-    this.pixelPass = style === 'pixel' ? createPixelPass(this.renderer) : null;
-    // Hard shadow edges read better at low resolution.
-    this.renderer.shadowMap.type =
-      style === 'pixel' ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+    const pixel = style === 'pixel';
+    if (pixel === this.pixel) return;
+    this.pixel = pixel;
+    // Hard shadow edges suit the block look.
+    this.renderer.shadowMap.type = pixel ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
     this.renderer.shadowMap.needsUpdate = true;
+    this.effects.setPixel(pixel);
+    this.weapons.setPixel(pixel);
+    this.powers.setPixel(pixel);
+    // Rebuild every model with the new style on the next frame.
+    this.arenaSource = '';
+    this.rebuildCharacters = true;
+    for (const group of [...this.discs.values(), ...this.discPool, ...this.pickups.values()]) {
+      this.scene.remove(group);
+      disposeVisual(group);
+    }
+    this.discs.clear();
+    this.discPool = [];
+    this.pickups.clear();
     this.scene.traverse((object) => {
       if (object instanceof THREE.Mesh)
         for (const mat of Array.isArray(object.material) ? object.material : [object.material])
@@ -559,7 +636,6 @@ export class GameRenderer {
     for (const view of this.decoys.values()) this.scene.remove(view.root);
     this.decoys.clear();
     this.boundary.dispose();
-    this.pixelPass?.dispose();
     disposeVisual(this.scene);
     this.renderer.dispose();
     this.canvas.remove();

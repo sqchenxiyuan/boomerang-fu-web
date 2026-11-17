@@ -13,6 +13,16 @@ export class PowersView {
   private sparks = new InstanceBatch(new THREE.IcosahedronGeometry(1, 0), 768);
   private crystals = new InstanceBatch(new THREE.ConeGeometry(0.13, 0.55, 4), 256);
   private disposed = false;
+  setPixel(pixel: boolean): void {
+    this.sparks.useGeometry(
+      pixel ? new THREE.BoxGeometry(1.3, 1.3, 1.3) : new THREE.IcosahedronGeometry(1, 0),
+    );
+    this.crystals.useGeometry(
+      pixel ? new THREE.BoxGeometry(0.16, 0.5, 0.16) : new THREE.ConeGeometry(0.13, 0.55, 4),
+    );
+    this.patches.useGeometry(new THREE.CircleGeometry(1, pixel ? 8 : 24));
+    this.edges.useGeometry(new THREE.RingGeometry(0.94, 1, pixel ? 8 : 36));
+  }
   constructor() {
     this.root.add(this.patches.mesh, this.edges.mesh, this.sparks.mesh, this.crystals.mesh);
     this.patches.mesh.name = 'power-zone-surfaces';

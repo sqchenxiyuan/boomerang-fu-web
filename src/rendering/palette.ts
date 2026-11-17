@@ -43,8 +43,19 @@ export function place<T extends THREE.Object3D>(
   return object;
 }
 
+let boomerangGeometry: THREE.BufferGeometry | null = null;
 export function makeBoomerang(color = '#f7d58c'): THREE.Group {
   const group = new THREE.Group();
+  group.add(mesh((boomerangGeometry ??= boomerangShape()), color));
+  const middle = box(0.13, 0.025, 0.28, '#fff5d6');
+  middle.position.set(0, 0.06, 0.04);
+  middle.rotation.y = -0.3;
+  group.add(middle);
+  return group;
+}
+
+/** One shared geometry for every boomerang; views never dispose it. */
+function boomerangShape(): THREE.BufferGeometry {
   const shape = new THREE.Shape();
   shape.moveTo(-0.58, -0.22);
   shape.lineTo(-0.43, -0.4);
@@ -62,13 +73,8 @@ export function makeBoomerang(color = '#f7d58c'): THREE.Group {
     bevelThickness: 0.025,
   });
   geometry.rotateX(Math.PI / 2);
-  const body = mesh(geometry, color);
-  group.add(body);
-  const middle = box(0.13, 0.025, 0.28, '#fff5d6');
-  middle.position.set(0, 0.06, 0.04);
-  middle.rotation.y = -0.3;
-  group.add(middle);
-  return group;
+  geometry.userData.shared = true;
+  return geometry;
 }
 
 export function shadow(radius: number, opacity = 0.16): THREE.Mesh {

@@ -1,4 +1,5 @@
-import { POWERUPS, RULES } from '../core/config';
+import { POWERUPS, ROSTER, RULES } from '../core/config';
+import { defaultThumbnail } from '../agents/defaults';
 import { actorColor, actorName, actorToken } from '../agents/registry';
 import { loadLibrary, saveLibrary, type AgentLibrary, type AgentLook } from '../agents/look';
 import { Atelier } from './atelier';
@@ -84,15 +85,15 @@ export class View {
       <div class="vignette" aria-hidden="true"></div>
       <header class="topbar">
         <a class="brand" href="#" id="brand" aria-label="回到主菜单"><span class="brand-mark">${boomerang}</span><span>回旋花园<small>BOOMERANG GARDEN</small></span></a>
-        <div class="top-actions"><span class="edition">一场小小的食物大战</span><button class="icon-button" id="sound" title="音效开关 · M" aria-label="关闭音效">${soundIcon}</button><button class="icon-button" id="fullscreen" title="全屏" aria-label="切换全屏">${fullIcon}</button><button class="icon-button pause-button" id="pause-button" title="暂停 · Esc" aria-label="暂停游戏" hidden>Ⅱ</button></div>
+        <div class="top-actions"><span class="edition">一场小小的 Agent 大战</span><button class="icon-button" id="sound" title="音效开关 · M" aria-label="关闭音效">${soundIcon}</button><button class="icon-button" id="fullscreen" title="全屏" aria-label="切换全屏">${fullIcon}</button><button class="icon-button pause-button" id="pause-button" title="暂停 · Esc" aria-label="暂停游戏" hidden>Ⅱ</button></div>
       </header>
       <section class="menu-card" id="menu" aria-labelledby="menu-title">
         <div class="eyebrow"><span class="live-dot"></span> COURTYARD CLUB · 01</div>
         <h1 id="menu-title">小小花园，<br>大大<span>回旋。</span></h1>
-        <p class="intro">扔出去，接回来。<br>和食物伙伴过上几招，击倒最多的人赢。</p>
+        <p class="intro">扔出去，接回来。<br>和 Agent 伙伴过上几招，击倒最多的人赢。</p>
         <div class="mode-selector" role="group" aria-label="游戏模式"><button class="mode selected" data-mode="solo" aria-pressed="true">单人挑战 <span>VS 机器人</span></button><button class="mode" data-mode="local" aria-pressed="false">同屏双人 <span>和朋友一起</span></button><button class="mode" data-mode="bots" aria-pressed="false">AI 观战 <span>机器人互战</span></button></div>
         <div class="agent-slot-row" id="agent-slot-row">
-          <span class="agent-slot-thumb" id="agent-thumb" aria-hidden="true">🍉</span>
+          <span class="agent-slot-thumb" id="agent-thumb" aria-hidden="true"></span>
           <div class="agent-slots">
             <label><span id="agent-slot-0-name">1P 形象</span><select id="agent-slot-0" aria-label="1P 出战形象"></select></label>
             <label id="agent-slot-1-label" hidden>2P 形象<select id="agent-slot-1" aria-label="2P 出战形象"></select></label>
@@ -103,7 +104,7 @@ export class View {
         <div class="settings-row map-settings"><label>地图<select id="map" aria-label="地图">${mapOptions()}</select></label><label>回合换图<select id="rotation" aria-label="回合换图"><option value="fixed">固定地图</option><option value="cycle">依次轮换</option></select></label></div>
         <p class="map-description" id="map-description">${mapInfo('original-enclosed').description}</p>
         <div class="settings-row"><label>决胜缩圈<select id="sudden-death" aria-label="决胜缩圈时间"><option value="180">180 秒 · 原版节奏</option><option value="60">60 秒</option><option value="30">30 秒 · 快速体验</option></select></label><label>计分<select id="scoring" aria-label="计分方式"><option value="kills" selected>击倒计分 · 原版</option><option value="survival">存活计分 · 先得 5 分</option></select></label></div>
-        <div class="settings-row"><label>画面风格<select id="visual-style" aria-label="画面风格"><option value="standard">标准 · 柔和低多边形</option><option value="pixel">像素风 · 描边与色阶</option></select></label></div>
+        <div class="settings-row"><label>画面风格<select id="visual-style" aria-label="画面风格"><option value="standard">标准 · 柔和低多边形</option><option value="pixel">像素风 · 体素方块模型</option></select></label></div>
         <button class="primary-button" id="start">进入花园 <span>↗</span></button>
         <div class="match-meta"><span id="goal-label">双人先得 14 分 · 多人 16 分</span><span>${ORIGINAL_MAPS.filter((map) => !map.tutorial).length} 张原版地图</span><span>支持手柄</span></div>
         <details class="instructions"><summary>第一次玩？看看操作 <span>＋</span></summary><div class="instruction-content">
@@ -280,7 +281,7 @@ export class View {
     const agents = this.library.agents;
     for (const slot of [0, 1]) {
       const select = this.get<HTMLSelectElement>(`agent-slot-${slot}`);
-      const fallback = slot === 0 ? '默认 · 瓜瓜' : '默认 · 茄子';
+      const fallback = ROSTER[slot].name;
       select.replaceChildren(
         new Option(fallback, ''),
         ...agents.map((agent) => new Option(agent.name, agent.id)),
@@ -293,14 +294,13 @@ export class View {
     const thumb = this.get('agent-thumb');
     thumb.replaceChildren();
     thumb.style.removeProperty('--agent-bg');
-    if (chosen) {
-      const img = document.createElement('img');
-      img.src = chosen.img;
-      img.alt = '';
-      img.className = 'agent-slot-thumb';
-      thumb.style.setProperty('--agent-bg', chosen.bg);
-      thumb.appendChild(img);
-    } else thumb.textContent = '🍉';
+    const img = document.createElement('img');
+    img.alt = '';
+    img.className = 'agent-slot-thumb';
+    // Without a chosen agent, slot 1P fights as the first roster preset.
+    img.src = chosen ? chosen.img : defaultThumbnail(0);
+    if (chosen) thumb.style.setProperty('--agent-bg', chosen.bg);
+    thumb.appendChild(img);
   }
 
   private text(id: string, value: string): void {

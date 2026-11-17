@@ -47,5 +47,5 @@ export const actorLook = (actorId: number): AgentLook | null => assigned.get(act
 export function actorToken(actorId: number): string {
   const look = assigned.get(actorId);
   if (look) return [...look.name][0] ?? 'A';
-  return ['瓜', '茄', '橙', '奶'][actorId] ?? '?';
+  return [...(ROSTER[actorId]?.name ?? '?')][0];
 }

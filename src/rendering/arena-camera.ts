@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import type { Arena } from '../core/types';
 import type { Vec2 } from '../core/math';
 
@@ -97,4 +98,43 @@ export function arenaCameraDistance(frame: ArenaCameraFrame, aspect: number, fov
       }
     }
   return distance * 1.06;
+}
+
+/**
+ * World-space box of the ground and props (heights 0…3) the arena camera can
+ * show at the given aspect, with headroom for the intro zoom and the menu offset.
+ * The pixel style voxelises scenery only inside it, up to 8 units high.
+ */
+export function arenaCameraFootprint(arena: Arena, aspect: number, fov = 31): THREE.Box3 {
+  const original = arena.floors !== undefined;
+  const frame = arenaCameraFrame(arena);
+  const center = original ? frame.center : { x: 0, y: 0 };
+  const distance = original
+    ? arenaCameraDistance(frame, aspect, fov)
+    : Math.hypot(26, 27) * Math.max(1, 1.65 / aspect);
+  const up = original ? ORIGINAL_CAMERA_UP : 26,
+    back = original ? ORIGINAL_CAMERA_BACK : 27;
+  const scale = (distance / Math.hypot(up, back)) * 1.1;
+  const camera = new THREE.PerspectiveCamera(fov, aspect, 0.1, 1000);
+  camera.position.set(center.x, up * scale, center.y + back * scale);
+  camera.lookAt(center.x, 0, center.y);
+  camera.updateMatrixWorld();
+  const box = new THREE.Box3();
+  const ray = new THREE.Vector3();
+  for (const height of [0, 3])
+    for (const [x, y] of [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ]) {
+      ray.set(x, y, 0.5).unproject(camera).sub(camera.position).normalize();
+      // Rays above the horizon would never meet the plane; clamp them far away.
+      const t = ray.y < -1e-3 ? (height - camera.position.y) / ray.y : 400;
+      box.expandByPoint(camera.position.clone().addScaledVector(ray, Math.min(t, 400)));
+    }
+  box.min.y = -1.2;
+  box.max.y = 8;
+  box.min.x -= 2.6; // menu framing shifts the camera left
+  return box.expandByVector(new THREE.Vector3(1, 0, 1));
 }

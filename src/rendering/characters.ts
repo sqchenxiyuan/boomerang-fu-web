@@ -1,17 +1,17 @@
 import * as THREE from 'three';
-import { ROSTER, RULES } from '../core/config';
+import { RULES } from '../core/config';
 import { lerpV } from '../core/math';
 import type { Actor } from '../core/types';
-import { box, cylinder, makeBoomerang, material, mesh, place, shadow, sphere } from './palette';
+import { box, cylinder, makeBoomerang, place, shadow, sphere } from './palette';
 import { createDeathModel, type DeathModel } from './death-models';
 import { sampleDeathPose, sampleFallPose } from './death-visuals';
 import { boundaryWarning } from '../core/feedback';
 import { meleeAge, sampleMeleePose } from './melee-pose';
 import { actorIdentity, type ActorIdentity } from '../agents/registry';
 import { lookPalette } from '../agents/look';
+import { defaultLook } from '../agents/defaults';
 import { createAgentBody } from './agent-model';
 import { sampleCharacterPose, type MotionContext } from './character-motion';
-import { OVERLAY_LAYER } from './pixel-pass';
 
 export interface CharacterView {
   root: THREE.Group;
@@ -57,7 +57,6 @@ function makeLabel(text: string, color: string): THREE.Sprite {
   sprite.scale.set(1.65, 0.52, 1);
   sprite.position.y = 2.48;
   sprite.renderOrder = 10;
-  sprite.layers.set(OVERLAY_LAYER);
   return sprite;
 }
 
@@ -65,137 +64,17 @@ export function createCharacter(
   actor: Actor,
   identity: ActorIdentity = actorIdentity(actor.id),
 ): CharacterView {
-  const profile = ROSTER[actor.id];
-  // A custom agent (presentation only) replaces the fruit body, face and colours.
-  const look = identity.look,
-    agentColors = look ? lookPalette(look.hue) : null;
+  // Every fighter is an agent: a custom one from the atelier, else a roster preset.
+  const look = identity.look ?? defaultLook(actor.id),
+    agentColors = lookPalette(look?.hue ?? identity.color);
   const root = new THREE.Group(),
     body = new THREE.Group(),
     rig = new THREE.Group();
   const groundShadow = shadow(0.66);
   root.add(body, rig, groundShadow);
   body.position.y = 0.72;
-  if (look) {
-    body.add(createAgentBody(look));
-  } else if (profile.kind === 'melon') {
-    const shape = new THREE.Shape();
-    shape.moveTo(-0.7, -0.27);
-    shape.lineTo(0, 0.92);
-    shape.lineTo(0.7, -0.27);
-    shape.quadraticCurveTo(0, -0.8, -0.7, -0.27);
-    const rind = mesh(
-      new THREE.ExtrudeGeometry(shape, {
-        depth: 0.44,
-        bevelEnabled: true,
-        bevelSegments: 1,
-        bevelSize: 0.07,
-        bevelThickness: 0.05,
-      }),
-      '#418f65',
-    );
-    rind.position.z = -0.22;
-    body.add(rind);
-    const faceShape = new THREE.Shape();
-    faceShape.moveTo(-0.56, -0.21);
-    faceShape.lineTo(0, 0.76);
-    faceShape.lineTo(0.56, -0.21);
-    faceShape.quadraticCurveTo(0, -0.62, -0.56, -0.21);
-    const flesh = mesh(new THREE.ShapeGeometry(faceShape), '#ef8078');
-    flesh.position.z = 0.279;
-    body.add(flesh);
-    const backFlesh = mesh(new THREE.ShapeGeometry(faceShape), '#e97f78');
-    backFlesh.rotation.y = Math.PI;
-    backFlesh.position.z = -0.28;
-    body.add(backFlesh);
-    const rindLine = new THREE.Mesh(
-      new THREE.TorusGeometry(0.59, 0.04, 4, 18, Math.PI * 0.72),
-      material('#deedb8'),
-    );
-    rindLine.rotation.z = Math.PI * 1.14;
-    rindLine.position.set(0, 0.05, 0.289);
-    body.add(rindLine);
-    for (const [x, y] of [
-      [0, 0.5],
-      [-0.28, 0.09],
-      [0.28, 0.09],
-      [-0.25, -0.27],
-      [0.25, -0.27],
-    ]) {
-      const seed = sphere(0.036, '#563d35');
-      seed.scale.y = 1.7;
-      place(seed, x, y, 0.296, body);
-    }
-    for (const [x, y] of [
-      [0, 0.5],
-      [-0.22, 0.07],
-      [0.22, 0.07],
-      [-0.2, -0.27],
-      [0.2, -0.27],
-    ]) {
-      const seed = sphere(0.036, '#563d35');
-      seed.scale.y = 1.7;
-      place(seed, x, y, -0.296, body);
-    }
-  } else if (profile.kind === 'eggplant') {
-    const egg = sphere(0.63, '#8b66b2', 2);
-    egg.scale.set(0.8, 1.25, 0.77);
-    body.add(egg);
-    const cap = sphere(0.31, '#5b9a65', 0);
-    cap.scale.set(1.2, 0.4, 1.2);
-    place(cap, 0, 0.68, 0, body);
-    const stem = cylinder(0.07, 0.12, 0.38, '#497955', 6);
-    stem.rotation.z = -0.3;
-    place(stem, 0.05, 0.87, 0, body);
-    for (let i = 0; i < 5; i++) {
-      const leaf = mesh(new THREE.ConeGeometry(0.13, 0.45, 3), '#6ca069');
-      leaf.rotation.z = Math.PI * 0.8;
-      leaf.rotation.y = (i * Math.PI * 2) / 5;
-      place(leaf, Math.sin(i * 1.25) * 0.21, 0.57, Math.cos(i * 1.25) * 0.21, body);
-    }
-  } else if (profile.kind === 'orange') {
-    body.add(sphere(0.62, '#f3af4b', 2));
-    const stem = cylinder(0.055, 0.08, 0.22, '#7c7643', 5);
-    place(stem, 0, 0.64, 0, body);
-    const leaf = sphere(0.22, '#5c9861', 0);
-    leaf.scale.set(1.7, 0.25, 0.7);
-    leaf.rotation.z = 0.4;
-    place(leaf, 0.2, 0.65, 0, body);
-  } else {
-    body.add(box(0.88, 1.16, 0.64, '#e9f0df'));
-    place(box(0.9, 0.4, 0.66, '#83bbd4'), 0, -0.32, 0, body);
-    const roof = cylinder(0, 0.64, 0.38, '#a7cfe0', 4);
-    roof.rotation.y = Math.PI / 4;
-    roof.scale.z = 0.72;
-    place(roof, 0, 0.75, 0, body);
-    const emblem = sphere(0.12, '#569fbc');
-    emblem.scale.z = 0.1;
-    place(emblem, 0, -0.28, 0.34, body);
-  }
-  const faceZ =
-    profile.kind === 'melon'
-      ? 0.31
-      : profile.kind === 'milk'
-        ? 0.34
-        : profile.kind === 'eggplant'
-          ? 0.49
-          : 0.59;
-  for (const x of look ? [] : [-0.18, 0.18]) {
-    const eye = sphere(0.07, '#203e37', 1);
-    eye.scale.set(0.8, 1.25, 0.5);
-    place(eye, x, 0.13, faceZ, body);
-    place(sphere(0.018, '#fff7dd'), x + 0.015, 0.16, faceZ + 0.035, body);
-    const blush = sphere(0.08, profile.kind === 'eggplant' ? '#c795bf' : '#e8a390');
-    blush.scale.set(1.2, 0.5, 0.1);
-    place(blush, x * 1.7, 0.015, faceZ - 0.01, body);
-  }
-  if (!look) {
-    const smile = new THREE.Mesh(
-      new THREE.TorusGeometry(0.075, 0.014, 4, 12, Math.PI),
-      material('#34443a'),
-    );
-    smile.rotation.z = Math.PI;
-    place(smile, 0, 0.025, faceZ + 0.015, body);
-  }
+  if (look) body.add(createAgentBody(look));
+  else body.add(box(0.8, 1.1, 0.5, identity.color));
   const arms: THREE.Group[] = [],
     hands: THREE.Group[] = [],
     limbs: THREE.Mesh[] = [];
@@ -203,12 +82,12 @@ export function createCharacter(
     // Floating hands: no connecting limb is drawn; the hand hovers in the rig frame.
     const arm = new THREE.Group();
     place(arm, 0, 0, 0, rig);
-    const limb = cylinder(0.075, 0.075, 1, agentColors?.dark ?? '#344e3c', 6);
+    const limb = cylinder(0.075, 0.075, 1, agentColors.dark, 6);
     limb.visible = false;
     arm.add(limb);
     const hand = new THREE.Group();
     place(hand, side * 0.64, 0.6, 0.06, arm);
-    const palm = sphere(0.15, agentColors?.light ?? '#fff0ca');
+    const palm = sphere(0.15, agentColors.light);
     palm.scale.set(1, 0.92, 1.05);
     hand.add(palm);
     arm.add(hand);
@@ -220,7 +99,7 @@ export function createCharacter(
   for (const x of [-0.24, 0.24]) {
     const foot = new THREE.Group();
     place(foot, x, 0.16, 0, rig);
-    const shoe = sphere(0.18, agentColors?.dark ?? '#314b3c');
+    const shoe = sphere(0.18, agentColors.dark);
     shoe.scale.set(0.85, 0.6, 1.25);
     foot.add(shoe);
     feet.push(foot);

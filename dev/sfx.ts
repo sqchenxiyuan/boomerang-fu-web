@@ -4,6 +4,7 @@ import { SFX_CATALOG, WEB_ONLY } from '../src/devtools/sfx-catalog';
 import type { SfxEntry, SfxGroup, WebSound } from '../src/devtools/sfx-catalog';
 import { GardenAudioGraph } from '../src/platform/audio-score';
 import type { MusicScene } from '../src/platform/audio-types';
+import { RECIPES, type Recipe } from '../src/platform/sfx/recipes';
 import { FmodPlayer } from './fmod-player';
 
 const GROUPS: [SfxGroup | 'all', string][] = [
@@ -58,11 +59,22 @@ function playWeb(sound: WebSound): void {
     return;
   }
   graph.reset();
+  if (sound.sound) {
+    const name = sound.sound;
+    if ((RECIPES[name] as Recipe).loop) {
+      // Loops are auditioned for three seconds.
+      graph.effects.loop('audition', name, { gain: 1 });
+      window.clearTimeout(loopTimer);
+      loopTimer = window.setTimeout(() => graph.effects.silenceLoops(), 3000);
+    } else graph.effects.play(name, { jitter: false });
+    return;
+  }
   const events = (sound.events ?? []).map(
     (event) => ({ position: { x: 0, y: 0 }, actorId: 0, ...event }) as GameEvent,
   );
-  graph.play(events, webContext!.now() + 0.02);
+  graph.play(events);
 }
+let loopTimer = 0;
 function stopWebMusic(): void {
   webScene = null;
   configureWeb();

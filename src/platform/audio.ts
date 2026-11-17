@@ -16,6 +16,7 @@ export class AudioEngine {
   private error: string | null = null;
   private stageKey = '';
   private stage = { centerX: 0, halfX: 10 };
+  private lastTime: number | null = null;
   get muted(): boolean {
     return this.settings.muted;
   }
@@ -63,6 +64,10 @@ export class AudioEngine {
     this.active = preview || !paused;
     this.setStage(state.arena, state.round);
     this.graph?.setScene(this.scene, this.active);
+    // Scaled simulation time since the previous frame drives footsteps and loops.
+    const dt = this.lastTime === null ? 0 : Math.max(0, Math.min(0.1, state.time - this.lastTime));
+    this.lastTime = state.time;
+    if (!preview) this.graph?.observe(state, dt);
   }
   /** Pan against the span the camera frames (same framing as the renderer; world +x is screen right). */
   private setStage(arena: Arena, round: number): void {
@@ -78,6 +83,7 @@ export class AudioEngine {
     this.graph?.play(events);
   }
   reset(): void {
+    this.lastTime = null;
     this.graph?.reset();
   }
   toggle(): boolean {

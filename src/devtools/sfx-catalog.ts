@@ -14,11 +14,14 @@
  */
 import type { GameEvent } from '../core/types';
 import type { MusicScene } from '../platform/audio-types';
+import type { SoundName } from '../platform/sfx/recipes';
 
 export type SfxStatus = 'godot' | 'original' | 'open';
 export type SfxGroup = 'combat' | 'death' | 'environment' | 'powerups' | 'ui' | 'music' | 'atmos';
 export interface WebSound {
   label: string;
+  /** A generated sound played directly (loops are auditioned for a few seconds). */
+  sound?: SoundName;
   /** Synthetic events fed to GardenAudioGraph.play (position/actorId default to 0). */
   events?: Partial<GameEvent>[];
   /** Or a music scene to audition instead of one-shot effects. */
@@ -96,13 +99,12 @@ export const SFX_CATALOG: SfxEntry[] = [
     '蓄力（开源皮肤自制，不在原版 bank）',
     'open',
     'skins/open/overrides/open_audio.gd:99',
-    [],
-    {
-      note: 'Web 暂无蓄力音（第二批计划）',
-    },
+    [{ label: '蓄力循环', sound: 'chargeLoop' }],
   ),
   e('combat/dash', '冲刺', 'godot', 'godot/original_audio.gd:79', [one('dash', { type: 'dash' })]),
-  e('combat/dash_end', '冲刺结束收势', 'godot', 'godot/main.gd:590', [], { note: NO_WEB }),
+  e('combat/dash_end', '冲刺结束收势', 'godot', 'godot/main.gd:590', [
+    { label: '冲刺收势', sound: 'dashEnd' },
+  ]),
   e('combat/dash_slam', '冲刺撞到人', 'original', 'recovered-source/Actor.cs:1119', [], {
     note: NO_WEB,
   }),
@@ -123,47 +125,55 @@ export const SFX_CATALOG: SfxEntry[] = [
   e('combat/disc_spawn', '补发武器 / 开场发镖', 'godot', 'godot/main.gd:2051', [
     one('equip', { type: 'equip' }),
   ]),
-  e('combat/faceplant', '角色扑倒在地', 'godot', 'godot/main.gd:942', [], { note: NO_WEB }),
-  e(
-    'combat/fire_extinguish',
-    '身上的火被熄灭（冒蒸汽）',
-    'godot',
-    'godot/original_audio.gd:104',
-    [],
-    { note: NO_WEB },
-  ),
+  e('combat/faceplant', '角色扑倒在地', 'godot', 'godot/main.gd:942', [
+    { label: '扑倒', sound: 'faceplant' },
+  ]),
+  e('combat/fire_extinguish', '身上的火被熄灭（冒蒸汽）', 'godot', 'godot/original_audio.gd:104', [
+    { label: '熄火冒汽', sound: 'extinguish' },
+  ]),
   e('combat/fire_ignite', '被点燃', 'godot', 'godot/original_audio.gd:106', [
     one('burn', { type: 'burn' }),
   ]),
-  e('combat/fire_loop', '角色燃烧中', 'godot', 'godot/original_audio.gd:150', [], {
-    loop: true,
-    note: NO_WEB,
-  }),
+  e(
+    'combat/fire_loop',
+    '角色燃烧中',
+    'godot',
+    'godot/original_audio.gd:150',
+    [{ label: '燃烧循环', sound: 'burningLoop' }],
+    {
+      loop: true,
+    },
+  ),
   e(
     'combat/footstep',
     '脚步（跑步动画关键帧触发，按玩家区分音高）',
     'godot',
     'godot/original_audio.gd:140',
-    [],
+    [{ label: '脚步', sound: 'footstep' }],
     {
       params: { pitch: 0 },
-      note: 'Web 没有脚步声',
     },
   ),
-  e('combat/hop', '走出边缘开始坠落时的小跳', 'godot', 'godot/original_audio.gd:104', [], {
-    note: 'Web 坠落时没有起跳声',
-  }),
-  e('combat/land', '落地（开源皮肤自制）', 'open', 'skins/open/overrides/open_audio.gd:15', [], {
-    note: NO_WEB,
-  }),
+  e('combat/hop', '走出边缘开始坠落时的小跳', 'godot', 'godot/original_audio.gd:104', [
+    { label: '边缘小跳', sound: 'hop' },
+  ]),
+  e('combat/land', '落地（开源皮肤自制）', 'open', 'skins/open/overrides/open_audio.gd:15', [
+    { label: '落地', sound: 'spawnLand' },
+  ]),
   e('combat/melee', '持镖挥砍出手', 'godot', 'godot/original_audio.gd:81', [
     one('slash', { type: 'slash' }),
   ]),
-  e('combat/retrieve', '按住召回飞镖', 'godot', 'godot/original_audio.gd:164', [], {
-    loop: true,
-    params: { pitch: 0, retrieveCharge: 0.5 },
-    note: NO_WEB,
-  }),
+  e(
+    'combat/retrieve',
+    '按住召回飞镖',
+    'godot',
+    'godot/original_audio.gd:164',
+    [{ label: '召回循环', sound: 'recallLoop' }],
+    {
+      loop: true,
+      params: { pitch: 0, retrieveCharge: 0.5 },
+    },
+  ),
   e('combat/revive', '组队模式复活', 'original', 'recovered-source/Player.cs:2670', [], {
     note: 'Web 无组队模式',
   }),
@@ -178,17 +188,22 @@ export const SFX_CATALOG: SfxEntry[] = [
     '回合入场落地',
     'godot',
     'godot/assets/original/audio-inputs.json（particle_audio 3）',
-    [],
+    [{ label: '入场落地', sound: 'spawnLand' }],
+  ),
+  e('combat/spawnin_whoosh', '回合入场呼啸', 'godot', 'godot/main.gd:1047', [
+    { label: '入场呼啸', sound: 'spawnWhoosh' },
+  ]),
+  e(
+    'combat/telekinesis',
+    '遥控镖飞行中',
+    'godot',
+    'godot/original_audio.gd:166',
+    [{ label: '遥控循环', sound: 'telekinesisLoop' }],
     {
-      note: 'Web 入场没有落地声',
+      loop: true,
+      params: { pitch: 0, velocity: 0.5 },
     },
   ),
-  e('combat/spawnin_whoosh', '回合入场呼啸', 'godot', 'godot/main.gd:1047', [], { note: NO_WEB }),
-  e('combat/telekinesis', '遥控镖飞行中', 'godot', 'godot/original_audio.gd:166', [], {
-    loop: true,
-    params: { pitch: 0, velocity: 0.5 },
-    note: NO_WEB,
-  }),
   e(
     'combat/throw',
     '投掷（aimPower = 蓄力 0–1）',
@@ -215,15 +230,14 @@ export const SFX_CATALOG: SfxEntry[] = [
     '出界警告（越接近死亡音越高）',
     'godot',
     'godot/original_audio.gd:147',
-    [],
+    [{ label: '出界警告', sound: 'oobWarning' }],
     {
       params: { pitch: 0.5 },
-      note: 'Web 暂无出界警告音（第二批计划）',
     },
   ),
-  e('death/shatter', '冻住后被打碎', 'godot', 'godot/original_audio.gd:99', [], {
-    note: 'Web 冻住被击杀与普通击杀同音',
-  }),
+  e('death/shatter', '冻住后被打碎', 'godot', 'godot/original_audio.gd:99', [
+    { label: '冰冻碎裂', sound: 'shatter' },
+  ]),
   e('death/sliced', '被切开', 'godot', 'godot/original_audio.gd:98', [death('slice')]),
   e('death/sliced_coffee', '咖啡角色被切开（专属）', 'godot', 'godot/main.gd:1063', [], {
     note: 'Web 角色不同，无专属死亡音',
@@ -279,18 +293,14 @@ export const SFX_CATALOG: SfxEntry[] = [
     '云雾喷出',
     'godot',
     'godot/assets/original/audio-inputs.json（particle_audio 19）',
-    [],
-    { note: NO_WEB },
+    [{ label: '云雾', sound: 'cloudPuff' }],
   ),
   e(
     'environment/cloud_puff_mini',
     '小团云雾喷出',
     'godot',
     'godot/assets/original/audio-inputs.json（particle_audio 20）',
-    [],
-    {
-      note: NO_WEB,
-    },
+    [{ label: '小云雾', sound: 'cloudPuff' }],
   ),
   e('environment/crown_rico', '皇冠落地弹跳', 'original', 'recovered-source/HatDebris.cs:6', [], {
     note: NO_WEB,
@@ -324,14 +334,20 @@ export const SFX_CATALOG: SfxEntry[] = [
     ],
     { params: { velocity: 0.6 } },
   ),
-  e('environment/firecell_loop', '地面火焰燃烧', 'godot', 'godot/original_audio.gd:132', [], {
-    loop: true,
-    params: { intensity: 0.5, plants: 0 },
-    note: NO_WEB,
-  }),
-  e('environment/firecell_start', '地面开始着火', 'godot', 'godot/original_audio.gd:227', [], {
-    note: NO_WEB,
-  }),
+  e(
+    'environment/firecell_loop',
+    '地面火焰燃烧',
+    'godot',
+    'godot/original_audio.gd:132',
+    [{ label: '地火循环', sound: 'fireCellLoop' }],
+    {
+      loop: true,
+      params: { intensity: 0.5, plants: 0 },
+    },
+  ),
+  e('environment/firecell_start', '地面开始着火', 'godot', 'godot/original_audio.gd:227', [
+    { label: '起火', sound: 'ignite' },
+  ]),
   e(
     'environment/floor_cracking',
     '地板开裂',
@@ -403,16 +419,14 @@ export const SFX_CATALOG: SfxEntry[] = [
     '穿过芦苇沙沙作响',
     'godot',
     'godot/assets/original/level40/behaviors.json',
-    [],
-    { note: NO_WEB },
+    [{ label: '穿过植物', sound: 'reeds' }],
   ),
   e(
     'environment/splash_small',
     '小水花',
     'godot',
     'godot/assets/original/audio-inputs.json（particle_audio 17）',
-    [],
-    { note: NO_WEB },
+    [{ label: '小水花', sound: 'splashSmall' }],
   ),
   e('environment/switch', '开关被打中', 'godot', 'godot/core/original_level3_behaviors.gd:607', [
     env,
@@ -430,11 +444,17 @@ export const SFX_CATALOG: SfxEntry[] = [
   e('environment/teleportal_disc', '飞镖穿过传送门', 'godot', 'godot/main.gd:784', [
     one('teleport', { type: 'teleport' }),
   ]),
-  e('environment/wet_floor', '湿地上滑行', 'godot', 'godot/original_audio.gd:156', [], {
-    loop: true,
-    params: { velocity: 0.5 },
-    note: NO_WEB,
-  }),
+  e(
+    'environment/wet_floor',
+    '湿地上滑行',
+    'godot',
+    'godot/original_audio.gd:156',
+    [{ label: '湿地滑行', sound: 'slideLoop' }],
+    {
+      loop: true,
+      params: { velocity: 0.5 },
+    },
+  ),
 
   // ── music ──
   ...['flutey', 'jungle', 'shuffle', 'skulls', 'stepup', 'surf', 'trap'].map((name) =>
@@ -505,7 +525,9 @@ export const SFX_CATALOG: SfxEntry[] = [
     [],
     { note: NO_WEB },
   ),
-  e('powerups/decoy_die', '替身被打掉', 'godot', 'godot/main.gd:1600', [], { note: NO_WEB }),
+  e('powerups/decoy_die', '替身被打掉', 'godot', 'godot/main.gd:1600', [
+    { label: '替身被打掉', sound: 'decoyDie' },
+  ]),
   e('powerups/decoy_spawn', '释放替身', 'godot', 'godot/main.gd:1600', [
     one('decoy', { type: 'decoy' }),
   ]),
@@ -531,9 +553,9 @@ export const SFX_CATALOG: SfxEntry[] = [
       },
     ),
   ),
-  e('powerups/grenade_blink', '爆炸镖引信闪烁', 'godot', 'godot/main.gd:2008', [], {
-    note: NO_WEB,
-  }),
+  e('powerups/grenade_blink', '爆炸镖引信闪烁', 'godot', 'godot/main.gd:2008', [
+    { label: '引信滴答', sound: 'fuseTick' },
+  ]),
   e('powerups/ice_freeze', '被冻住', 'godot', 'godot/original_audio.gd:104', [
     one('freeze', { type: 'freeze' }),
   ]),
@@ -559,7 +581,9 @@ export const SFX_CATALOG: SfxEntry[] = [
   e('powerups/teleport', '传送镖传送', 'godot', 'godot/main.gd:662', [
     one('teleport', { type: 'teleport' }),
   ]),
-  e('powerups/unfreeze', '解冻', 'godot', 'godot/original_audio.gd:104', [], { note: NO_WEB }),
+  e('powerups/unfreeze', '解冻', 'godot', 'godot/original_audio.gd:104', [
+    { label: '解冻', sound: 'unfreeze' },
+  ]),
 
   // ── ui ──
   e('ui/add_bot', '大厅添加机器人', 'original', 'recovered-source/UIMenuLobby.cs:816'),
@@ -653,9 +677,9 @@ export const SFX_CATALOG: SfxEntry[] = [
       note: 'Web 无躲猫猫模式',
     },
   ),
-  e('ui/roundtitle_go', '回合标题「开始！」', 'godot', 'godot/ffa_shell.gd:631', [], {
-    note: 'Web 「开始」没有单独的声音',
-  }),
+  e('ui/roundtitle_go', '回合标题「开始！」', 'godot', 'godot/ffa_shell.gd:631', [
+    { label: '开始！', sound: 'roundGo' },
+  ]),
   e('ui/roundtitle_other', '其他回合标题（第 N 回合等）', 'godot', 'godot/ffa_shell.gd:482', [
     one('round', { type: 'round' }),
   ]),

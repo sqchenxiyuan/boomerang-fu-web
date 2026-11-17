@@ -85,6 +85,24 @@ class Application {
     this.view.onPreviewMap = (mapId) => {
       if (this.screen === 'menu') this.showPreview({ ...defaultOptions(), mapId });
     };
+    const STYLE_KEY = 'boomerang-garden.visual-style.v1';
+    const storedStyle = (() => {
+      try {
+        return localStorage.getItem(STYLE_KEY) === 'pixel' ? 'pixel' : 'standard';
+      } catch {
+        return 'standard';
+      }
+    })();
+    this.runtime.setVisualStyle(storedStyle);
+    this.view.setVisualStyle(storedStyle);
+    this.view.onVisualStyle = (style) => {
+      this.runtime.setVisualStyle(style);
+      try {
+        localStorage.setItem(STYLE_KEY, style);
+      } catch {
+        // Per-viewer convenience only.
+      }
+    };
     this.view.onAgentsChanged = () => {
       if (this.screen === 'menu') this.showPreview(this.options);
     };

@@ -58,6 +58,7 @@ export class View {
   onFullscreen = (): void => {};
   /** The chosen agents or the saved library changed. */
   onAgentsChanged = (): void => {};
+  onVisualStyle = (_style: 'standard' | 'pixel'): void => {};
   private library: AgentLibrary = loadLibrary();
   private atelier: Atelier | null = null;
   private menuMode: MatchOptions['mode'] = 'solo';
@@ -102,6 +103,7 @@ export class View {
         <div class="settings-row map-settings"><label>地图<select id="map" aria-label="地图">${mapOptions()}</select></label><label>回合换图<select id="rotation" aria-label="回合换图"><option value="fixed">固定地图</option><option value="cycle">依次轮换</option></select></label></div>
         <p class="map-description" id="map-description">${mapInfo('original-enclosed').description}</p>
         <div class="settings-row"><label>决胜缩圈<select id="sudden-death" aria-label="决胜缩圈时间"><option value="180">180 秒 · 原版节奏</option><option value="60">60 秒</option><option value="30">30 秒 · 快速体验</option></select></label><label>计分<select id="scoring" aria-label="计分方式"><option value="kills" selected>击倒计分 · 原版</option><option value="survival">存活计分 · 先得 5 分</option></select></label></div>
+        <div class="settings-row"><label>画面风格<select id="visual-style" aria-label="画面风格"><option value="standard">标准 · 柔和低多边形</option><option value="pixel">像素风 · 描边与色阶</option></select></label></div>
         <button class="primary-button" id="start">进入花园 <span>↗</span></button>
         <div class="match-meta"><span id="goal-label">双人先得 14 分 · 多人 16 分</span><span>${ORIGINAL_MAPS.filter((map) => !map.tutorial).length} 张原版地图</span><span>支持手柄</span></div>
         <details class="instructions"><summary>第一次玩？看看操作 <span>＋</span></summary><div class="instruction-content">
@@ -196,6 +198,9 @@ export class View {
       });
     };
     this.get('start').addEventListener('click', () => start());
+    this.get<HTMLSelectElement>('visual-style').addEventListener('change', (event) =>
+      this.onVisualStyle((event.target as HTMLSelectElement).value as 'standard' | 'pixel'),
+    );
     for (const slot of [0, 1])
       this.get<HTMLSelectElement>(`agent-slot-${slot}`).addEventListener('change', (event) => {
         const value = (event.target as HTMLSelectElement).value;
@@ -256,6 +261,10 @@ export class View {
 
   private get<T extends HTMLElement = HTMLElement>(id: string): T {
     return this.root.querySelector<T>(`#${id}`)!;
+  }
+
+  setVisualStyle(style: 'standard' | 'pixel'): void {
+    this.get<HTMLSelectElement>('visual-style').value = style;
   }
 
   /** Custom agents by actor id: 1P is actor 0 (also in AI spectating), 2P is actor 1. */

@@ -14,6 +14,10 @@ import {
 } from './arena-camera';
 import type { ArenaCameraFrame } from './arena-camera';
 import { createCharacter, updateCharacter } from './characters';
+import { THROW_FOLLOW } from './character-motion';
+import { OVERLAY_LAYER, createPixelPass, type PixelPass } from './pixel-pass';
+
+export type VisualStyle = 'standard' | 'pixel';
 import type { CharacterView } from './characters';
 import { Effects } from './effects';
 import { BoundaryView } from './boundary-view';
@@ -35,6 +39,7 @@ function cloneCharacter(source: CharacterView): CharacterView {
     ...source,
     root,
     body: copy(source.body),
+    rig: source.rig && copy(source.rig),
     leftArm: copy(source.leftArm),
     rightArm: copy(source.rightArm),
     feet: source.feet.map(copy),
@@ -171,6 +176,8 @@ export class GameRenderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.12;
+    // Name labels live on the overlay layer so pixel art can keep them crisp.
+    this.camera.layers.enable(OVERLAY_LAYER);
     this.scene.background = new THREE.Color('#a7c8bb');
     this.scene.fog = new THREE.Fog('#a7c8bb', 60, 105);
     this.scene.add(new THREE.HemisphereLight('#fff8df', '#769f96', 1.9));
@@ -297,6 +304,11 @@ export class GameRenderer {
     const presentation = transitionPresentation(state);
     if (state.arena.floors) updateOriginalArena(this.arena, state.arena, simulationTime, alpha);
     const entranceOrder = [...state.actors].sort((a, b) => b.score - a.score || a.id - b.id);
+    // Throw follow-through is derived from the newest owned disc, so seeks agree.
+    const throwAge = new Map<number, number>();
+    for (const disc of state.discs)
+      if (!disc.dead && !disc.mini && disc.ownerId >= 0 && disc.age < THROW_FOLLOW)
+        throwAge.set(disc.ownerId, Math.min(throwAge.get(disc.ownerId) ?? Infinity, disc.age));
     for (const actor of state.actors) {
       const view = this.characters.get(actor.id);
       if (view) {
@@ -305,6 +317,7 @@ export class GameRenderer {
           menu ? { ...actor, facing: { x: -0.15, y: 1 } } : actor,
           alpha,
           simulationTime,
+          { throwAge: throwAge.get(actor.id) ?? null },
         );
         const pose =
           !menu && state.phase === 'countdown'
@@ -505,7 +518,28 @@ export class GameRenderer {
       this.camera.position.z += Math.cos(simulationTime * 71) * this.effects.shake;
     }
     this.camera.lookAt(this.cameraTarget.x, 0, this.cameraTarget.z);
-    this.renderer.render(this.scene, this.camera);
+    if (this.pixelPass) this.pixelPass.render(this.scene, this.camera);
+    else this.renderer.render(this.scene, this.camera);
+  }
+
+  private pixelPass: PixelPass | null = null;
+  get visualStyle(): VisualStyle {
+    return this.pixelPass ? 'pixel' : 'standard';
+  }
+  /** Pixel art renders at a quarter resolution with posterised colour and outlines. */
+  setVisualStyle(style: VisualStyle): void {
+    if (style === this.visualStyle) return;
+    this.pixelPass?.dispose();
+    this.pixelPass = style === 'pixel' ? createPixelPass(this.renderer) : null;
+    // Hard shadow edges read better at low resolution.
+    this.renderer.shadowMap.type =
+      style === 'pixel' ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.needsUpdate = true;
+    this.scene.traverse((object) => {
+      if (object instanceof THREE.Mesh)
+        for (const mat of Array.isArray(object.material) ? object.material : [object.material])
+          mat.needsUpdate = true;
+    });
   }
 
   stats(): { calls: number; triangles: number; geometries: number; textures: number } {
@@ -525,6 +559,7 @@ export class GameRenderer {
     for (const view of this.decoys.values()) this.scene.remove(view.root);
     this.decoys.clear();
     this.boundary.dispose();
+    this.pixelPass?.dispose();
     disposeVisual(this.scene);
     this.renderer.dispose();
     this.canvas.remove();

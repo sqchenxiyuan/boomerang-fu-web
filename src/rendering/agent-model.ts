@@ -14,8 +14,6 @@ export const AGENT_LAYOUT = {
   /** Body-local y of the head's lowest voxel row. */
   headBase: -0.2,
   torso: { w: 0.62, h: 0.44, d: 0.4, y: -0.42 },
-  /** Shoulder anchors for the existing arm rig. */
-  shoulder: { x: 0.36, y: -0.3 },
   /** Fraction of the head height below the slice plane. */
   cut: 0.3,
 } as const;

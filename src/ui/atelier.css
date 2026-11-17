@@ -2,7 +2,8 @@
 .atelier {
   position: absolute;
   inset: 0;
-  z-index: 20;
+  /* Above the play tools (35) and replay studio (40, 60). */
+  z-index: 70;
   display: grid;
   place-items: center;
   padding: 18px;

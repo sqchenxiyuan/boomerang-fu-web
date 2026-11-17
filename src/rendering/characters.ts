@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ROSTER, RULES } from '../core/config';
-import { length, lerpV } from '../core/math';
+import { lerpV } from '../core/math';
 import type { Actor } from '../core/types';
 import { box, cylinder, makeBoomerang, material, mesh, place, shadow, sphere } from './palette';
 import { createDeathModel, type DeathModel } from './death-models';
@@ -9,10 +9,14 @@ import { boundaryWarning } from '../core/feedback';
 import { meleeAge, sampleMeleePose } from './melee-pose';
 import { actorIdentity, type ActorIdentity } from '../agents/registry';
 import { lookPalette } from '../agents/look';
-import { AGENT_LAYOUT, createAgentBody } from './agent-model';
+import { createAgentBody } from './agent-model';
+import { sampleCharacterPose, type MotionContext } from './character-motion';
+import { OVERLAY_LAYER } from './pixel-pass';
 
 export interface CharacterView {
   root: THREE.Group;
+  /** Facing-only frame for the floating hands and feet (no body squash). */
+  rig?: THREE.Group;
   body: THREE.Group;
   leftArm: THREE.Group;
   rightArm: THREE.Group;
@@ -53,6 +57,7 @@ function makeLabel(text: string, color: string): THREE.Sprite {
   sprite.scale.set(1.65, 0.52, 1);
   sprite.position.y = 2.48;
   sprite.renderOrder = 10;
+  sprite.layers.set(OVERLAY_LAYER);
   return sprite;
 }
 
@@ -65,9 +70,10 @@ export function createCharacter(
   const look = identity.look,
     agentColors = look ? lookPalette(look.hue) : null;
   const root = new THREE.Group(),
-    body = new THREE.Group();
+    body = new THREE.Group(),
+    rig = new THREE.Group();
   const groundShadow = shadow(0.66);
-  root.add(body, groundShadow);
+  root.add(body, rig, groundShadow);
   body.position.y = 0.72;
   if (look) {
     body.add(createAgentBody(look));
@@ -194,13 +200,17 @@ export function createCharacter(
     hands: THREE.Group[] = [],
     limbs: THREE.Mesh[] = [];
   for (const side of [-1, 1]) {
+    // Floating hands: no connecting limb is drawn; the hand hovers in the rig frame.
     const arm = new THREE.Group();
-    if (look) place(arm, side * AGENT_LAYOUT.shoulder.x, AGENT_LAYOUT.shoulder.y, 0, body);
-    else place(arm, side * 0.58, -0.08, 0, body);
+    place(arm, 0, 0, 0, rig);
     const limb = cylinder(0.075, 0.075, 1, agentColors?.dark ?? '#344e3c', 6);
+    limb.visible = false;
     arm.add(limb);
     const hand = new THREE.Group();
-    hand.add(sphere(0.12, agentColors?.light ?? '#fff0ca'));
+    place(hand, side * 0.64, 0.6, 0.06, arm);
+    const palm = sphere(0.15, agentColors?.light ?? '#fff0ca');
+    palm.scale.set(1, 0.92, 1.05);
+    hand.add(palm);
     arm.add(hand);
     hands.push(hand);
     limbs.push(limb);
@@ -209,7 +219,7 @@ export function createCharacter(
   const feet: THREE.Group[] = [];
   for (const x of [-0.24, 0.24]) {
     const foot = new THREE.Group();
-    place(foot, x, 0.16, 0, root);
+    place(foot, x, 0.16, 0, rig);
     const shoe = sphere(0.18, agentColors?.dark ?? '#314b3c');
     shoe.scale.set(0.85, 0.6, 1.25);
     foot.add(shoe);
@@ -291,6 +301,7 @@ export function createCharacter(
   root.add(death.root);
   return {
     root,
+    rig,
     body,
     leftArm: arms[0],
     rightArm: arms[1],
@@ -310,28 +321,13 @@ export function createCharacter(
   };
 }
 
-const armAxis = new THREE.Vector3(0, 1, 0),
-  armDirection = new THREE.Vector3();
-function poseHand(
-  view: CharacterView,
-  index: number,
-  x: number,
-  y: number,
-  z: number,
-  yaw: number,
+function applyJoint(
+  object: THREE.Object3D,
+  j: { x: number; y: number; z: number; yaw: number; pitch: number; roll: number; scale: number },
 ): void {
-  if (!view.hands || !view.limbs) return;
-  const arm = index === 0 ? view.leftArm : view.rightArm;
-  const hand = view.hands[index],
-    limb = view.limbs[index];
-  arm.rotation.set(0, 0, 0);
-  hand.position.set(x - arm.position.x, y - arm.position.y, z - arm.position.z);
-  hand.rotation.set(0, yaw, 0);
-  armDirection.copy(hand.position);
-  const reach = armDirection.length();
-  limb.position.copy(armDirection).multiplyScalar(0.5);
-  limb.scale.set(1, reach, 1);
-  limb.quaternion.setFromUnitVectors(armAxis, armDirection.normalize());
+  object.position.set(j.x, j.y, j.z);
+  object.rotation.set(j.pitch, j.yaw, j.roll, 'YXZ');
+  object.scale.setScalar(j.scale);
 }
 
 export function updateCharacter(
@@ -339,59 +335,35 @@ export function updateCharacter(
   actor: Actor,
   alpha: number,
   time: number,
+  motion: MotionContext = {},
 ): void {
   const pos = lerpV(actor.previous, actor.position, alpha);
   view.root.position.set(pos.x, 0, pos.y);
   const facing = Math.atan2(actor.facing.x, actor.facing.y);
-  view.body.rotation.set(0, facing, 0);
-  const speed = length(actor.velocity);
-  const cycle = time * (actor.powers.includes('haste') ? 20 : 16) + actor.id;
-  view.body.position.y = 0.82 + (actor.alive ? Math.sin(cycle) * Math.min(0.06, speed * 0.012) : 0);
-  view.body.rotation.z = Math.sin(cycle / 2) * Math.min(0.07, speed * 0.01);
-  const age = meleeAge(actor, alpha);
-  const melee = age === null ? null : sampleMeleePose(age, actor.attackArmed);
-  const squash = actor.dashTime > 0 ? 0.82 : (melee?.stretch ?? 1);
-  view.body.scale.set(1 / Math.sqrt(squash), squash, 1 / Math.sqrt(squash));
-  const twist = melee?.twist ?? 0;
-  view.body.rotation.order = 'YXZ';
-  view.body.rotation.y += twist;
-  view.body.rotation.x = melee?.lean ?? 0;
-  view.body.position.x = actor.facing.x * (melee?.step ?? 0) * 0.3;
-  view.body.position.z = actor.facing.y * (melee?.step ?? 0) * 0.3;
-  view.body.position.y += melee?.height ?? 0;
-  view.feet.forEach((foot, i) => {
-    foot.position.y =
-      0.16 + Math.max(0, Math.sin(cycle + i * Math.PI)) * Math.min(speed * 0.025, 0.15);
-    foot.rotation.y = facing;
-    const side = i === 0 ? -1 : 1;
-    const stride = (melee?.step ?? 0) * (i === 0 ? 1 : -0.45);
-    foot.position.x = side * 0.24 * Math.cos(facing) + stride * actor.facing.x;
-    foot.position.z = -side * 0.24 * Math.sin(facing) + stride * actor.facing.y;
-  });
-  const swing = Math.sin(cycle) * Math.min(speed * 0.025, 0.12);
-  let handX = 0.72,
-    handY = actor.charge > 0 ? 0.1 : -0.24,
-    handZ = actor.charge > 0 ? -0.22 : swing;
-  let handYaw = 0;
-  if (melee) {
-    const w = melee.weight;
-    const x = melee.handX * Math.cos(twist) - melee.handZ * Math.sin(twist);
-    const z = melee.handX * Math.sin(twist) + melee.handZ * Math.cos(twist);
-    handX += (x - handX) * w;
-    handY += (melee.handY - handY) * w;
-    handZ += (z - handZ) * w;
-    handYaw = (melee.angle + Math.PI / 2 - twist) * w;
-  }
-  poseHand(view, 1, handX, handY, handZ, handYaw);
-  poseHand(
-    view,
-    0,
-    -0.72 + (melee?.weight ?? 0) * 0.24,
-    -0.24 + (melee?.weight ?? 0) * 0.26,
-    -swing + (melee?.weight ?? 0) * 0.34,
-    0,
+  const pose = sampleCharacterPose(actor, time, motion, alpha);
+  const b = pose.body;
+  // The body moves in the facing frame; its squash never reaches the hands.
+  view.body.position.set(
+    b.x * Math.cos(facing) + b.z * Math.sin(facing),
+    b.y,
+    -b.x * Math.sin(facing) + b.z * Math.cos(facing),
   );
-  view.weapon.rotation.z = 0.4 * (1 - (melee?.weight ?? 0));
+  view.body.rotation.set(b.pitch, facing + b.yaw, b.roll, 'YXZ');
+  view.body.scale.set(b.sx, b.sy, b.sz);
+  const rig = view.rig;
+  if (rig) {
+    rig.position.set(0, 0, 0);
+    rig.scale.setScalar(1);
+    rig.rotation.set(0, facing, 0);
+    view.hands?.forEach((hand, i) => applyJoint(hand, pose.hands[i]));
+    view.feet.forEach((foot, i) => {
+      applyJoint(foot, pose.feet[i]);
+      foot.rotation.y = 0;
+    });
+  }
+  const age = meleeAge(actor, alpha);
+  const meleeWeight = age === null ? 0 : sampleMeleePose(age, actor.attackArmed).weight;
+  view.weapon.rotation.z = 0.4 * (1 - meleeWeight);
   view.weapon.visible = actor.armed && actor.alive;
   if (view.leftWeapon)
     view.leftWeapon.visible = actor.alive && (actor.heldDiscs ?? (actor.armed ? 1 : 0)) > 1;
@@ -433,9 +405,10 @@ export function updateCharacter(
     view.body.position.y += pose.height;
     view.body.rotation.z += pose.tilt;
     view.body.scale.multiplyScalar(pose.scale);
-    view.feet.forEach((foot) => {
-      foot.position.y += pose.height;
-    });
+    if (view.rig) {
+      view.rig.position.y = pose.height;
+      view.rig.scale.setScalar(pose.scale);
+    }
     view.ring.visible = false;
     view.aim.visible = false;
   }

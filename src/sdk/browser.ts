@@ -1,7 +1,7 @@
 import { GameSession } from './session';
 import type { GameEvent, GameState, MatchOptions } from '../core/types';
 import type { SessionSnapshot } from './types';
-import { GameRenderer } from '../rendering/renderer';
+import { GameRenderer, type VisualStyle } from '../rendering/renderer';
 import { Input } from '../platform/input';
 import { AudioEngine } from '../platform/audio';
 import type { AudioSettings } from '../platform/audio';
@@ -393,6 +393,15 @@ export class BrowserGame {
     this.assertLive();
     this.audio.unlock();
     return this.audio.toggle();
+  }
+  /** Presentation only: `'pixel'` renders low-resolution pixel art with outlines. */
+  get visualStyle(): VisualStyle {
+    return this.renderer.visualStyle;
+  }
+  setVisualStyle(style: VisualStyle): void {
+    this.assertLive();
+    if (style !== 'standard' && style !== 'pixel') throw new RangeError('Unknown visual style');
+    this.renderer.setVisualStyle(style);
   }
   get playback(): ReplayPlayer | null {
     return this.player;

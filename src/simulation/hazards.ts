@@ -5,6 +5,7 @@ import type { Vec2 } from '../core/math';
 import type { Actor, Arena, GameState } from '../core/types';
 import { damageActor } from './combat';
 import { shapeContains, obstacleDistance } from '../core/geometry';
+import { dcos, dsin } from '../core/dmath';
 
 type FallKind = 'water' | 'cliff';
 const FALL_DURATION: Record<FallKind, number> = { water: 0.66, cliff: 0.74 };
@@ -39,10 +40,7 @@ export function hazardContactPoints(
   if (centerMissing) misses++;
   for (let i = 0; i < 8; i++) {
     const angle = -Math.PI / 2 + (i * Math.PI) / 4;
-    const p = add(
-      position,
-      v(Math.cos(angle) * radius, Math.sin(angle) * radius * (i === 0 ? 1.25 : 1)),
-    );
+    const p = add(position, v(dcos(angle) * radius, dsin(angle) * radius * (i === 0 ? 1.25 : 1)));
     if (!onGround(arena, p)) misses++;
     if (
       includeObstacles &&

@@ -1,4 +1,5 @@
 import type { Phase } from './types';
+import { dsin } from './dmath';
 
 /** Static-source timings and explicitly adapted Web timings; see transitions-analysis.md. */
 export const PRESENTATION = {
@@ -100,7 +101,7 @@ export function introPose(time: number, actorIndex: number, actorCount: number):
   if (local < 0) return { visible: false, height: 0, scale: 1, squash: 1, landing: 0 };
   const drop = clamp01(local / PRESENTATION.landing);
   const settle = clamp01((local - PRESENTATION.landing) / PRESENTATION.landingSettle);
-  const impact = local >= PRESENTATION.landing ? Math.sin(settle * Math.PI) : 0;
+  const impact = local >= PRESENTATION.landing ? dsin(settle * Math.PI) : 0;
   return {
     visible: true,
     height: 2.6 * (1 - drop * drop),

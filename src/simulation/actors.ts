@@ -30,6 +30,7 @@ import { heldDiscs, ownedWeapons, recoverDisc } from './inventory';
 import { damageActor } from './combat';
 import { breakDisguise, spawnDecoy } from './status-effects';
 import { shapeContains } from '../core/geometry';
+import { dacos, dcos, dsin } from '../core/dmath';
 
 /*
  * Actor locomotion, Player input and weapon budget, following the reference
@@ -37,8 +38,8 @@ import { shapeContains } from '../core/geometry';
  * the fixed-step motion runs first, then input, then the per-frame timers.
  */
 const A = NATIVE.actor;
-const easeIn = (t: number): number => 1 - Math.cos((Math.PI / 2) * t);
-const easeOut = (t: number): number => Math.sin((Math.PI / 2) * t);
+const easeIn = (t: number): number => 1 - dcos((Math.PI / 2) * t);
+const easeOut = (t: number): number => dsin((Math.PI / 2) * t);
 
 export const aimPower = (actor: Actor): number =>
   Math.min(1, Math.max(0, easeIn(Math.min(1, Math.max(0, (actor.charge - 0.1) / 0.9)))));
@@ -536,7 +537,7 @@ function spinAngle(actor: Actor): number {
   if (!old || length(current) < 1e-6 || length(old) < 1e-6) return 0;
   const a = normalize(current),
     b = normalize(old);
-  let angle = (Math.acos(Math.max(-1, Math.min(1, dot(a, b)))) * 180) / Math.PI;
+  let angle = (dacos(Math.max(-1, Math.min(1, dot(a, b)))) * 180) / Math.PI;
   if (a.x * b.y - a.y * b.x < 0) angle = -angle;
   return Math.max(-90, Math.min(90, angle));
 }

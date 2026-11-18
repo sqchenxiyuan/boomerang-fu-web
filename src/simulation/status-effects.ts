@@ -5,6 +5,7 @@ import type { Vec2 } from '../core/math';
 import type { Actor, DecoyState, GameState, HazardZone } from '../core/types';
 import { isInBoundary } from './boundary';
 import { damageActor } from './combat';
+import { dsin } from '../core/dmath';
 
 export function breakDisguise(actor: Actor): void {
   actor.disguised = false;
@@ -180,7 +181,7 @@ function tickDecoys(state: GameState, dt: number): void {
       continue;
     }
     // DecoyInput exposes movement/dash only. Steering is derived from snapshot state.
-    const wanted = rotate(decoy.facing, Math.sin(decoy.age * 1.7 + decoy.id) * dt * 1.8);
+    const wanted = rotate(decoy.facing, dsin(decoy.age * 1.7 + decoy.id) * dt * 1.8);
     if (!safePosition(state.arena, add(decoy.position, mul(wanted, 1.1)), RULES.playerRadius))
       decoy.facing = rotate(decoy.facing, Math.PI * 0.72);
     else decoy.facing = wanted;

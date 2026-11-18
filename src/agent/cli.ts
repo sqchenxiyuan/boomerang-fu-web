@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { connect } from 'node:net';
 import { availableParallelism, freemem, loadavg } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -31,6 +30,7 @@ import {
   type TraceLine,
 } from './match';
 import { AgentRuntime } from './runtime';
+import { dispatch, serveLocal } from './local-runtime';
 import { createStrategy, validCodeSize } from './sandbox';
 import { BUILTIN_STRATEGIES, STARTER_STRATEGY, isDifficulty } from './strategies';
 
@@ -568,42 +568,6 @@ Engine: ${ENGINE_ID}. The observation and action API match the MUNDI Godot adapt
 }
 
 /** JSON lines: arkena.game.v1 methods plus MUNDI's advance. */
-function dispatch(runtime: AgentRuntime, method: string, params: Record<string, unknown> = {}) {
-  const both = () => ({
-    frame: runtime.snapshot(),
-    observations: [runtime.observe(0), runtime.observe(1)],
-  });
-  switch (method) {
-    case 'reset': {
-      // Platform modes: every match-* variant runs as one match (targets and
-      // round limits are settled by the platform), like the MUNDI embed.
-      const mode = String(params.mode);
-      if (
-        !['round', 'match', 'match-seven', 'match-short', 'match-medium', 'match-long'].includes(
-          mode,
-        )
-      )
-        throw new RangeError('mode must be round or match');
-      runtime.reset({
-        ...(params as never as object),
-        mode: mode === 'round' ? 'round' : 'match',
-      } as never);
-      return both();
-    }
-    case 'advance':
-      runtime.step(params.actions as unknown[], DECISION_TICKS);
-      return both();
-    case 'step':
-      return runtime.step(params.actions as unknown[], Number(params.frames ?? DECISION_TICKS));
-    case 'observe':
-      return runtime.observe(Number(params.player));
-    case 'snapshot':
-      return runtime.snapshot();
-    default:
-      throw new Error(`Unknown method: ${method}`);
-  }
-}
-
 async function serve(flags: Flags) {
   const runtime = new AgentRuntime();
   const hello = {
@@ -614,45 +578,11 @@ async function serve(flags: Flags) {
     decisionTicks: DECISION_TICKS,
   };
   if (flags['--connect']) {
-    // The MUNDI local driver role: connect back, authenticate, then reset/advance/snapshot/quit.
-    const port = Number(process.env.MUNDI_LOCAL_PORT);
-    if (!Number.isInteger(port) || port <= 0) throw new Error('MUNDI_LOCAL_PORT is not set');
-    const socket = connect({ host: '127.0.0.1', port });
-    socket.setNoDelay(true);
-    await new Promise<void>((done, fail) => socket.once('connect', done).once('error', fail));
-    socket.write(
-      JSON.stringify({
-        hello: LOCAL_PROTOCOL,
-        token: process.env.MUNDI_LOCAL_TOKEN ?? '',
-        engine: ENGINE_ID,
-      }) + '\n',
-    );
-    const lines = createInterface({ input: socket, crlfDelay: Infinity });
-    for await (const line of lines) {
-      if (line.length > 1048576) break;
-      const request = JSON.parse(line) as {
-        id: number;
-        method: string;
-        params?: Record<string, unknown>;
-      };
-      if (request.method === 'quit') {
-        socket.end(JSON.stringify({ id: request.id, result: true }) + '\n');
-        break;
-      }
-      try {
-        if (!['reset', 'advance', 'snapshot'].includes(request.method))
-          throw new Error('Unknown local runtime method');
-        if (request.method !== 'snapshot') dispatch(runtime, request.method, request.params);
-        const result = {
-          frame: runtime.snapshot(),
-          observations: [runtime.observe(0), runtime.observe(1)],
-        };
-        socket.write(JSON.stringify({ id: request.id, result }) + '\n');
-      } catch (error) {
-        socket.write(JSON.stringify({ id: request.id, error: (error as Error).message }) + '\n');
-      }
-    }
-    runtime.dispose();
+    // The MUNDI local driver role (same code as the platform's pinned runtime file).
+    await serveLocal({
+      port: Number(process.env.MUNDI_LOCAL_PORT),
+      token: process.env.MUNDI_LOCAL_TOKEN ?? '',
+    });
     return;
   }
   process.stdout.write(JSON.stringify(hello) + '\n');

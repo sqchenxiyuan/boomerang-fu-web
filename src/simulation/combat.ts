@@ -26,6 +26,7 @@ import { obstacleDistance } from '../core/geometry';
 import { freeze, slowMo } from './clock';
 import { getStunned, startPushback, stopAiming, stopLunge } from './actors';
 import { dropDisc, startFreeform, startThrow, bounceDisc } from './projectiles';
+import { dcos, dsin } from '../core/dmath';
 
 /*
  * Combat triggers from the reference CombatWorld: melee/disarm polygons, blocks,
@@ -419,10 +420,7 @@ export function triggerDiscParry(state: GameState, actor: Actor, disc: Disc): bo
     let n = normal;
     const turn = (vector: Vec2): Vec2 => {
       const a = (-45 * Math.PI) / 180;
-      return v(
-        vector.x * Math.cos(a) - vector.y * Math.sin(a),
-        vector.x * Math.sin(a) + vector.y * Math.cos(a),
-      );
+      return v(vector.x * dcos(a) - vector.y * dsin(a), vector.x * dsin(a) + vector.y * dcos(a));
     };
     if (dot(normalize(reflect(incoming, n)), normalize(sub(owner.position, disc.position))) > 0.9)
       incoming = turn(incoming);

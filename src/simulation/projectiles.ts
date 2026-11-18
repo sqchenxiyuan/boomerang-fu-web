@@ -33,6 +33,7 @@ import { addZone, hitDecoy } from './status-effects';
 import { strikeEnvironment } from './environment';
 import { clockOf, slowMo } from './clock';
 import { startPushback } from './actors';
+import { dcos, dsin } from '../core/dmath';
 export { throwDisc } from './actors';
 
 /*
@@ -43,7 +44,7 @@ export { throwDisc } from './actors';
  */
 const D = NATIVE.disc;
 const U = NATIVE.scale;
-const easeIn = (t: number): number => 1 - Math.cos((Math.PI / 2) * t);
+const easeIn = (t: number): number => 1 - dcos((Math.PI / 2) * t);
 const cubicOut = (t: number): number => 1 + (t - 1) ** 3;
 const quartOut = (t: number): number => 1 - (t - 1) ** 4;
 const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
@@ -426,7 +427,7 @@ function calculateControlled(
     if (speed > 1 * U) {
       setMovement(disc, 'throwing');
       const fraction = (speed / disc.speedLimit!) * (owner?.retrieveCharge ?? 0) * 4;
-      disc.throwTimer = Math.sin((Math.PI / 2) * (1 - clamp01(fraction))) * disc.throwDuration!;
+      disc.throwTimer = dsin((Math.PI / 2) * (1 - clamp01(fraction))) * disc.throwDuration!;
       disc.throwDirection = normalize(disc.velocity);
     } else if (disc.throwTimer! < disc.throwDuration!) setMovement(disc, 'throwing');
     else if (disc.canReturn) startReturn(disc);

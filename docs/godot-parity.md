@@ -40,6 +40,7 @@
 ## 兼容性
 
 - `SIMULATION_VERSION` 改为 `0.8.0`。0.6/0.7 录像会被拒绝导入，因为同一组输入在新物理下结果不同。
+- 之后的 0.9.0 只把三角函数换成跨引擎确定的实现（`src/core/dmath.ts`），机制与参数不变。
 - `MatchOptions.scoring`：`'kills'`（默认）或 `'survival'`（旧规则：最后存活得 1 分，先得 5 分）。`scoreGoal` 可以省略，省略时按计分方式和人数取默认值。
 - `Difficulty` 新增 `'impossible'`。
 - 新增的角色和飞镖字段都是可选的，旧快照仍可读取；`Disc.state` 仍是粗粒度投影，细分状态见 `Disc.movement`。

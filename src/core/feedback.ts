@@ -1,4 +1,5 @@
 import type { Actor, GameState } from './types';
+import { dsin } from './dmath';
 
 /** Shared copy for the full application and the embeddable SDK HUD. */
 export function eliminationLabel(actor: Actor): string {
@@ -53,7 +54,7 @@ export function boundaryWarning(actor: Actor): {
     intensity,
     pulse:
       0.5 +
-      Math.sin(
+      dsin(
         1.5 * Math.PI +
           Math.max(0, elapsed - grace.duration * 0.2) * (3 + intensity * intensity * 17),
       ) *

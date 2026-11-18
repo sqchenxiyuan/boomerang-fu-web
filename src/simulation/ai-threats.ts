@@ -17,6 +17,7 @@ import type { Actor, Arena, Disc, GameState } from '../core/types';
 import { obstacleDistance } from '../core/geometry';
 import { isInBoundary } from './boundary';
 import { hazardKind } from './hazards';
+import { dcos } from '../core/dmath';
 
 /*
  * Threat perception for bots: a cheap forward model of the reference disc forces
@@ -24,7 +25,7 @@ import { hazardKind } from './hazards';
  * search over evasive moves. Read-only: it never mutates the simulation.
  */
 const D = NATIVE.disc;
-const easeIn = (t: number): number => 1 - Math.cos((Math.PI / 2) * Math.min(1, Math.max(0, t)));
+const easeIn = (t: number): number => 1 - dcos((Math.PI / 2) * Math.min(1, Math.max(0, t)));
 /** A disc closer than this to the actor's centre deals damage. */
 export const HIT_DISTANCE = NATIVE.damageRadius + D.colliderRadius;
 

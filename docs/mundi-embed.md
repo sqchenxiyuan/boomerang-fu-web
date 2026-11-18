@@ -8,7 +8,7 @@ MUNDI 平台把游戏放进同源 iframe，通过 `arkena.game.v1` 协议驱动�
 npm run build:mundi
 ```
 
-输出 `dist-mundi/<引擎标识>/`，例如 `dist-mundi/boomerang-garden-web-0.8.0-agent.1/`：
+输出 `dist-mundi/<引擎标识>/`，例如 `dist-mundi/boomerang-garden-web-0.9.0-agent.1/`：
 
 | 文件 | 内容 |
 | --- | --- |

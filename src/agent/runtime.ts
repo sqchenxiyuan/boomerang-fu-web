@@ -41,6 +41,7 @@ import {
   type ProjectileView,
 } from './contract';
 import { matchPlaylist } from './playlist';
+import { dcos, dsin } from '../core/dmath';
 
 /*
  * Headless agent runtime: the web simulation behind the reference adapter's
@@ -423,8 +424,8 @@ function rays(state: GameState, actor: Actor): AgentRay[] {
   const result: AgentRay[] = [];
   for (let k = 0; k < RAY_DIRECTIONS; k++) {
     const angle = (k * Math.PI * 2) / RAY_DIRECTIONS;
-    const x = Math.cos(angle),
-      y = Math.sin(angle);
+    const x = dcos(angle),
+      y = dsin(angle);
     const direction = toWebDirection(x, y);
     const hit = traceObstacles(
       state.arena,

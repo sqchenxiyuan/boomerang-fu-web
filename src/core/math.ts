@@ -1,3 +1,4 @@
+import { datan2, dcos, dsin } from './dmath';
 export interface Vec2 {
   x: number;
   y: number;
@@ -14,13 +15,13 @@ export const clamp = (x: number, a: number, b: number): number => Math.min(b, Ma
 export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 export const lerpV = (a: Vec2, b: Vec2, t: number): Vec2 => v(lerp(a.x, b.x, t), lerp(a.y, b.y, t));
 export const rotate = (p: Vec2, angle: number): Vec2 =>
-  v(p.x * Math.cos(angle) - p.y * Math.sin(angle), p.x * Math.sin(angle) + p.y * Math.cos(angle));
+  v(p.x * dcos(angle) - p.y * dsin(angle), p.x * dsin(angle) + p.y * dcos(angle));
 export const cross = (a: Vec2, b: Vec2): number => a.x * b.y - a.y * b.x;
 export const reflect = (dir: Vec2, normal: Vec2): Vec2 =>
   sub(dir, mul(normal, 2 * dot(dir, normal)));
 export const clampLength = (a: Vec2, max: number): Vec2 =>
   length(a) > max ? mul(normalize(a), max) : a;
-export const angleBetween = (a: Vec2, b: Vec2): number => Math.atan2(cross(a, b), dot(a, b));
+export const angleBetween = (a: Vec2, b: Vec2): number => datan2(cross(a, b), dot(a, b));
 
 export class Random {
   constructor(public seed: number) {

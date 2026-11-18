@@ -1,7 +1,9 @@
-// Builds the MUNDI embed (mundi.html) into an immutable, versioned folder:
-// dist-mundi/<engine id>/ with index.html, hashed assets and SOURCE.json
-// (engine, protocol, source commit, per-file SHA-256). The platform copies the
-// folder verbatim to /games/<engine id>/; relative URLs keep it location-free.
+// Builds the MUNDI artifacts for one engine id, from one source commit:
+// - dist-mundi/<engine id>/: the embed (mundi.html → index.html), hashed assets
+//   and SOURCE.json (engine, protocol, commit, per-file SHA-256). The platform
+//   copies it verbatim to /games/<engine id>/; relative URLs keep it location-free.
+// - dist-mundi/<engine id>.local-runtime.mjs: the standalone Node runtime its CLI
+//   and batch runner spawn (mundi.local.v1), hash recorded in SOURCE.json.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
@@ -47,6 +49,18 @@ await build({
   },
 });
 await rename(join(outDir, 'mundi.html'), join(outDir, 'index.html'));
+const runtimeFile = `${ENGINE_ID}.local-runtime.mjs`;
+await esbuild.build({
+  entryPoints: [join(root, 'src/agent/local-runtime-main.ts')],
+  outfile: join(root, 'dist-mundi', runtimeFile),
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: 'node22',
+  minify: true,
+  legalComments: 'none',
+  logLevel: 'warning',
+});
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 async function list(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -72,6 +86,14 @@ const source = {
   commit: git('rev-parse', 'HEAD'),
   dirty: git('status', '--porcelain', '--untracked-files=no') !== '',
   files,
+  runtime: {
+    file: runtimeFile,
+    kind: 'web-node-v1',
+    node: '>=22',
+    sha256: createHash('sha256')
+      .update(await readFile(join(root, 'dist-mundi', runtimeFile)))
+      .digest('hex'),
+  },
 };
 await writeFile(join(outDir, 'SOURCE.json'), JSON.stringify(source, null, 2) + '\n');
 console.log(`${ENGINE_ID}: ${Object.keys(files).length} files → ${relative(root, outDir)}`);

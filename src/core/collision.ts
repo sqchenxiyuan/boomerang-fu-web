@@ -10,6 +10,7 @@ import {
 } from './geometry';
 import type { Vec2 } from './math';
 import type { Arena, Obstacle } from './types';
+import { dcos, dsin } from './dmath';
 
 export interface Hit {
   t: number;
@@ -184,9 +185,7 @@ export function onGround(arena: Arena, position: Vec2, margin = 0): boolean {
     if (margin > 0)
       for (let i = 0; i < 16; i++) {
         const angle = (i * Math.PI) / 8;
-        if (
-          !covered(v(position.x + Math.cos(angle) * margin, position.y + Math.sin(angle) * margin))
-        )
+        if (!covered(v(position.x + dcos(angle) * margin, position.y + dsin(angle) * margin)))
           return false;
       }
     return true;

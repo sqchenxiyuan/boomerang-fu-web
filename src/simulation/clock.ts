@@ -1,5 +1,6 @@
 import { NATIVE } from '../core/config';
 import type { ClockState, GameState } from '../core/types';
+import { dcos, dsin } from '../core/dmath';
 
 /**
  * TimeKeeper from the reference simulation. Freeze frames stop scaled time; slow
@@ -11,8 +12,8 @@ import type { ClockState, GameState } from '../core/types';
  * fixed-rate SDK/replay contract and smooth rendering at the cost of exact
  * fixed-step parity during slow motion.
  */
-const easeIn = (t: number): number => 1 - Math.cos((Math.PI / 2) * t);
-const easeOut = (t: number): number => Math.sin((Math.PI / 2) * t);
+const easeIn = (t: number): number => 1 - dcos((Math.PI / 2) * t);
+const easeOut = (t: number): number => dsin((Math.PI / 2) * t);
 const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
 
 export const createClock = (): ClockState => ({

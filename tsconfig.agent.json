@@ -4,6 +4,6 @@
     "types": ["node"],
     "lib": ["ES2022"]
   },
-  "include": ["src/agent/cli.ts"],
+  "include": ["src/agent/cli.ts", "src/agent/local-runtime-main.ts"],
   "exclude": []
 }

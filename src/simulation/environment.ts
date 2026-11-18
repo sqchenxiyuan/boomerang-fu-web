@@ -35,18 +35,19 @@ import { damageActor } from './combat';
 import { recoverDisc } from './inventory';
 import { addZone } from './status-effects';
 import { hazardContactPoints } from './hazards';
+import { datan2, dcos, dsin } from '../core/dmath';
 
 const PI2 = Math.PI * 2;
-const easeIn = (t: number): number => 1 - Math.cos((Math.PI * clamp(t, 0, 1)) / 2);
-const easeOut = (t: number): number => Math.sin((Math.PI * clamp(t, 0, 1)) / 2);
-const easeBoth = (t: number): number => (1 - Math.cos(Math.PI * clamp(t, 0, 1))) / 2;
+const easeIn = (t: number): number => 1 - dcos((Math.PI * clamp(t, 0, 1)) / 2);
+const easeOut = (t: number): number => dsin((Math.PI * clamp(t, 0, 1)) / 2);
+const easeBoth = (t: number): number => (1 - dcos(Math.PI * clamp(t, 0, 1))) / 2;
 const cubicBoth = (t: number): number => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
 const decrement = (time: number | undefined, dt: number): number =>
   Math.max(0, (time ?? 0) - dt - 1e-12);
 const mechanisms = (state: GameState): EnvironmentMechanism[] =>
   state.arena.environment?.mechanisms ?? [];
 const nearestAngle = (from: number, to: number): number =>
-  from + Math.atan2(Math.sin(to - from), Math.cos(to - from));
+  from + datan2(dsin(to - from), dcos(to - from));
 
 function changed(state: GameState, mechanism: EnvironmentMechanism): void {
   state.arena.revision = (state.arena.revision ?? 0) + 1;
@@ -348,7 +349,7 @@ function tickMotion(
     let duration = mechanism.rotationDuration ?? 4;
     if (mechanism.rotationModulation) {
       const wave = mechanism.rotationModulation;
-      duration = wave.initialDuration + wave.amplitude * Math.sin(wave.rate * time);
+      duration = wave.initialDuration + wave.amplitude * dsin(wave.rate * time);
     } else if ((mechanism.rotationDurations?.length ?? 0) > 1) {
       const target = mechanism.rotationDurations![mechanism.targetIndex ?? 0];
       // Unity SmoothDamp's critically damped update, smoothTime=.5.
@@ -852,7 +853,7 @@ export function tickEnvironmentContacts(state: GameState, dt: number): void {
       const angle = -Math.PI / 2 + (i * Math.PI) / 4;
       const point = add(
         position,
-        v(Math.cos(angle) * radius, Math.sin(angle) * radius * (i === 0 ? 1.25 : 1)),
+        v(dcos(angle) * radius, dsin(angle) * radius * (i === 0 ? 1.25 : 1)),
       );
       if (solidFloors.some((floor) => floorContains(floor, point))) return true;
     }
@@ -1019,7 +1020,7 @@ export function strikeEnvironment(state: GameState, strike: EnvironmentStrike): 
     if (strike.kind === 'melee') {
       if (
         dot(normalize(strike.direction), normalize(sub(mechanism.position, strike.position))) <
-        Math.cos(RULES.attackArc / 2)
+        dcos(RULES.attackArc / 2)
       )
         continue;
       if (mechanism.kind === 'switch') {

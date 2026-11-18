@@ -5,6 +5,7 @@ import type { Arena } from '../core/types';
 import { RULES } from '../core/config';
 import { portalDestination } from './portals';
 import { floorContains, obstacleOverlaps } from '../core/geometry';
+import { dcos, dsin } from '../core/dmath';
 
 export interface NavigationWaypoint extends Vec2 {
   /** This edge must be traversed by entering a portal, never by walking across the map. */
@@ -83,12 +84,7 @@ export function findFloorEscape(arena: Arena, start: Vec2, heading = v()): Vec2 
   const settled = (p: Vec2) => {
     for (let i = 0; i < 8; i++) {
       const angle = (i * Math.PI) / 4;
-      if (
-        threatenedFloor(
-          arena,
-          v(p.x + Math.cos(angle) * clearance, p.y + Math.sin(angle) * clearance),
-        )
-      )
+      if (threatenedFloor(arena, v(p.x + dcos(angle) * clearance, p.y + dsin(angle) * clearance)))
         return false;
     }
     return true;

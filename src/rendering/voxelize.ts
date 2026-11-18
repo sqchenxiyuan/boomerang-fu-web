@@ -898,28 +898,3 @@ export function voxelShadeTexture(): THREE.DataTexture {
   shade.needsUpdate = true;
   return shade;
 }
-
-let water: THREE.CanvasTexture | null = null;
-/** A tiny repeating texture that makes flat water read as pixel art. */
-export function pixelWaterTexture(): THREE.CanvasTexture {
-  if (water) return water;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 8;
-  const context = canvas.getContext('2d')!;
-  for (let y = 0; y < 8; y++)
-    for (let x = 0; x < 8; x++) {
-      const wave = (x + y * 3) % 8 === 0 || (x * 5 + y) % 11 === 0;
-      const shade = wave ? 255 : 214 + Math.floor(hash01(x, y, 3) * 26);
-      context.fillStyle = `rgb(${shade},${shade},${shade})`;
-      context.fillRect(x, y, 1, 1);
-    }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.generateMipmaps = false;
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.repeat.set(120, 120);
-  water = texture;
-  return texture;
-}

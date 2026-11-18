@@ -6,6 +6,13 @@ import { box, cylinder, material, place, sphere } from './palette';
 import { contourShapes, extrudeContours, rectanglePath } from './polygon-geometry';
 import { mergeStaticMeshes } from './batches';
 import { OriginalPlantsView } from './original-plants';
+import {
+  groundMaterial,
+  shoreDistances,
+  shoreSignature,
+  WaterMaterial,
+  type GroundKind,
+} from './surfaces';
 
 const warningColor = new THREE.Color('#f0a267');
 
@@ -90,10 +97,38 @@ function floorColors(
   return [style.ground, style.edge];
 }
 
+function groundKind(
+  floor: Floor,
+  style: ReturnType<typeof styleFor>,
+  topColor: string,
+): GroundKind {
+  if (floor.kind === 'ice') return 'ice';
+  if (floor.kind === 'wood' || (floor.kind === 'moving' && floor.radius === undefined))
+    return 'wood';
+  if (floor.kind === 'moving' || floor.kind === 'falling') return 'stone';
+  if (topColor === STYLES.garden.ground) return 'grass';
+  return style === STYLES.temple ? 'sand' : 'stone';
+}
+
+/** Turf (or a sand crust) curls over the top of a side wall. */
+function lipColor(kind: GroundKind, topColor: string): string | undefined {
+  if (kind !== 'grass' && kind !== 'sand') return undefined;
+  return `#${new THREE.Color(topColor)
+    .multiplyScalar(kind === 'grass' ? 0.82 : 0.9)
+    .getHexString()}`;
+}
+
 function makeFloor(floor: Floor, style: ReturnType<typeof styleFor>, scene: string): THREE.Group {
   const root = new THREE.Group();
   root.name = `floor:${floor.id}`;
   const [topColor, sideColor] = floorColors(floor, style, scene);
+  const kind = groundKind(floor, style, topColor);
+  const topMaterial = groundMaterial(topColor, { kind, part: 'top' });
+  const sideMaterial = groundMaterial(sideColor, {
+    kind,
+    part: 'side',
+    lip: lipColor(kind, topColor),
+  });
   const thickness = floor.kind === 'wood' || floor.kind === 'moving' ? 0.34 : 0.68;
   const geometry = extrudeContours(floor.paths, thickness);
   geometry.translate(0, -thickness, 0);
@@ -103,7 +138,7 @@ function makeFloor(floor: Floor, style: ReturnType<typeof styleFor>, scene: stri
     floor.kind === 'moving' ||
     !floor.active ||
     floor.warning;
-  const top = animated ? material(topColor).clone() : material(topColor);
+  const top = animated ? topMaterial.clone() : topMaterial;
   if (animated) top.userData.shared = false;
   const baseColor = new THREE.Color(topColor);
   if (floor.kind === 'falling') {
@@ -111,7 +146,7 @@ function makeFloor(floor: Floor, style: ReturnType<typeof styleFor>, scene: stri
     baseColor.offsetHSL(0, 0, ((Math.abs(seed) % 7) - 3) * 0.013);
     top.color.copy(baseColor);
   }
-  const mesh = new THREE.Mesh(geometry, [top, material(sideColor)]);
+  const mesh = new THREE.Mesh(geometry, [top, sideMaterial]);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   if (geometry.getAttribute('position')?.count) root.add(mesh);
@@ -321,16 +356,17 @@ export function createOriginalArenaView(arena: Arena): ArenaView {
   const root = new THREE.Group(),
     style = styleFor(arena);
   root.name = `original:${arena.sourceScene ?? arena.id ?? 'arena'}`;
-  const water = new THREE.Mesh(
-    new THREE.PlaneGeometry(240, 240),
-    new THREE.MeshStandardMaterial({
-      color: arena.hazard === 'cliff' ? '#758c9c' : style.water,
-      roughness: arena.hazard === 'cliff' ? 1 : 0.32,
-      metalness: arena.hazard === 'cliff' ? 0 : 0.1,
-    }),
-  );
+  const cliff = arena.hazard === 'cliff';
+  const waterMaterial = cliff
+    ? new THREE.MeshStandardMaterial({ color: '#758c9c', roughness: 1, metalness: 0 })
+    : new WaterMaterial({ color: style.water, roughness: 0.32, metalness: 0.1 });
+  if (waterMaterial instanceof WaterMaterial) {
+    waterMaterial.setShore(shoreDistances(arena));
+    waterMaterial.userData.shoreSignature = shoreSignature(arena);
+  }
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), waterMaterial);
   water.rotation.x = -Math.PI / 2;
-  water.position.y = arena.hazard === 'cliff' ? -5 : -0.52;
+  water.position.y = cliff ? -5 : -0.52;
   water.receiveShadow = true;
   root.add(water);
   const floors = new Map<string, THREE.Group>();
@@ -413,6 +449,7 @@ export function createOriginalArenaView(arena: Arena): ArenaView {
 /** Runtime owns all pose/state. No browser clock advances a mechanism here. */
 export function updateOriginalArena(view: ArenaView, arena: Arena, time: number, alpha = 1): void {
   const mechanisms = new Map((arena.environment?.mechanisms ?? []).map((m) => [m.id, m]));
+  refreshShore(view, arena);
   view.plants?.update(mechanisms, time, alpha, (m) => heightDelta(m, alpha, mechanisms) ?? 0);
   for (const floor of arena.floors ?? []) {
     const group = view.floors.get(floor.id);
@@ -476,6 +513,16 @@ export function updateOriginalArena(view: ArenaView, arena: Arena, time: number,
     const knob = group.userData.knob as THREE.Mesh;
     knob.material = material(mechanism.active ? '#8fd3af' : '#e1b36d');
   }
+}
+
+/** Falling tiles come and go; the foam follows the land that is standing. */
+function refreshShore(view: ArenaView, arena: Arena): void {
+  const water = view.water.material;
+  if (!(water instanceof WaterMaterial)) return;
+  const signature = shoreSignature(arena);
+  if (signature === water.userData.shoreSignature) return;
+  water.userData.shoreSignature = signature;
+  water.setShore(shoreDistances(arena));
 }
 
 /** Only immutable geometry enters this root. Keep movable/destructible floor and

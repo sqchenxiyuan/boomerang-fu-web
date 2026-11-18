@@ -18,7 +18,8 @@ import { CameraRig } from './camera-rig';
 import { createCharacter, updateCharacter } from './characters';
 import { THROW_FOLLOW } from './character-motion';
 import type { CharacterView } from './characters';
-import { pixelWaterTexture, voxelizeMesh, voxelizeStatic, voxelizeTree } from './voxelize';
+import { voxelizeMesh, voxelizeStatic, voxelizeTree } from './voxelize';
+import { setSurfacePixel, setSurfaceTime } from './surfaces';
 
 export type VisualStyle = 'standard' | 'pixel';
 /** Voxel edge in world units: scenery, and small props (hands, discs, pickups). */
@@ -96,8 +97,8 @@ function buildArena(state: GameState, pixel = false, aspect = 16 / 9): ArenaView
 /**
  * Pixel style: immutable scenery becomes one world-aligned voxel mesh, every
  * movable floor, wall, gate and switch is voxelised in place (so mechanisms,
- * tints and visibility keep working), plants share one voxel bush, and the water
- * gets a nearest-filtered pixel texture.
+ * tints and visibility keep working), plants share one voxel bush. Ground and
+ * water patterns snap to the voxel grid through `setSurfacePixel`.
  */
 function pixelateArena(view: ArenaView, arena: Arena, aspect: number): void {
   const bounds = arenaCameraFootprint(arena, Math.max(16 / 9, aspect));
@@ -134,11 +135,6 @@ function pixelateArena(view: ArenaView, arena: Arena, aspect: number): void {
     });
   }
   voxelizeTree(view.root, ARENA_VOXEL, (object) => exclude.has(object));
-  if (arena.hazard !== 'cliff') {
-    const water = view.water.material as THREE.MeshStandardMaterial;
-    water.map = pixelWaterTexture();
-    water.needsUpdate = true;
-  }
 }
 
 function disposeVisual(root: THREE.Object3D): void {
@@ -250,6 +246,8 @@ export class GameRenderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.12;
+    // Surface patterns are module-wide; a new renderer starts in the smooth style.
+    setSurfacePixel(0);
     this.scene.background = new THREE.Color('#a7c8bb');
     this.scene.fog = new THREE.Fog('#a7c8bb', 60, 105);
     this.scene.add(new THREE.HemisphereLight('#fff8df', '#769f96', 1.9));
@@ -561,9 +559,7 @@ export class GameRenderer {
       group.children[0].rotation.z = simulationTime * 0.7 + id.length;
       group.children[0].scale.setScalar(1 + Math.sin(simulationTime * 3) * 0.045);
     }
-    if (state.arena.hazard !== 'cliff')
-      (this.arena.water.material as THREE.MeshStandardMaterial).roughness =
-        0.28 + Math.sin(simulationTime * 0.5) * 0.04;
+    setSurfaceTime(simulationTime);
     this.boundary.update(state, menu);
     this.effects.update(
       menu ? dt : Math.max(0, Math.min(0.1, state.time - this.previousTime)),
@@ -665,6 +661,7 @@ export class GameRenderer {
     const pixel = style === 'pixel';
     if (pixel === this.pixel) return;
     this.pixel = pixel;
+    setSurfacePixel(pixel ? ARENA_VOXEL : 0);
     // Hard shadow edges suit the block look.
     this.renderer.shadowMap.type = pixel ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
     this.renderer.shadowMap.needsUpdate = true;

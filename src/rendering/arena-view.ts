@@ -6,6 +6,14 @@ import type { Arena, Obstacle } from '../core/types';
 import { box, cylinder, material, mesh, place, sphere } from './palette';
 import { createOriginalArenaView } from './original-arena';
 import type { OriginalPlantsView } from './original-plants';
+import { groundMaterial, shoreDistances, WaterMaterial, type GroundKind } from './surfaces';
+
+const THEME_GROUND: Record<keyof typeof THEMES, GroundKind> = {
+  garden: 'grass',
+  canal: 'grass',
+  sandstone: 'sand',
+  ruins: 'stone',
+};
 
 export interface ArenaView {
   root: THREE.Group;
@@ -186,15 +194,30 @@ export function createArenaView(arena: Arena): ArenaView {
     steps: 1,
   });
   groundGeo.rotateX(-Math.PI / 2);
-  const ground = new THREE.Mesh(groundGeo, [material(colors.ground), material(colors.edge)]);
+  const theme = mapInfo(arena.id).theme;
+  const kind = THEME_GROUND[theme];
+  const ground = new THREE.Mesh(groundGeo, [
+    groundMaterial(colors.ground, { kind, part: 'top' }),
+    groundMaterial(colors.edge, {
+      kind,
+      part: 'side',
+      lip:
+        kind === 'stone'
+          ? undefined
+          : `#${new THREE.Color(colors.ground).multiplyScalar(0.84).getHexString()}`,
+    }),
+  ]);
   ground.position.y = -1.05;
   ground.receiveShadow = true;
   ground.castShadow = true;
   root.add(ground);
-  const water = new THREE.Mesh(
-    new THREE.PlaneGeometry(200, 200),
-    new THREE.MeshStandardMaterial({ color: colors.water, roughness: 0.28, metalness: 0.12 }),
-  );
+  const waterMaterial = new WaterMaterial({
+    color: colors.water,
+    roughness: 0.28,
+    metalness: 0.12,
+  });
+  waterMaterial.setShore(shoreDistances(arena));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), waterMaterial);
   water.rotation.x = -Math.PI / 2;
   water.position.y = -0.48;
   water.receiveShadow = true;

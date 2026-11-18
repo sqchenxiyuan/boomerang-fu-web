@@ -204,6 +204,25 @@ describe('snapshot-driven death presentation', () => {
     expect(view.death.root.visible).toBe(false);
   });
 
+  it('takes the floating hands away with the body: none left on the water or beside a disguise', () => {
+    const actor = makeActor(0, 'human', 0);
+    const view = fakeView();
+    updateCharacter(view, actor, 1, 5);
+    expect(view.hands!.every((hand) => hand.visible)).toBe(true);
+    actor.alive = false;
+    actor.death = death('water');
+    updateCharacter(view, actor, 1, 5);
+    expect(view.hands!.some((hand) => hand.visible)).toBe(false);
+    actor.alive = true;
+    actor.death = undefined;
+    actor.disguised = true;
+    updateCharacter(view, actor, 1, 5);
+    expect(view.hands!.some((hand) => hand.visible)).toBe(false);
+    actor.disguised = false;
+    updateCharacter(view, actor, 1, 5);
+    expect(view.hands!.every((hand) => hand.visible)).toBe(true);
+  });
+
   it('never re-shows a removed corpse because old invulnerability is still set', () => {
     const actor = makeActor(0, 'human', 0);
     const view = fakeView();
@@ -233,6 +252,7 @@ function fakeView(): CharacterView {
     leftArm: new THREE.Group(),
     rightArm: new THREE.Group(),
     feet: [new THREE.Group(), new THREE.Group()],
+    hands: [new THREE.Group(), new THREE.Group()],
     weapon: new THREE.Group(),
     shield: new THREE.Mesh(),
     aim: new THREE.Group(),

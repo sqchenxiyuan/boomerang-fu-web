@@ -341,6 +341,11 @@ export function updateCharacter(
   view.feet.forEach((foot) => {
     foot.visible = actor.alive;
   });
+  // The floating hands go with the body: a dead fighter (sunk, sliced, burnt)
+  // must not leave two spheres behind, e.g. bobbing on the water.
+  view.hands?.forEach((hand) => {
+    hand.visible = actor.alive;
+  });
   if (!actor.alive && actor.death) {
     const pose = sampleDeathPose(actor.death, time);
     const model = view.death;
@@ -382,6 +387,10 @@ export function updateCharacter(
     view.body.visible = false;
     view.feet.forEach((foot) => {
       foot.visible = false;
+    });
+    // Hands too: floating hands beside a crate would give the disguise away.
+    view.hands?.forEach((hand) => {
+      hand.visible = false;
     });
     view.weapon.visible = false;
     if (view.leftWeapon) view.leftWeapon.visible = false;

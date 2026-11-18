@@ -23,10 +23,15 @@ interface AuditEntry {
   static: StaticAudit;
   bots: BotAudit | null;
 }
-const audits = (auditData as { maps: Record<string, AuditEntry> }).maps;
+// A generated snapshot (npm run audit:maps); its shape may lag the current types.
+const snapshot = auditData as unknown as {
+  simulationVersion: string;
+  mapDataVersion: string;
+  maps: Record<string, AuditEntry>;
+};
+const audits = snapshot.maps;
 const auditFresh =
-  (auditData as { simulationVersion: string }).simulationVersion === SIMULATION_VERSION &&
-  (auditData as { mapDataVersion: string }).mapDataVersion === MAP_DATA_VERSION;
+  snapshot.simulationVersion === SIMULATION_VERSION && snapshot.mapDataVersion === MAP_DATA_VERSION;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const el = <K extends keyof HTMLElementTagNameMap>(
@@ -56,9 +61,12 @@ const GROUPS: { id: string; label: string; test: (map: MapInfo) => boolean }[] =
 ];
 const groupOf = (map: MapInfo) => GROUPS.slice(1).find((g) => g.test(map))?.label ?? '';
 
-/** Feature tags read from the map data. */
+/** Feature tags read from the map data itself (not the audit snapshot, which can be stale). */
+const tagCache = new Map<string, string[]>();
 function tagsOf(map: MapInfo): string[] {
-  const f = audits[map.id]?.static.features ?? mapFeatures(createArena(map.id));
+  const cached = tagCache.get(map.id);
+  if (cached) return cached;
+  const f = mapFeatures(createArena(map.id));
   const tags: string[] = [];
   if (f.hazard === 'water') tags.push('水域');
   if (f.hazard === 'cliff') tags.push('悬崖');
@@ -73,7 +81,8 @@ function tagsOf(map: MapInfo): string[] {
   if (m.has('door')) tags.push('门');
   if (m.has('destructible') || m.has('destroyer')) tags.push('可破坏');
   if (f.plants) tags.push('植物');
-  if (f.floorKinds.includes('ice')) tags.push('冰面');
+  if (f.floorKinds.includes('ice') || f.surfaceKinds.includes('ice')) tags.push('冰面');
+  tagCache.set(map.id, tags);
   return tags;
 }
 const frameArea = (map: MapInfo) => {

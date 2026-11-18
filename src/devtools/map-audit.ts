@@ -36,6 +36,8 @@ export interface MapFeatures {
   portals: number;
   mechanisms: string[];
   floorKinds: string[];
+  /** Surface patches laid over the ground ('ice' slides, 'water' pools). */
+  surfaceKinds: string[];
   plants: number;
   obstacles: number;
 }
@@ -108,6 +110,7 @@ export function mapFeatures(arena: Arena): MapFeatures {
     portals: arena.portals?.length ?? 0,
     mechanisms: mechanisms.filter((kind) => kind !== 'plant'),
     floorKinds,
+    surfaceKinds: [...new Set((arena.surfaces ?? []).map((s) => s.kind))].sort(),
     plants,
     obstacles: arena.obstacles.length,
   };

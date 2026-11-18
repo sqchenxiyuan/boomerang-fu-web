@@ -1,0 +1,3285 @@
+{
+ "format": "map-audit-v1",
+ "simulationVersion": "0.10.0",
+ "mapDataVersion": "2f74e5c3393ef5555a3f91e461dd581fab65bad2154870d91503698649600e44",
+ "rounds": 6,
+ "maps": {
+  "original-enclosed": {
+   "static": {
+    "id": "original-enclosed",
+    "walkableArea": 7720.25,
+    "reachableArea": 1226.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 25.317977802344327,
+    "frame": {
+     "width": 47,
+     "height": 47
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "animated",
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 72
+    },
+    "findings": []
+   },
+   "bots": {
+    "id": "original-enclosed",
+    "rounds": 6,
+    "meanSeconds": 6.607205980638578,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.024999999999999998
+   }
+  },
+  "original-slide-traps": {
+   "static": {
+    "id": "original-slide-traps",
+    "walkableArea": 14594.25,
+    "reachableArea": 12092,
+    "outsideBoundaryArea": 9331.75,
+    "outsideCameraArea": 8925.75,
+    "minSpawnDistance": 37.36038627644259,
+    "frame": {
+     "width": 74,
+     "height": 52
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 71
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 9332 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 8926 平方单位可走地面在镜头取景外"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-slide-traps",
+    "rounds": 6,
+    "meanSeconds": 5.698831046288324,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-turnstile": {
+   "static": {
+    "id": "original-turnstile",
+    "walkableArea": 1587.25,
+    "reachableArea": 1495.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 26.866947191391155,
+    "frame": {
+     "width": 77.459999,
+     "height": 48.5
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "cliff",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 34
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 2 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 3 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 6 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-turnstile",
+    "rounds": 6,
+    "meanSeconds": 12.098562576590774,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.24444444444444438
+   }
+  },
+  "original-pools": {
+   "static": {
+    "id": "original-pools",
+    "walkableArea": 14934.5,
+    "reachableArea": 14281.5,
+    "outsideBoundaryArea": 11974,
+    "outsideCameraArea": 11456.5,
+    "minSpawnDistance": 25.66900830787976,
+    "frame": {
+     "width": 74,
+     "height": 48.00000000000001
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 35
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 11974 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 11457 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-pools",
+    "rounds": 6,
+    "meanSeconds": 4.380106958273116,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 7
+    },
+    "stuckSeconds": 0.049999999999999996
+   }
+  },
+  "original-marketplace": {
+   "static": {
+    "id": "original-marketplace",
+    "walkableArea": 21353.5,
+    "reachableArea": 21352.25,
+    "outsideBoundaryArea": 18870.5,
+    "outsideCameraArea": 18543.75,
+    "minSpawnDistance": 27.512764578100864,
+    "frame": {
+     "width": 74,
+     "height": 52
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 80,
+     "obstacles": 65
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 18871 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 18544 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-marketplace",
+    "rounds": 6,
+    "meanSeconds": 5.141652799660814,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.011111111111111112
+   }
+  },
+  "original-washer": {
+   "static": {
+    "id": "original-washer",
+    "walkableArea": 7449.75,
+    "reachableArea": 4053.25,
+    "outsideBoundaryArea": 1408,
+    "outsideCameraArea": 1253,
+    "minSpawnDistance": 23.312539862914996,
+    "frame": {
+     "width": 80,
+     "height": 64
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "movingObstacle"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 55
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 2 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 3 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 4 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 6 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 1408 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 1253 平方单位可走地面在镜头取景外"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-washer",
+    "rounds": 6,
+    "meanSeconds": 9.322476824913382,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.016666666666666666
+   }
+  },
+  "original-toaster": {
+   "static": {
+    "id": "original-toaster",
+    "walkableArea": 10226,
+    "reachableArea": 10223.5,
+    "outsideBoundaryArea": 7423.5,
+    "outsideCameraArea": 6874.75,
+    "minSpawnDistance": 40.97961671477663,
+    "frame": {
+     "width": 80,
+     "height": 56
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 58
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 7424 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 6875 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-toaster",
+    "rounds": 6,
+    "meanSeconds": 7.603497276526686,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.05555555555555555
+   }
+  },
+  "original-plants": {
+   "static": {
+    "id": "original-plants",
+    "walkableArea": 11244.25,
+    "reachableArea": 10907.25,
+    "outsideBoundaryArea": 8668.5,
+    "outsideCameraArea": 8224.25,
+    "minSpawnDistance": 31.195392038007792,
+    "frame": {
+     "width": 59,
+     "height": 47
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 1025,
+     "obstacles": 33
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 8669 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 8224 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-plants",
+    "rounds": 6,
+    "meanSeconds": 3.488888888888758,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-rooms": {
+   "static": {
+    "id": "original-rooms",
+    "walkableArea": 62031,
+    "reachableArea": 62031,
+    "outsideBoundaryArea": 60237.75,
+    "outsideCameraArea": 59822,
+    "minSpawnDistance": 26,
+    "frame": {
+     "width": 57,
+     "height": 53.00000000000001
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 62
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 60238 平方单位可走地面，走进去会触发出界计时"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-rooms",
+    "rounds": 6,
+    "meanSeconds": 6.359746683096759,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.005555555555555556
+   }
+  },
+  "original-cloud-sweep": {
+   "static": {
+    "id": "original-cloud-sweep",
+    "walkableArea": 2015,
+    "reachableArea": 2015,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 25.512412686768783,
+    "frame": {
+     "width": 79.00000301666336,
+     "height": 69.00000348076543
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "cliff",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 59
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-cloud-sweep",
+    "rounds": 6,
+    "meanSeconds": 4.734357141760012,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.022222222222222223
+   }
+  },
+  "original-whisk": {
+   "static": {
+    "id": "original-whisk",
+    "walkableArea": 14447.5,
+    "reachableArea": 13911.25,
+    "outsideBoundaryArea": 10902.25,
+    "outsideCameraArea": 10334.5,
+    "minSpawnDistance": 38.25347646645989,
+    "frame": {
+     "width": 74,
+     "height": 59
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 44
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 10902 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 10335 平方单位可走地面在镜头取景外"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-whisk",
+    "rounds": 6,
+    "meanSeconds": 3.9172103167160066,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-temple-garden": {
+   "static": {
+    "id": "original-temple-garden",
+    "walkableArea": 8197.75,
+    "reachableArea": 8197.75,
+    "outsideBoundaryArea": 6154.5,
+    "outsideCameraArea": 5819.75,
+    "minSpawnDistance": 20.584003459482805,
+    "frame": {
+     "width": 74,
+     "height": 48.00000000000001
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 1653,
+     "obstacles": 29
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 6155 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 5820 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-temple-garden",
+    "rounds": 6,
+    "meanSeconds": 5.73523836110802,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-falling": {
+   "static": {
+    "id": "original-falling",
+    "walkableArea": 1775,
+    "reachableArea": 1684,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 35.69314202401374,
+    "frame": {
+     "width": 84.61017431418846,
+     "height": 84.6101746247714
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "fallingFloor"
+     ],
+     "floorKinds": [
+      "falling"
+     ],
+     "plants": 20,
+     "obstacles": 14
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 2 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 3 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 4 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 5 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 6 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-falling",
+    "rounds": 6,
+    "meanSeconds": 5.0013542213745446,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-island": {
+   "static": {
+    "id": "original-island",
+    "walkableArea": 1941.5,
+    "reachableArea": 1799.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 32.97576182165387,
+    "frame": {
+     "width": 88.92659466732508,
+     "height": 88.92659466732508
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "animated",
+      "destructible",
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 78,
+     "obstacles": 62
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-island",
+    "rounds": 6,
+    "meanSeconds": 3.324324719495676,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-mini-island": {
+   "static": {
+    "id": "original-mini-island",
+    "walkableArea": 1276.75,
+    "reachableArea": 1225.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 20.0000001785714,
+    "frame": {
+     "width": 71.88225164045807,
+     "height": 71.8822524686793
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 24
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-mini-island",
+    "rounds": 6,
+    "meanSeconds": 8.452750043766109,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-clouds": {
+   "static": {
+    "id": "original-clouds",
+    "walkableArea": 2526.5,
+    "reachableArea": 2519.5,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 42.5,
+    "minSpawnDistance": 39.631232290581124,
+    "frame": {
+     "width": 91.00000352717561,
+     "height": 80.00000403768789
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "cliff",
+     "pits": 0,
+     "portals": 4,
+     "mechanisms": [
+      "animated",
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 54,
+     "obstacles": 63
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 6 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 43 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-clouds",
+    "rounds": 6,
+    "meanSeconds": 3.8986494389914506,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-falling2": {
+   "static": {
+    "id": "original-falling2",
+    "walkableArea": 1608.25,
+    "reachableArea": 1608.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 32,
+    "frame": {
+     "width": 60,
+     "height": 48.00000000000001
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "fallingFloor"
+     ],
+     "floorKinds": [
+      "falling"
+     ],
+     "plants": 0,
+     "obstacles": 28
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-falling2",
+    "rounds": 6,
+    "meanSeconds": 3.6271024972734494,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.016666666666666666
+   }
+  },
+  "original-square": {
+   "static": {
+    "id": "original-square",
+    "walkableArea": 1376.25,
+    "reachableArea": 1348.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 32.000000533201614,
+    "frame": {
+     "width": 70.46803818161263,
+     "height": 70.46803880277857
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "cliff",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 55,
+     "obstacles": 38
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-square",
+    "rounds": 6,
+    "meanSeconds": 3.7527777777776383,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-wheel": {
+   "static": {
+    "id": "original-wheel",
+    "walkableArea": 1583.75,
+    "reachableArea": 1539.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 15.938008573243476,
+    "frame": {
+     "width": 59.5999985,
+     "height": 58.1500015
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "cliff",
+     "pits": 0,
+     "portals": 6,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 33
+    },
+    "findings": []
+   },
+   "bots": {
+    "id": "original-wheel",
+    "rounds": 6,
+    "meanSeconds": 39.5648640334815,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 2,
+    "causes": {
+     "weapon": 4,
+     "boundary": 2
+    },
+    "stuckSeconds": 17.222222222221458
+   }
+  },
+  "original-maze": {
+   "static": {
+    "id": "original-maze",
+    "walkableArea": 13913,
+    "reachableArea": 13913,
+    "outsideBoundaryArea": 12370.5,
+    "outsideCameraArea": 11897,
+    "minSpawnDistance": 21.41401437376935,
+    "frame": {
+     "width": 60,
+     "height": 48.00000000000001
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 2,
+     "mechanisms": [
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 71
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 12371 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 11897 平方单位可走地面在镜头取景外"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-maze",
+    "rounds": 6,
+    "meanSeconds": 9.469444444443992,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.008333333333333333
+   }
+  },
+  "original-ring": {
+   "static": {
+    "id": "original-ring",
+    "walkableArea": 11987,
+    "reachableArea": 11754.5,
+    "outsideBoundaryArea": 10099.5,
+    "outsideCameraArea": 7533.75,
+    "minSpawnDistance": 26.059344162046013,
+    "frame": {
+     "width": 73.63642425934103,
+     "height": 73.63642425934103
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 2,
+     "mechanisms": [
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 67
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 10100 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 7534 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-ring",
+    "rounds": 6,
+    "meanSeconds": 6.206982772324643,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.002777777777777778
+   }
+  },
+  "original-forest": {
+   "static": {
+    "id": "original-forest",
+    "walkableArea": 22417,
+    "reachableArea": 22415.75,
+    "outsideBoundaryArea": 19294,
+    "outsideCameraArea": 18833.25,
+    "minSpawnDistance": 29.805031886411424,
+    "frame": {
+     "width": 74,
+     "height": 54
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 2,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 51
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 19294 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 18833 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-forest",
+    "rounds": 6,
+    "meanSeconds": 4.044444444444286,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-split": {
+   "static": {
+    "id": "original-split",
+    "walkableArea": 1215,
+    "reachableArea": 948.5,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 12.00000017785352,
+    "frame": {
+     "width": 88.85281489778009,
+     "height": 88.85281541541833
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 2,
+     "mechanisms": [
+      "movingFloor"
+     ],
+     "floorKinds": [
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 36
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 5 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 6 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-split",
+    "rounds": 6,
+    "meanSeconds": 6.3263819553857585,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.03333333333333333
+   }
+  },
+  "original-moving": {
+   "static": {
+    "id": "original-moving",
+    "walkableArea": 16723,
+    "reachableArea": 16723,
+    "outsideBoundaryArea": 15432.5,
+    "outsideCameraArea": 12750,
+    "minSpawnDistance": 31.400637319038797,
+    "frame": {
+     "width": 70.46803818161263,
+     "height": 70.46803880277857
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 69
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 15433 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 12750 平方单位可走地面在镜头取景外"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-moving",
+    "rounds": 6,
+    "meanSeconds": 4.566666666666513,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 5,
+     "explosion": 1
+    },
+    "stuckSeconds": 0.005555555555555556
+   }
+  },
+  "original-drift": {
+   "static": {
+    "id": "original-drift",
+    "walkableArea": 1010,
+    "reachableArea": 970.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 28,
+    "minSpawnDistance": 23.999999999999996,
+    "frame": {
+     "width": 66,
+     "height": 54
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 2,
+     "mechanisms": [
+      "destructible",
+      "movingFloor"
+     ],
+     "floorKinds": [
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 19
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 28 平方单位可走地面在镜头取景外"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-drift",
+    "rounds": 6,
+    "meanSeconds": 3.3899217143792573,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-tracks": {
+   "static": {
+    "id": "original-tracks",
+    "walkableArea": 22317.75,
+    "reachableArea": 22308.25,
+    "outsideBoundaryArea": 19802.75,
+    "outsideCameraArea": 19340.5,
+    "minSpawnDistance": 33.241540277189316,
+    "frame": {
+     "width": 69,
+     "height": 59
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 2,
+     "mechanisms": [
+      "destructible",
+      "movingFloor"
+     ],
+     "floorKinds": [
+      "moving"
+     ],
+     "plants": 113,
+     "obstacles": 38
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 5 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 6 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 19803 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-tracks",
+    "rounds": 6,
+    "meanSeconds": 7.143034755046709,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.013888888888888888
+   }
+  },
+  "original-tutorial": {
+   "static": {
+    "id": "original-tutorial",
+    "walkableArea": 30351,
+    "reachableArea": 154,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 32.00000035642492,
+    "frame": {
+     "width": 76.8319992899373,
+     "height": 76.83199975581175
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "door",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 68,
+     "obstacles": 54
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 2 与出生点 1 不连通（教程分区）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 3 与出生点 1 不连通（教程分区）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 4 与出生点 1 不连通（教程分区）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 5 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 6 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": null
+  },
+  "original-spin": {
+   "static": {
+    "id": "original-spin",
+    "walkableArea": 1267.5,
+    "reachableArea": 753.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 34.67708312416146,
+    "frame": {
+     "width": 66,
+     "height": 58.00000000000001
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "movingFloor"
+     ],
+     "floorKinds": [
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 49
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 3 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 4 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 6 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-spin",
+    "rounds": 6,
+    "meanSeconds": 7.586158276083047,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.013888888888888888
+   }
+  },
+  "original-teleportals": {
+   "static": {
+    "id": "original-teleportals",
+    "walkableArea": 10890,
+    "reachableArea": 10550.5,
+    "outsideBoundaryArea": 8868.25,
+    "outsideCameraArea": 5905,
+    "minSpawnDistance": 24.005208127168206,
+    "frame": {
+     "width": 76.124892431105,
+     "height": 76.12489305227093
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 6,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 79
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 8868 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 5905 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-teleportals",
+    "rounds": 6,
+    "meanSeconds": 4.748576443596779,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.06388888888888888
+   }
+  },
+  "original-temple": {
+   "static": {
+    "id": "original-temple",
+    "walkableArea": 14419.25,
+    "reachableArea": 14419.25,
+    "outsideBoundaryArea": 11481.5,
+    "outsideCameraArea": 10995,
+    "minSpawnDistance": 30.743611779522592,
+    "frame": {
+     "width": 84,
+     "height": 56
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 178,
+     "obstacles": 131
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 11482 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 10995 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-temple",
+    "rounds": 6,
+    "meanSeconds": 4.505541688549732,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.008333333333333333
+   }
+  },
+  "original-pier": {
+   "static": {
+    "id": "original-pier",
+    "walkableArea": 13840,
+    "reachableArea": 13736,
+    "outsideBoundaryArea": 10881,
+    "outsideCameraArea": 10692.5,
+    "minSpawnDistance": 32.4821486450635,
+    "frame": {
+     "width": 93.199997,
+     "height": 64.299999
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 82
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 10881 平方单位可走地面，走进去会触发出界计时"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-pier",
+    "rounds": 6,
+    "meanSeconds": 6.859969891410671,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.016666666666666666
+   }
+  },
+  "original-onsen": {
+   "static": {
+    "id": "original-onsen",
+    "walkableArea": 12512.75,
+    "reachableArea": 11883.75,
+    "outsideBoundaryArea": 8516.25,
+    "outsideCameraArea": 8128.25,
+    "minSpawnDistance": 37.251543946258145,
+    "frame": {
+     "width": 92,
+     "height": 56
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 69
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 8516 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 8128 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-onsen",
+    "rounds": 6,
+    "meanSeconds": 6.12220835521628,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.005555555555555556
+   }
+  },
+  "original-henge": {
+   "static": {
+    "id": "original-henge",
+    "walkableArea": 17066.25,
+    "reachableArea": 17065.75,
+    "outsideBoundaryArea": 14546,
+    "outsideCameraArea": 14031.25,
+    "minSpawnDistance": 30,
+    "frame": {
+     "width": 69,
+     "height": 54
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 59
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 14546 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 14031 平方单位可走地面在镜头取景外"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-henge",
+    "rounds": 6,
+    "meanSeconds": 5.1541319991523045,
+    "kills": 5,
+    "selfKills": 1,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 5,
+     "explosion": 1
+    },
+    "stuckSeconds": 0.008333333333333333
+   }
+  },
+  "original-bridges": {
+   "static": {
+    "id": "original-bridges",
+    "walkableArea": 2398.75,
+    "reachableArea": 2245,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 33.56815839298151,
+    "frame": {
+     "width": 101.71353295115833,
+     "height": 103.19178683320325
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 46,
+     "obstacles": 48
+    },
+    "findings": []
+   },
+   "bots": {
+    "id": "original-bridges",
+    "rounds": 6,
+    "meanSeconds": 3.4458263998303873,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.005555555555555556
+   }
+  },
+  "original-mist": {
+   "static": {
+    "id": "original-mist",
+    "walkableArea": 1857.5,
+    "reachableArea": 1838.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 26.346726133402807,
+    "frame": {
+     "width": 88.87769304840181,
+     "height": 85.3081725482121
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "cliff",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 63
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-mist",
+    "rounds": 6,
+    "meanSeconds": 6.874310852489791,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.05555555555555555
+   }
+  },
+  "original-bamboo-grove": {
+   "static": {
+    "id": "original-bamboo-grove",
+    "walkableArea": 21730,
+    "reachableArea": 21729.75,
+    "outsideBoundaryArea": 18765,
+    "outsideCameraArea": 18236.75,
+    "minSpawnDistance": 32.51991486912294,
+    "frame": {
+     "width": 69,
+     "height": 54
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 390,
+     "obstacles": 52
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 18765 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 18237 平方单位可走地面在镜头取景外"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-bamboo-grove",
+    "rounds": 6,
+    "meanSeconds": 3.7590963032390263,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-pinball": {
+   "static": {
+    "id": "original-pinball",
+    "walkableArea": 6590.75,
+    "reachableArea": 1658.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 29.344607940642184,
+    "frame": {
+     "width": 66.00000236692047,
+     "height": 55.00000287743276
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 108
+    },
+    "findings": []
+   },
+   "bots": {
+    "id": "original-pinball",
+    "rounds": 6,
+    "meanSeconds": 3.338888888888769,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.005555555555555556
+   }
+  },
+  "original-big-raft": {
+   "static": {
+    "id": "original-big-raft",
+    "walkableArea": 1711.25,
+    "reachableArea": 1709.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 16.00000017821246,
+    "frame": {
+     "width": 94.50966961314688,
+     "height": 94.5096691990363
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destroyer",
+      "destructible",
+      "reactiveFloor",
+      "switch",
+      "trapFloor"
+     ],
+     "floorKinds": [
+      "falling",
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 44
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-big-raft",
+    "rounds": 6,
+    "meanSeconds": 3.8455606822183874,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-circle-maze": {
+   "static": {
+    "id": "original-circle-maze",
+    "walkableArea": 38236.25,
+    "reachableArea": 38236,
+    "outsideBoundaryArea": 35058.5,
+    "outsideCameraArea": 34632.75,
+    "minSpawnDistance": 34,
+    "frame": {
+     "width": 68,
+     "height": 68
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "reactiveFloor",
+      "switch"
+     ],
+     "floorKinds": [
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 57
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 35059 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 34633 平方单位可走地面在镜头取景外"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-circle-maze",
+    "rounds": 6,
+    "meanSeconds": 3.6305555555554165,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.002777777777777778
+   }
+  },
+  "original-courtyard": {
+   "static": {
+    "id": "original-courtyard",
+    "walkableArea": 32724.5,
+    "reachableArea": 1543.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 38.62641659025698,
+    "frame": {
+     "width": 97.33809663436543,
+     "height": 97.33809642731012
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "trapFloor"
+     ],
+     "floorKinds": [
+      "falling"
+     ],
+     "plants": 0,
+     "obstacles": 103
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 2 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "开局时出生点 3 与出生点 1 不连通（靠机关连通）"
+     },
+     {
+      "level": "info",
+      "code": "spawn-isolated",
+      "message": "出生点 5 与出生点 1 不连通（网页版最多 4 人，用不到这个点）"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-courtyard",
+    "rounds": 6,
+    "meanSeconds": 13.561097244104799,
+    "kills": 5,
+    "selfKills": 1,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 4,
+     "fire": 1,
+     "fall": 1
+    },
+    "stuckSeconds": 0.7861111111111092
+   }
+  },
+  "original-crate": {
+   "static": {
+    "id": "original-crate",
+    "walkableArea": 83125.25,
+    "reachableArea": 1228.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 30,
+    "frame": {
+     "width": 52,
+     "height": 52
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 107
+    },
+    "findings": []
+   },
+   "bots": {
+    "id": "original-crate",
+    "rounds": 6,
+    "meanSeconds": 7.0192231397191405,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.008333333333333333
+   }
+  },
+  "original-donut": {
+   "static": {
+    "id": "original-donut",
+    "walkableArea": 1914,
+    "reachableArea": 1904.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 28.284271247461902,
+    "frame": {
+     "width": 62,
+     "height": 62
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "movingFloor"
+     ],
+     "floorKinds": [
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 30
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-donut",
+    "rounds": 6,
+    "meanSeconds": 5.16944444444426,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.005555555555555556
+   }
+  },
+  "original-four-cogs": {
+   "static": {
+    "id": "original-four-cogs",
+    "walkableArea": 45742,
+    "reachableArea": 45742,
+    "outsideBoundaryArea": 43415,
+    "outsideCameraArea": 43212.5,
+    "minSpawnDistance": 31.112698372208094,
+    "frame": {
+     "width": 68,
+     "height": 60
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "movingFloor",
+      "movingObstacle"
+     ],
+     "floorKinds": [
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 60
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 43415 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-four-cogs",
+    "rounds": 6,
+    "meanSeconds": 3.6972222222220843,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-island-pair": {
+   "static": {
+    "id": "original-island-pair",
+    "walkableArea": 1668.25,
+    "reachableArea": 1661.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 24.186773244895647,
+    "frame": {
+     "width": 70,
+     "height": 56
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "reactiveFloor",
+      "switch",
+      "trapFloor"
+     ],
+     "floorKinds": [
+      "falling",
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 41
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-island-pair",
+    "rounds": 6,
+    "meanSeconds": 7.634378223992125,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 5,
+     "fall": 1
+    },
+    "stuckSeconds": 0.008333333333333333
+   }
+  },
+  "original-jungle-ruins": {
+   "static": {
+    "id": "original-jungle-ruins",
+    "walkableArea": 55382.25,
+    "reachableArea": 55382.25,
+    "outsideBoundaryArea": 53398.5,
+    "outsideCameraArea": 53074.5,
+    "minSpawnDistance": 29.154759474226502,
+    "frame": {
+     "width": 60,
+     "height": 48.00000000000001
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 62
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 53399 平方单位可走地面，走进去会触发出界计时"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-jungle-ruins",
+    "rounds": 6,
+    "meanSeconds": 3.5249999999998636,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-maze2": {
+   "static": {
+    "id": "original-maze2",
+    "walkableArea": 88215.5,
+    "reachableArea": 88215.5,
+    "outsideBoundaryArea": 86590.25,
+    "outsideCameraArea": 86355.75,
+    "minSpawnDistance": 15,
+    "frame": {
+     "width": 52,
+     "height": 52
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 4,
+     "mechanisms": [
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 51
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 86590 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-maze2",
+    "rounds": 6,
+    "meanSeconds": 7.667429636572077,
+    "kills": 5,
+    "selfKills": 1,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 5,
+     "fire": 1
+    },
+    "stuckSeconds": 0.011111111111111112
+   }
+  },
+  "original-pincer": {
+   "static": {
+    "id": "original-pincer",
+    "walkableArea": 2574.25,
+    "reachableArea": 2448.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 26.000000444274853,
+    "frame": {
+     "width": 110.06601885101475,
+     "height": 110.06601833337649
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "movingObstacle",
+      "switch",
+      "trapFloor"
+     ],
+     "floorKinds": [
+      "falling"
+     ],
+     "plants": 0,
+     "obstacles": 47
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-pincer",
+    "rounds": 6,
+    "meanSeconds": 17.746081002521898,
+    "kills": 3,
+    "selfKills": 1,
+    "draws": 2,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 3,
+     "fall": 2,
+     "fire": 1
+    },
+    "stuckSeconds": 0.5083333333333323
+   }
+  },
+  "original-raft-crusher": {
+   "static": {
+    "id": "original-raft-crusher",
+    "walkableArea": 1936.5,
+    "reachableArea": 1935.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 24.000001899782635,
+    "frame": {
+     "width": 81.94544323146292,
+     "height": 77.61587463106324
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "movingFloor",
+      "movingObstacle",
+      "switch"
+     ],
+     "floorKinds": [
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 46
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-raft-crusher",
+    "rounds": 6,
+    "meanSeconds": 6.766666666666363,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 4,
+     "explosion": 2
+    },
+    "stuckSeconds": 0.016666666666666666
+   }
+  },
+  "original-raft-pair": {
+   "static": {
+    "id": "original-raft-pair",
+    "walkableArea": 1908,
+    "reachableArea": 1908,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 32.7566787083184,
+    "frame": {
+     "width": 68,
+     "height": 64
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "reactiveFloor",
+      "switch",
+      "trapFloor"
+     ],
+     "floorKinds": [
+      "falling",
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 47
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-raft-pair",
+    "rounds": 6,
+    "meanSeconds": 11.086111111110554,
+    "kills": 4,
+    "selfKills": 0,
+    "draws": 2,
+    "suddenDeath": 0,
+    "causes": {
+     "fall": 2,
+     "explosion": 3,
+     "weapon": 1
+    },
+    "stuckSeconds": 0.022222222222222223
+   }
+  },
+  "original-raft-switches": {
+   "static": {
+    "id": "original-raft-switches",
+    "walkableArea": 1788,
+    "reachableArea": 1660.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 20,
+    "frame": {
+     "width": 78,
+     "height": 56
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "reactiveFloor",
+      "switch"
+     ],
+     "floorKinds": [
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 88
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-raft-switches",
+    "rounds": 6,
+    "meanSeconds": 7.776636558077395,
+    "kills": 4,
+    "selfKills": 1,
+    "draws": 1,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 3,
+     "explosion": 4
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-raft-switches2": {
+   "static": {
+    "id": "original-raft-switches2",
+    "walkableArea": 355421,
+    "reachableArea": 355418,
+    "outsideBoundaryArea": 351213.5,
+    "outsideCameraArea": 350723.25,
+    "minSpawnDistance": 29.1547594742265,
+    "frame": {
+     "width": 88,
+     "height": 80
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "reactiveFloor",
+      "switch"
+     ],
+     "floorKinds": [
+      "moving"
+     ],
+     "plants": 0,
+     "obstacles": 122
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 351214 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-raft-switches2",
+    "rounds": 6,
+    "meanSeconds": 3.506937510941494,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-rivercrossing": {
+   "static": {
+    "id": "original-rivercrossing",
+    "walkableArea": 36099,
+    "reachableArea": 35911,
+    "outsideBoundaryArea": 34176.75,
+    "outsideCameraArea": 33843.25,
+    "minSpawnDistance": 24.08318915758459,
+    "frame": {
+     "width": 62,
+     "height": 58.00000000000001
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 2,
+     "mechanisms": [
+      "destructible",
+      "trapFloor"
+     ],
+     "floorKinds": [
+      "falling"
+     ],
+     "plants": 0,
+     "obstacles": 59
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 34177 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "outside-camera",
+      "message": "约 33843 平方单位可走地面在镜头取景外"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-rivercrossing",
+    "rounds": 6,
+    "meanSeconds": 19.911620316494986,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 5,
+     "fall": 1
+    },
+    "stuckSeconds": 0.13055555555555567
+   }
+  },
+  "original-roller-sweep": {
+   "static": {
+    "id": "original-roller-sweep",
+    "walkableArea": 1810.25,
+    "reachableArea": 1798,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 32,
+    "frame": {
+     "width": 64,
+     "height": 72
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destroyer",
+      "destructible",
+      "movingObstacle"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 44
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-roller-sweep",
+    "rounds": 6,
+    "meanSeconds": 3.892641811245653,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-shrine": {
+   "static": {
+    "id": "original-shrine",
+    "walkableArea": 1634.25,
+    "reachableArea": 1634.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 30.000000011133178,
+    "frame": {
+     "width": 76.39934881388638,
+     "height": 76.39934881388638
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "cliff",
+     "pits": 0,
+     "portals": 4,
+     "mechanisms": [
+      "destructible"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 75
+    },
+    "findings": []
+   },
+   "bots": {
+    "id": "original-shrine",
+    "rounds": 6,
+    "meanSeconds": 8.608347815659748,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.011111111111111112
+   }
+  },
+  "original-trap": {
+   "static": {
+    "id": "original-trap",
+    "walkableArea": 1717,
+    "reachableArea": 1660.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 32,
+    "frame": {
+     "width": 84,
+     "height": 52
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "trapFloor"
+     ],
+     "floorKinds": [
+      "falling"
+     ],
+     "plants": 0,
+     "obstacles": 28
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-trap",
+    "rounds": 6,
+    "meanSeconds": 9.105555555555105,
+    "kills": 5,
+    "selfKills": 0,
+    "draws": 1,
+    "suddenDeath": 0,
+    "causes": {
+     "fall": 1,
+     "weapon": 5
+    },
+    "stuckSeconds": 0.008333333333333333
+   }
+  },
+  "original-trap-islands": {
+   "static": {
+    "id": "original-trap-islands",
+    "walkableArea": 1978.25,
+    "reachableArea": 1933.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 36.49657518178931,
+    "frame": {
+     "width": 72,
+     "height": 70
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "destructible",
+      "trapFloor"
+     ],
+     "floorKinds": [
+      "falling"
+     ],
+     "plants": 0,
+     "obstacles": 33
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-trap-islands",
+    "rounds": 6,
+    "meanSeconds": 3.78611111111096,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-trap-maze2": {
+   "static": {
+    "id": "original-trap-maze2",
+    "walkableArea": 2096,
+    "reachableArea": 2096,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 23.999999999999996,
+    "frame": {
+     "width": 70,
+     "height": 70
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "water",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [
+      "trapFloor"
+     ],
+     "floorKinds": [
+      "falling"
+     ],
+     "plants": 0,
+     "obstacles": 125
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-trap-maze2",
+    "rounds": 6,
+    "meanSeconds": 8.10875681332073,
+    "kills": 0,
+    "selfKills": 0,
+    "draws": 6,
+    "suddenDeath": 0,
+    "causes": {
+     "fall": 12
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "original-turn-teleportals": {
+   "static": {
+    "id": "original-turn-teleportals",
+    "walkableArea": 87956.75,
+    "reachableArea": 87956.75,
+    "outsideBoundaryArea": 85341.25,
+    "outsideCameraArea": 82376.75,
+    "minSpawnDistance": 40.00000058960134,
+    "frame": {
+     "width": 84.87558916093862,
+     "height": 77.29884382305858
+    },
+    "spawns": 6,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "cliff",
+     "pits": 0,
+     "portals": 6,
+     "mechanisms": [
+      "destructible",
+      "movingObstacle"
+     ],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 45
+    },
+    "findings": [
+     {
+      "level": "info",
+      "code": "outside-boundary",
+      "message": "边界外有约 85341 平方单位可走地面，走进去会触发出界计时"
+     },
+     {
+      "level": "info",
+      "code": "dynamic",
+      "message": "含移动/掉落机关：静态检查只看开局状态"
+     }
+    ]
+   },
+   "bots": {
+    "id": "original-turn-teleportals",
+    "rounds": 6,
+    "meanSeconds": 6.73471528871907,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.005555555555555556
+   }
+  },
+  "courtyard": {
+   "static": {
+    "id": "courtyard",
+    "walkableArea": 2105,
+    "reachableArea": 2105,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 22,
+    "frame": {
+     "width": 69,
+     "height": 45
+    },
+    "spawns": 4,
+    "pickupSpawns": 6,
+    "features": {
+     "hazard": "none",
+     "pits": 2,
+     "portals": 0,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 9
+    },
+    "findings": []
+   },
+   "bots": {
+    "id": "courtyard",
+    "rounds": 6,
+    "meanSeconds": 3.327102497273454,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "canal": {
+   "static": {
+    "id": "canal",
+    "walkableArea": 2092.25,
+    "reachableArea": 2092.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 27.5,
+    "frame": {
+     "width": 69,
+     "height": 45
+    },
+    "spawns": 4,
+    "pickupSpawns": 5,
+    "features": {
+     "hazard": "none",
+     "pits": 4,
+     "portals": 0,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 6
+    },
+    "findings": []
+   },
+   "bots": {
+    "id": "canal",
+    "rounds": 6,
+    "meanSeconds": 6.969430577438484,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.022222222222222223
+   }
+  },
+  "market": {
+   "static": {
+    "id": "market",
+    "walkableArea": 2180.25,
+    "reachableArea": 2180.25,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 27.5,
+    "frame": {
+     "width": 69,
+     "height": 45
+    },
+    "spawns": 4,
+    "pickupSpawns": 5,
+    "features": {
+     "hazard": "none",
+     "pits": 0,
+     "portals": 0,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 12
+    },
+    "findings": []
+   },
+   "bots": {
+    "id": "market",
+    "rounds": 6,
+    "meanSeconds": 13.07638195538541,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0.10555555555555561
+   }
+  },
+  "switchback": {
+   "static": {
+    "id": "switchback",
+    "walkableArea": 2133.75,
+    "reachableArea": 2133.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 27.5,
+    "frame": {
+     "width": 69,
+     "height": 45
+    },
+    "spawns": 4,
+    "pickupSpawns": 5,
+    "features": {
+     "hazard": "none",
+     "pits": 2,
+     "portals": 0,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 6
+    },
+    "findings": []
+   },
+   "bots": {
+    "id": "switchback",
+    "rounds": 6,
+    "meanSeconds": 5.086111111110882,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  },
+  "portals": {
+   "static": {
+    "id": "portals",
+    "walkableArea": 2247.75,
+    "reachableArea": 2247.75,
+    "outsideBoundaryArea": 0,
+    "outsideCameraArea": 0,
+    "minSpawnDistance": 27.5,
+    "frame": {
+     "width": 69,
+     "height": 45
+    },
+    "spawns": 4,
+    "pickupSpawns": 5,
+    "features": {
+     "hazard": "none",
+     "pits": 0,
+     "portals": 4,
+     "mechanisms": [],
+     "floorKinds": [],
+     "plants": 0,
+     "obstacles": 6
+    },
+    "findings": []
+   },
+   "bots": {
+    "id": "portals",
+    "rounds": 6,
+    "meanSeconds": 5.7666527996607755,
+    "kills": 6,
+    "selfKills": 0,
+    "draws": 0,
+    "suddenDeath": 0,
+    "causes": {
+     "weapon": 6
+    },
+    "stuckSeconds": 0
+   }
+  }
+ }
+}

@@ -70,6 +70,17 @@ interface Brain {
   floorEscapeIn: number;
   floorEscape?: Vec2 | null;
   escapingFloor: boolean;
+  /** Closest the recalled disc has come, and how long it has failed to get closer. */
+  recallGap?: number;
+  recallStall?: number;
+  /** A recall pinned behind a wall never arrives: walk to the disc until this time. */
+  fetchUntil?: number;
+  /** Where the bot last made progress from, and how long it has stood near it. */
+  anchor?: Vec2;
+  stillFor?: number;
+  /** A detour taken after standing still with no opponent in sight. */
+  detour?: NavigationWaypoint[];
+  detourUntil?: number;
 }
 
 export class BotController {
@@ -203,6 +214,21 @@ export class BotController {
       towards = normalize(delta);
     const sight = lineOfSight(state.arena, actor.position, enemy.position);
     const reaction = THINK[state.options.difficulty] ?? THINK.normal;
+    // Two bots can stall for minutes with a wall or an unreachable platform between
+    // them, each pressing toward the other. Standing still out of sight earns a detour:
+    // as close to the opponent as the map allows, else toward a random pickup point.
+    if (!brain.anchor || distance(brain.anchor, actor.position) > 0.6) {
+      brain.anchor = { ...actor.position };
+      brain.stillFor = 0;
+    } else brain.stillFor = (brain.stillFor ?? 0) + dt;
+    if (!sight && brain.stillFor! > 1.5 && state.time >= (brain.detourUntil ?? 0)) {
+      let detour = findPath(state.arena, actor.position, enemy.position, { partial: true });
+      if (!detour.length || distance(detour[detour.length - 1], actor.position) < 1)
+        detour = findPath(state.arena, actor.position, random.pick([...state.arena.pickupSpawns]));
+      brain.detour = detour;
+      brain.detourUntil = state.time + 2.5;
+      brain.anchor = undefined;
+    }
 
     if (brain.thinkIn <= 0) {
       brain.thinkIn = reaction;
@@ -217,7 +243,10 @@ export class BotController {
         .sort(
           (a, b) => distance(actor.position, a.position) - distance(actor.position, b.position),
         )[0];
-      if (pickup && d > 3) goal = pickup.position;
+      const fetching = !actor.armed && state.time < (brain.fetchUntil ?? 0);
+      const ownDisc = fetching ? state.discs.find((p) => p.ownerId === actor.id) : undefined;
+      if (ownDisc) goal = { ...ownDisc.position };
+      else if (pickup && d > 3) goal = pickup.position;
       else if (
         d < 3.2 &&
         (actor.attackCooldown > 0.1 || enemy.attackTime > 0.03 || brain.attackIn > 0.25)
@@ -268,6 +297,11 @@ export class BotController {
       }
       advancePath(brain.path, actor.position);
       brain.move = brain.path.length ? normalize(sub(brain.path[0], actor.position)) : towards;
+      if (brain.detour?.length && state.time < (brain.detourUntil ?? 0) && !sight) {
+        advancePath(brain.detour, actor.position);
+        if (distance(brain.detour[0], actor.position) > 0.2)
+          brain.move = normalize(sub(brain.detour[0], actor.position));
+      }
       if (
         !escapingBoundary &&
         brain.attackIn <= 0 &&
@@ -369,7 +403,22 @@ export class BotController {
     if (!actor.armed && !escapingBoundary) {
       brain.chargeFor = -1;
       const disc = state.discs.find((p) => p.ownerId === actor.id);
-      command.throwHeld = !!disc && !disc.explosive && (disc.state === 'dropped' || disc.age > 0.9);
+      let recall = !!disc && !disc.explosive && (disc.state === 'dropped' || disc.age > 0.9);
+      if (recall && disc && !disc.powers?.includes('controlled')) {
+        const gap = distance(disc.position, actor.position);
+        if (brain.recallGap === undefined || gap < brain.recallGap - 0.1) {
+          brain.recallGap = gap;
+          brain.recallStall = 0;
+        } else brain.recallStall = (brain.recallStall ?? 0) + dt;
+        if (brain.recallStall > 1) {
+          brain.fetchUntil = state.time + 2;
+          brain.recallGap = undefined;
+          brain.recallStall = 0;
+          brain.thinkIn = 0;
+        }
+      } else brain.recallGap = undefined;
+      if (state.time < (brain.fetchUntil ?? 0)) recall = false;
+      command.throwHeld = recall;
       if (disc?.powers?.includes('controlled') && disc.age > 0.2 && sight) {
         command.throwHeld = true;
         command.move = normalize(sub(enemy.position, disc.position));

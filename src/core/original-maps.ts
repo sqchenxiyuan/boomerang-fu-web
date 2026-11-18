@@ -1,4 +1,5 @@
 import data from './original-map-data.json';
+import { applyMapAdjustments } from './map-adjustments';
 import type { Arena, MapId } from './types';
 
 export interface MapInfo {
@@ -163,5 +164,5 @@ export function createOriginalArena(id: MapId): Arena {
   const entry = originalById.get(id);
   if (!entry) throw new RangeError(`Unknown original map: ${id}`);
   // Every match owns its floors, moving walls and mechanism clocks, including SDK instances.
-  return structuredClone(entry.arena);
+  return applyMapAdjustments(structuredClone(entry.arena), id);
 }

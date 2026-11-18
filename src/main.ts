@@ -85,6 +85,8 @@ class Application {
     this.view.onPreviewMap = (mapId) => {
       if (this.screen === 'menu') this.showPreview({ ...defaultOptions(), mapId });
     };
+    // Links from the map gallery: index.html?map=<id>.
+    this.view.selectMap(new URLSearchParams(location.search).get('map'));
     const STYLE_KEY = 'boomerang-garden.visual-style.v1';
     const storedStyle = (() => {
       try {

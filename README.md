@@ -61,10 +61,10 @@ npm run dev
 npm run build:sdk
 npm run verify:sdk
 # 在另一个项目安装；也可以使用绝对路径
-npm install ./dist-sdk/boomerang-garden-sdk-0.9.0.tgz
+npm install ./dist-sdk/boomerang-garden-sdk-0.10.0.tgz
 ```
 
-交付的是本地 ESM 包 `@boomerang-garden/sdk@0.9.0`，未发布 npm。`MAPS`、`ORIGINAL_MAPS`、`CUSTOM_MAPS` 提供可选目录；原版地图 ID 以 `original-` 开头。
+交付的是本地 ESM 包 `@boomerang-garden/sdk@0.10.0`，未发布 npm。`MAPS`、`ORIGINAL_MAPS`、`CUSTOM_MAPS` 提供可选目录；原版地图 ID 以 `original-` 开头。
 
 ```js
 import { createBrowserGame } from '@boomerang-garden/sdk/browser';
@@ -129,6 +129,8 @@ SDK 0.7.0 提供 `ReplayTransport` 与 `ReplayTimeline`，站点使用独立回�
 SDK 0.8.0 把模拟换成 Godot 参考实现的数值与状态机，模拟版本改为 0.8.0，旧录像不再兼容。新增 `scoring` 选项和 `impossible` 难度，`scoreGoal` 可以省略。改动范围、单位换算与保留差异见[与 Godot 参考实现对齐](docs/godot-parity.md)。
 
 SDK 0.9.0 让模拟在不同 JavaScript 引擎间逐位一致。浏览器和 Node 的 `Math.sin/cos/atan2/acos` 末位并不统一（实测 Node 26 与 Chromium 158 对 3%–17% 的随机输入结果不同），所以同一场录像在另一个浏览器或 Node 批量运行器里会慢慢漂移。模拟改用 `src/core/dmath.ts`：移植 fdlibm 算法，只用 IEEE 精确运算，误差小于 1 ulp。模拟版本改为 0.9.0，0.8.0 录像不再兼容。
+
+SDK 0.10.0 整理地图：[地图图鉴](maps.html)（`npm run dev` 后打开 `/maps.html`）展示全部 63 张地图的俯视图、特征、体检结论和可交互 3D 预览；`npm run audit:maps` 重新体检。原版地图里 5 个与树木、石柱或滑墙重叠的出生点做了 0.05–0.35 单位的微调（记录在 `src/core/map-adjustments.ts`，原始数据文件不变），同时修复了机器人在几张地图上长时间僵持的问题。模拟版本改为 0.10.0，0.9.0 录像不再兼容。详见[地图整理](docs/maps.md)。
 
 ## 分层
 

@@ -61,7 +61,7 @@ export default defineConfig({
     target: 'es2022',
     rollupOptions: {
       // dev/*.html (sound and effects galleries) are served by the dev server only.
-      input: { game: 'index.html', sdk: 'sdk-demo.html' },
+      input: { game: 'index.html', sdk: 'sdk-demo.html', maps: 'maps.html' },
       output: { manualChunks: { three: ['three'] } },
     },
   },

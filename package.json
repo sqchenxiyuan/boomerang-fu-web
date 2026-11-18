@@ -20,9 +20,10 @@
     "test:browser": "node scripts/v2-browser-verify.mjs",
     "test:sdk-browser": "node scripts/sdk-browser-verify.mjs",
     "test:v3-browser": "node scripts/v3-browser-verify.mjs",
-    "format": "prettier --write src tests dev scripts/*.mjs examples/*.mjs examples/*.js index.html sdk-demo.html mundi.html vite.config.ts package.json tsconfig.json tsconfig.sdk.json tsconfig.agent.json",
-    "format:check": "prettier --check src tests dev scripts/*.mjs examples/*.mjs examples/*.js index.html sdk-demo.html mundi.html vite.config.ts package.json tsconfig.json tsconfig.sdk.json tsconfig.agent.json",
-    "build:mundi": "tsc --noEmit && node scripts/build-mundi.mjs"
+    "format": "prettier --write src tests dev scripts/*.mjs examples/*.mjs examples/*.js index.html sdk-demo.html mundi.html maps.html vite.config.ts package.json tsconfig.json tsconfig.sdk.json tsconfig.agent.json",
+    "format:check": "prettier --check src tests dev scripts/*.mjs examples/*.mjs examples/*.js index.html sdk-demo.html mundi.html maps.html vite.config.ts package.json tsconfig.json tsconfig.sdk.json tsconfig.agent.json",
+    "build:mundi": "tsc --noEmit && node scripts/build-mundi.mjs",
+    "audit:maps": "node scripts/audit-maps.mjs"
   },
   "dependencies": {
     "@jitl/quickjs-singlefile-browser-release-sync": "0.32.0",

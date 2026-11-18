@@ -192,10 +192,21 @@ function staticTerrain(arena: Arena): StaticNavigation {
 }
 
 function graphFor(arena: Arena): Graph {
-  const signature = `${arena.revision ?? 0}:${arena.obstacles.map((o) => Number(o.broken)).join('')}`;
+  const terrain = staticTerrain(arena);
+  // Switch walls, doors and sweepers move after the graph is built: a stale graph
+  // routes bots straight into a wall that has since slid into place.
+  const moving = terrain
+    ? terrain.moving.obstacles
+        .map((o) =>
+          o.broken || o.disabled
+            ? '-'
+            : `${Math.round(o.position.x * 4)},${Math.round(o.position.y * 4)},${Math.round((o.angle ?? 0) * 20)}`,
+        )
+        .join(';')
+    : '';
+  const signature = `${arena.revision ?? 0}:${arena.obstacles.map((o) => Number(o.broken)).join('')}:${moving}`;
   const previous = graphs.get(arena);
   if (previous?.signature === signature) return previous;
-  const terrain = staticTerrain(arena);
   const sampled = new Map<string, boolean>();
   const safeNode = (point: Vec2): boolean => {
     const key = `${point.x},${point.y}`;
@@ -280,18 +291,34 @@ function graphFor(arena: Arena): Graph {
 }
 
 /** A* without portals, Dijkstra with shortcuts; Euclidean heuristics overestimate portal routes. */
-export function findPath(arena: Arena, start: Vec2, goal: Vec2): NavigationWaypoint[] {
+/**
+ * Waypoints from start to goal, or [] when the goal is unreachable. With
+ * `partial`, an unreachable goal instead yields a route to the reachable node
+ * nearest to it (bots use this so a cut-off opponent still draws them closer).
+ */
+export function findPath(
+  arena: Arena,
+  start: Vec2,
+  goal: Vec2,
+  options: { partial?: boolean } = {},
+): NavigationWaypoint[] {
   const hasPortals = !!arena.portals?.length;
   const hasWarnings = arena.floors?.some((floor) => (floor.warning ?? 0) > 0) ?? false;
   if (!hasPortals && clearPathSegment(arena, start, goal)) return [{ ...goal }];
   const { nodes, edges } = graphFor(arena);
+  // Connectors only consider nearby nodes: probing every node of a large map
+  // when none connects costs hundreds of long segment traces per call.
   const ordered = (point: Vec2) =>
-    nodes.map((_, i) => i).sort((a, b) => distance(nodes[a], point) - distance(nodes[b], point));
+    nodes
+      .map((_, i) => i)
+      .sort((a, b) => distance(nodes[a], point) - distance(nodes[b], point))
+      .slice(0, 48);
   // A body can legally hug a wall more closely than the conservative grid clearance.
   // Permit a body-sized connector out to the grid so AI never loses its route at a corner.
-  const first = ordered(start).find((i) =>
-    clearPathSegment(arena, start, nodes[i], RULES.playerRadius),
-  );
+  // A body standing on a shore with part of it over water is not "safe" at any body
+  // clearance; its connector only needs the centre line to stay on solid ground.
+  const connector = navigable(arena, start, RULES.playerRadius) ? RULES.playerRadius : 0.05;
+  const first = ordered(start).find((i) => clearPathSegment(arena, start, nodes[i], connector));
   const goalSafe = navigable(arena, goal, margin);
   const last = ordered(goal).find((i) => !goalSafe || clearPathSegment(arena, nodes[i], goal));
   if (first === undefined || last === undefined) return [];
@@ -300,6 +327,23 @@ export function findPath(arena: Arena, start: Vec2, goal: Vec2): NavigationWaypo
   const score = new Map<number, number>([[first, 0]]);
   const parents = new Map<number, { from: number; portalId?: string }>();
   const heuristic = (i: number): number => (hasPortals ? 0 : distance(nodes[i], nodes[last]));
+  const route = (end: number): NavigationWaypoint[] => {
+    const path: NavigationWaypoint[] = [{ ...nodes[end] }];
+    let cursor = end;
+    while (parents.has(cursor)) {
+      const parent = parents.get(cursor)!;
+      const point: NavigationWaypoint = { ...nodes[parent.from] };
+      if (parent.portalId) {
+        point.portalId = parent.portalId;
+        path[0].viaPortal = parent.portalId;
+      }
+      path.unshift(point);
+      cursor = parent.from;
+    }
+    return path;
+  };
+  let nearest = first,
+    nearestDistance = distance(nodes[first], goal);
   while (open.size) {
     let current = -1,
       best = Infinity;
@@ -311,19 +355,12 @@ export function findPath(arena: Arena, start: Vec2, goal: Vec2): NavigationWaypo
       }
     }
     open.delete(current);
+    if (options.partial && distance(nodes[current], goal) < nearestDistance) {
+      nearest = current;
+      nearestDistance = distance(nodes[current], goal);
+    }
     if (current === last) {
-      const path: NavigationWaypoint[] = [{ ...nodes[last] }];
-      let cursor = last;
-      while (parents.has(cursor)) {
-        const parent = parents.get(cursor)!;
-        const point: NavigationWaypoint = { ...nodes[parent.from] };
-        if (parent.portalId) {
-          point.portalId = parent.portalId;
-          path[0].viaPortal = parent.portalId;
-        }
-        path.unshift(point);
-        cursor = parent.from;
-      }
+      const path = route(last);
       if (goalSafe && distance(path[path.length - 1], goal) > 0.05) path.push({ ...goal });
       // Smooth only the first ordinary walking section. Never flatten a portal edge.
       while (
@@ -349,6 +386,8 @@ export function findPath(arena: Arena, start: Vec2, goal: Vec2): NavigationWaypo
       }
     }
   }
+  // Only worth walking when it actually gets closer than where the bot stands.
+  if (options.partial && nearestDistance < distance(start, goal) - 1) return route(nearest);
   return [];
 }
 

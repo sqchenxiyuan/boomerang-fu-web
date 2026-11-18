@@ -102,7 +102,7 @@ export class View {
         </div>
         <div class="settings-row"><label>机器人<select id="bots" aria-label="机器人数量"><option value="1">1 位对手</option><option value="3">3 位对手</option></select></label><label>难度<select id="difficulty" aria-label="机器人难度"><option value="easy">轻松</option><option value="normal" selected>标准</option><option value="hard">挑战</option><option value="impossible">极限</option></select></label></div>
         <div class="settings-row map-settings"><label>地图<select id="map" aria-label="地图">${mapOptions()}</select></label><label>回合换图<select id="rotation" aria-label="回合换图"><option value="fixed">固定地图</option><option value="cycle">依次轮换</option></select></label></div>
-        <p class="map-description" id="map-description">${mapInfo('original-enclosed').description}</p>
+        <p class="map-description"><span id="map-description">${mapInfo('original-enclosed').description}</span> <a class="map-gallery-link" id="map-gallery-link" href="./maps.html?map=original-enclosed" target="_blank" rel="noopener">地图图鉴 →</a></p>
         <div class="settings-row"><label>决胜缩圈<select id="sudden-death" aria-label="决胜缩圈时间"><option value="180">180 秒 · 原版节奏</option><option value="60">60 秒</option><option value="30">30 秒 · 快速体验</option></select></label><label>计分<select id="scoring" aria-label="计分方式"><option value="kills" selected>击倒计分 · 原版</option><option value="survival">存活计分 · 先得 5 分</option></select></label></div>
         <div class="settings-row"><label>画面风格<select id="visual-style" aria-label="画面风格"><option value="standard">标准 · 柔和低多边形</option><option value="pixel">像素风 · 体素方块模型</option></select></label></div>
         <button class="primary-button" id="start">进入花园 <span>↗</span></button>
@@ -242,6 +242,8 @@ export class View {
       const id = this.get<HTMLSelectElement>('map').value as MapId;
       const info = mapInfo(id);
       this.get('map-description').textContent = info.description;
+      this.get<HTMLAnchorElement>('map-gallery-link').href =
+        `./maps.html?map=${encodeURIComponent(id)}`;
       this.get('scene-caption').innerHTML =
         `<span class="location-dot">✦</span><div>${info.name}<small>${info.subtitle}</small></div><span class="scene-line"></span><span>短回合 · 随时再来</span>`;
       this.onPreviewMap(id);
@@ -264,6 +266,13 @@ export class View {
     return this.root.querySelector<T>(`#${id}`)!;
   }
 
+  /** Select a map by id (e.g. from ?map= in the URL) and preview it; unknown ids are ignored. */
+  selectMap(id: string | null): void {
+    const select = this.get<HTMLSelectElement>('map');
+    if (!id || ![...select.options].some((option) => option.value === id)) return;
+    select.value = id;
+    select.dispatchEvent(new Event('change'));
+  }
   setVisualStyle(style: 'standard' | 'pixel'): void {
     this.get<HTMLSelectElement>('visual-style').value = style;
   }

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>地图图鉴 · Boomerang Garden</title>
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <h1>地图图鉴</h1>
+        <p id="summary">正在载入地图…</p>
+      </div>
+      <a class="back" href="./index.html">返回游戏 →</a>
+    </header>
+    <section class="toolbar" aria-label="筛选">
+      <div class="chips" id="groups" role="group" aria-label="分组"></div>
+      <div class="chips" id="tags" role="group" aria-label="特征"></div>
+      <div class="controls">
+        <input id="search" type="search" placeholder="搜索地图名…" aria-label="搜索地图名" />
+        <select id="sort" aria-label="排序">
+          <option value="default">默认顺序</option>
+          <option value="size">按大小</option>
+          <option value="round">按回合时长</option>
+          <option value="issues">按体检问题</option>
+        </select>
+      </div>
+    </section>
+    <section class="legend" id="legend" aria-label="图例"></section>
+    <main id="grid" class="grid" aria-live="polite"></main>
+    <dialog id="detail" aria-labelledby="detail-title">
+      <div class="detail">
+        <div class="viewer">
+          <div class="stage" id="stage" aria-label="三维预览"></div>
+          <div class="viewer-controls">
+            <button type="button" data-style="standard" class="active">标准画风</button>
+            <button type="button" data-style="pixel">像素风</button>
+            <button type="button" id="watch">观看机器人对战</button>
+            <a id="play" class="play" href="./index.html">在游戏中打开 →</a>
+          </div>
+        </div>
+        <div class="info">
+          <button type="button" class="close" id="close" aria-label="关闭">×</button>
+          <h2 id="detail-title"></h2>
+          <p class="subtitle" id="detail-subtitle"></p>
+          <p id="detail-description"></p>
+          <div class="chips" id="detail-tags"></div>
+          <canvas id="detail-schematic" width="560" height="360" aria-label="俯视示意图"></canvas>
+          <dl class="facts" id="detail-facts"></dl>
+          <h3>体检结论</h3>
+          <ul class="findings" id="detail-findings"></ul>
+        </div>
+      </div>
+    </dialog>
+    <script type="module" src="/src/gallery/main.ts"></script>
+  </body>
+</html>

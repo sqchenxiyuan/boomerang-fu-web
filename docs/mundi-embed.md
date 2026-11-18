@@ -36,7 +36,7 @@ npm run build:mundi
 | `snapshot` | 当前帧 |
 | `presentEnding` | 出结果后，不再接受输入，按真实时间播放最多 240 帧收尾演出（回合结束 → 胜利），然后停留 750 ms，供平台录完整视频；结果不变 |
 | `audio` | 开关声音，返回 `{phase, enabled}`，并通过 `arkena:audio` 通知父页面 |
-| `appearance` | Web 扩展，仅影响显示：`{players: [look\|null, look\|null]}`，look 为 `{name, hue?, img}`，img 是 PNG/WebP data URL（Agent 画像），体素化后作为该玩家的角色模型；不进录像，也不影响结果 |
+| `appearance` | Web 扩展，仅影响显示：`{players: [look\|null, look\|null]}`。look 为 `{name, hue?, img}`（玩家画的 Agent，PNG/WebP data URL，体素化成头部），或 `{name, hue?, seed}`（MUNDI 默认形象：与平台 `agent-world.js` 相同的种子 5×5 对称脸加熊耳，见 `src/mundi/identity.ts`）。收到后重建角色模型，并在头顶名牌和比分条显示玩家名；不进录像，也不影响结果 |
 | `match-seven` | 与平台的 SevenScore 一致：所有回复里的帧和观察的比分下限为 0（回合结束时扣分本来就会清零）；模拟和录像动作不变 |
 | 暂停 | `{control:'pause', paused}` |
 | 直连运行器 | `connectRunner` 传入第二个端口，策略 Worker 直接发 `observations` / `pacedStep`；其他命令在该端口上被拒绝。`detachRunner` 断开并暂停 |
@@ -50,7 +50,7 @@ npm run build:mundi
 - 模拟用 `AgentRuntime`，与无头 CLI（`npm run agent`）是同一份代码，所以浏览器里实时对局的每一帧与 CLI 重算结果逐字段相同（`tests/mundi-host.test.ts` 验证）。
 - 实时节奏由 `src/mundi/pacer.ts` 控制：按墙钟时间累计帧额度（每秒 60 帧 × 速度，最多累计 2 秒），暂停或标签页隐藏时清零；4 倍速以下每批至少 ⌈速度⌉ 帧，4 倍速及以上整批推进。
 - 画面复用游戏渲染器，默认像素风；地址加 `?style=standard` 切换到普通画风。抬头显示只有比分、回合、倒计时与回合结束提示、缩圈提示和转场遮罩。
-- 默认外观：1P 红豆、2P 紫影。平台传入的原版角色名（Avocado 等）照常校验、写回帧和观察，但不改变外观；要显示玩家自己的 Agent，用 `appearance`。
+- 默认外观：1P 红豆、2P 紫影。平台传入的原版角色名（Avocado 等）照常校验、写回帧和观察，但不改变外观；玩家自己的 Agent 由平台通过 `appearance` 传入（画像或 MUNDI 种子形象）。
 - 声音默认关闭，由平台的声音按钮打开（浏览器自动播放规则要求用户操作）。
 
 ## 验证

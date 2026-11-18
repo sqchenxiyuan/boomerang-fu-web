@@ -645,6 +645,10 @@ export class GameRenderer {
 
   private pixel = false;
   private rebuildCharacters = false;
+  /** Rebuild every character model on the next frame (after agent looks change). */
+  refreshAgents(): void {
+    this.rebuildCharacters = true;
+  }
   get visualStyle(): VisualStyle {
     return this.pixel ? 'pixel' : 'standard';
   }

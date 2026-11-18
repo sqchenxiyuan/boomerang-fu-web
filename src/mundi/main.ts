@@ -8,6 +8,7 @@ import type { GameState } from '../core/types';
 import { AudioEngine } from '../platform/audio';
 import { GameRenderer, type VisualStyle } from '../rendering/renderer';
 import { MundiHost, type AudioStatus, type HostView, type Playback } from './host';
+import { mundiFaceLook } from './identity';
 import { FramePacer } from './pacer';
 import './mundi.css';
 
@@ -90,10 +91,23 @@ const BFAudio = {
 };
 Object.assign(window, { BFAudio });
 
-// ── Appearance: optional agent drawings for each player, display only. ──
+// ── Appearance: each player's MUNDI agent, display only. Either their drawing
+// (`img`) or MUNDI's seeded default face (`seed`), with their name and colour. ──
+const HEX = /^#[0-9a-f]{6}$/i;
 async function lookFrom(entry: unknown, index: number): Promise<AgentLook | null> {
   if (!entry || typeof entry !== 'object') return null;
-  const { name, hue, img } = entry as Record<string, unknown>;
+  const { name, hue, img, seed } = entry as Record<string, unknown>;
+  const label = cleanName(typeof name === 'string' ? name : '') || actorIdentity(index).name;
+  if (img === undefined) {
+    if (!Number.isSafeInteger(seed) || (seed as number) < 0 || (seed as number) > 0xffffffff)
+      throw new Error('Invalid appearance seed');
+    return mundiFaceLook(
+      seed as number,
+      typeof hue === 'string' && HEX.test(hue) ? hue : '#c6f24e',
+      label,
+      index,
+    );
+  }
   if (typeof img !== 'string' || !/^data:image\/(png|webp);base64,/.test(img) || img.length > 3e6)
     throw new Error('Invalid appearance image');
   const image = new Image();
@@ -107,14 +121,11 @@ async function lookFrom(entry: unknown, index: number): Promise<AgentLook | null
   const pixels = context.getImageData(0, 0, VOXEL_GRID, VOXEL_GRID);
   const runs = voxelize(pixels, VOXEL_GRID);
   if (!runs.length) return null;
-  const color =
-    typeof hue === 'string' && /^#[0-9a-f]{6}$/i.test(hue)
-      ? hue
-      : (dominantHex(pixels) ?? '#c6f24e');
+  const color = typeof hue === 'string' && HEX.test(hue) ? hue : (dominantHex(pixels) ?? '#c6f24e');
   return {
     v: 1,
     id: `mundi-${index}`,
-    name: cleanName(typeof name === 'string' ? name : '') || actorIdentity(index).name,
+    name: label,
     img: '',
     bg: '#e9efe6',
     hue: color,
@@ -131,6 +142,7 @@ function setAppearance(players: unknown): void {
     (looks) => {
       if (revision !== appearanceRevision) return;
       assignAgents(new Map(looks.map((look, index) => [index, look])));
+      renderer.refreshAgents();
     },
   );
 }

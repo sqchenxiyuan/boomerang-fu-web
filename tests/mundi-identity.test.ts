@@ -44,3 +44,14 @@ describe("MUNDI's default agent identity", () => {
     }
   });
 });
+
+describe('held boomerang tint', () => {
+  it('follows the colour the boomerang will fly in', async () => {
+    const { heldTint } = await import('../src/rendering/characters');
+    const actor = (powers: string[]) => ({ powers }) as never;
+    expect(heldTint(actor([]), '#dc3846')).toBe('#dc3846');
+    expect(heldTint(actor(['ice']), '#dc3846')).toBe('#a5ebff');
+    expect(heldTint(actor(['fire', 'haste']), '#dc3846')).toBe('#ffbd69');
+    expect(heldTint(actor(['explosive']), '#dc3846')).toBe('#ffc189');
+  });
+});

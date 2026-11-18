@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { NATIVE, RULES } from '../core/config';
 import { lerpV } from '../core/math';
 import type { Actor } from '../core/types';
-import { box, cylinder, makeBoomerang, place, shadow, sphere } from './palette';
+import { box, cylinder, makeBoomerang, material, place, shadow, sphere } from './palette';
 import { createDeathModel, type DeathModel } from './death-models';
 import { sampleDeathPose, sampleFallPose } from './death-visuals';
 import { boundaryWarning } from '../core/feedback';
@@ -46,6 +46,9 @@ export interface CharacterView {
   shadow: THREE.Mesh;
   death: DeathModel;
   leftWeapon?: THREE.Group;
+  /** The holder's colour; held boomerangs wear it like the ones they throw. */
+  playerColor?: string;
+  weaponTint?: string;
   disguise?: THREE.Group;
   iceBlock?: THREE.Mesh;
   hands?: THREE.Group[];
@@ -75,6 +78,23 @@ function makeLabel(text: string, color: string): THREE.Sprite {
   sprite.position.y = 2.48;
   sprite.renderOrder = 10;
   return sprite;
+}
+
+/** Held boomerang size: close to a thrown one (1), so it reads beside the body. */
+const HELD_SCALE = 0.9;
+/** The colour the held boomerang will fly in (weapons-view discEffectColor). */
+export function heldTint(actor: Actor, playerColor: string | undefined): string | undefined {
+  const powers = actor.powers ?? [];
+  if (powers.includes('ice')) return '#a5ebff';
+  if (powers.includes('fire')) return '#ffbd69';
+  if (powers.includes('teleport')) return '#c3a4ff';
+  if (powers.includes('controlled')) return '#9dfff0';
+  if (powers.includes('explosive')) return '#ffc189';
+  return playerColor;
+}
+function tintBoomerang(group: THREE.Group | undefined, color: string): void {
+  const body = group?.children[0];
+  if (body instanceof THREE.Mesh) body.material = material(color);
 }
 
 export function createCharacter(
@@ -127,14 +147,17 @@ export function createCharacter(
     foot.add(shoe);
     feet.push(foot);
   }
-  const weapon = makeBoomerang();
-  weapon.scale.setScalar(0.62);
+  // Held boomerangs read at a glance: thrown-size, out past the head's
+  // silhouette, in the holder's colour (the pale default vanished on grass).
+  const playerColor = look?.hue ?? identity.color;
+  const weapon = makeBoomerang(playerColor);
+  weapon.scale.setScalar(HELD_SCALE);
   weapon.rotation.z = 0.4;
-  place(weapon, 0.06, -0.025, 0.08, hands[1]);
-  const leftWeapon = makeBoomerang();
-  leftWeapon.scale.setScalar(0.62);
+  place(weapon, 0.2, -0.02, 0.12, hands[1]);
+  const leftWeapon = makeBoomerang(playerColor);
+  leftWeapon.scale.setScalar(HELD_SCALE);
   leftWeapon.rotation.z = -0.4;
-  place(leftWeapon, -0.06, -0.025, 0.08, hands[0]);
+  place(leftWeapon, -0.2, -0.02, 0.12, hands[0]);
   leftWeapon.visible = false;
   const disguise = new THREE.Group();
   place(box(1.1, 0.95, 0.95, '#b58a52'), 0, 0.48, 0, disguise);
@@ -218,6 +241,8 @@ export function createCharacter(
     shadow: groundShadow,
     death,
     leftWeapon,
+    playerColor,
+    weaponTint: playerColor,
     disguise,
     iceBlock,
     hands,
@@ -296,6 +321,11 @@ export function updateCharacter(
   const meleeWeight = age === null ? 0 : sampleMeleePose(age, actor.attackArmed).weight;
   view.weapon.rotation.z = 0.4 * (1 - meleeWeight);
   view.weapon.visible = actor.armed && actor.alive;
+  const tint = heldTint(actor, view.playerColor);
+  if (tint && tint !== view.weaponTint) {
+    for (const held of [view.weapon, view.leftWeapon]) tintBoomerang(held, tint);
+    view.weaponTint = tint;
+  }
   if (view.leftWeapon)
     view.leftWeapon.visible = actor.alive && (actor.heldDiscs ?? (actor.armed ? 1 : 0)) > 1;
   view.shield.visible = actor.shield && actor.alive;

@@ -14,7 +14,9 @@ npm run build:mundi
 | --- | --- |
 | `index.html` | 嵌入页入口，所有资源用相对路径，放在任意目录下都能运行 |
 | `assets/*` | 带内容哈希的 JS/CSS，其中 Three.js 单独分包 |
-| `SOURCE.json` | 引擎标识、协议、源码仓库与提交、工作区是否有未提交改动，以及每个文件的 SHA-256 |
+| `SOURCE.json` | 引擎标识、协议、源码仓库与提交、工作区是否有未提交改动、每个文件的 SHA-256，以及本地运行时（`runtime.file` / `sha256`） |
+
+同一次构建还输出 `dist-mundi/<引擎标识>.local-runtime.mjs`：MUNDI 本地 CLI 与中心批量执行器启动的 Node 运行时。它只实现 `mundi.local.v1`：回连、令牌握手，`reset` / `advance` / `snapshot` 返回 `{frame, observations}`，以及 `quit`；不含策略沙箱，也不读写文件。它的 SHA-256 记录在 `SOURCE.json.runtime`，平台导入时把它固定到 `game-source/<引擎标识>/local-runtime.mjs`。浏览器游戏和运行时因此来自同一个提交；模拟跨 JS 引擎逐位一致（`src/core/dmath.ts`），两边的帧完全相同。
 
 平台把整个目录原样复制到 `/games/<引擎标识>/`。目录发布后不可修改：模拟有任何变化，都必须换新的引擎标识（`src/sdk/recording.ts` 的 `SIMULATION_VERSION` 或 `src/agent/contract.ts` 的适配器后缀），否则旧录像无法重算。正式发布用的构建应在干净工作区完成（`SOURCE.json` 里 `dirty: false`）。
 

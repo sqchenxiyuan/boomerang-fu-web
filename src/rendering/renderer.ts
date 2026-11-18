@@ -225,11 +225,19 @@ export class GameRenderer {
   private arenaSource: string;
   private previousTime = 0;
 
-  constructor(container: HTMLElement, state: GameState) {
+  constructor(
+    container: HTMLElement,
+    state: GameState,
+    options: { preserveDrawingBuffer?: boolean } = {},
+  ) {
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: false,
       powerPreference: 'high-performance',
+      // An embedding page that copies the canvas outside our frame (MUNDI's
+      // video recorder draws it into a 2D canvas on its own rAF) needs the
+      // last frame kept; otherwise it reads an empty, black buffer.
+      preserveDrawingBuffer: options.preserveDrawingBuffer ?? false,
     });
     this.canvas = this.renderer.domElement;
     this.canvas.className = 'game-canvas';

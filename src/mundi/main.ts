@@ -29,7 +29,8 @@ const status = document.getElementById('status')!;
 const runtime = new AgentRuntime({ events: true });
 // A neutral first scene so the renderer can build before the platform's reset.
 runtime.reset({ seed: 1, mode: 'round' });
-const renderer = new GameRenderer(root, runtime.state);
+// The platform records replay videos by copying #canvas from its own frames.
+const renderer = new GameRenderer(root, runtime.state, { preserveDrawingBuffer: true });
 renderer.canvas.id = 'canvas';
 renderer.setVisualStyle(style);
 const pacer = new FramePacer();

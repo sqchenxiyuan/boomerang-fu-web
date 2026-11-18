@@ -43,7 +43,7 @@ npm run build:mundi
 | 并发 | 同一时间只执行一个命令，重叠的命令返回 `Game command already in flight` |
 | `dispose` | 回复后释放渲染、声音和模拟 |
 
-平台的录像器还会直接读取嵌入页的两个对象：`#canvas`（画面）和 `window.BFAudio.capture()`（返回含音轨的 `MediaStream`，取自限幅器之后的总输出）。嵌入页都提供了。
+平台的录像器还会直接读取嵌入页的两个对象：`#canvas`（画面）和 `window.BFAudio.capture()`（返回含音轨的 `MediaStream`，取自限幅器之后的总输出）。嵌入页都提供了。平台在自己的帧里用 `drawImage` 复制 `#canvas`，所以嵌入页的 WebGL 画布开启了 `preserveDrawingBuffer`；不开时读到的是已清空的缓冲，录出来的复盘视频是全黑的。
 
 ## 模拟与显示
 

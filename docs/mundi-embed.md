@@ -37,6 +37,7 @@ npm run build:mundi
 | `presentEnding` | 出结果后，不再接受输入，按真实时间播放最多 240 帧收尾演出（回合结束 → 胜利），然后停留 750 ms，供平台录完整视频；结果不变 |
 | `audio` | 开关声音，返回 `{phase, enabled}`，并通过 `arkena:audio` 通知父页面 |
 | `appearance` | Web 扩展，仅影响显示：`{players: [look\|null, look\|null]}`，look 为 `{name, hue?, img}`，img 是 PNG/WebP data URL（Agent 画像），体素化后作为该玩家的角色模型；不进录像，也不影响结果 |
+| `match-seven` | 与平台的 SevenScore 一致：所有回复里的帧和观察的比分下限为 0（回合结束时扣分本来就会清零）；模拟和录像动作不变 |
 | 暂停 | `{control:'pause', paused}` |
 | 直连运行器 | `connectRunner` 传入第二个端口，策略 Worker 直接发 `observations` / `pacedStep`；其他命令在该端口上被拒绝。`detachRunner` 断开并暂停 |
 | 并发 | 同一时间只执行一个命令，重叠的命令返回 `Game command already in flight` |

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { AGENT_PROTOCOL, ENGINE_ID } from '../src/agent/contract';
 import { AgentRuntime } from '../src/agent/runtime';
-import { MundiHost, type HostPort, type HostView, type Playback } from '../src/mundi/host';
+import {
+  MundiHost,
+  floorScores,
+  type HostPort,
+  type HostView,
+  type Playback,
+} from '../src/mundi/host';
 import { FramePacer } from '../src/mundi/pacer';
 
 /** A pacer on a fake clock: by default each request finds exactly one more frame due. */
@@ -251,6 +257,30 @@ describe('MUNDI embed host (arkena.game.v1)', () => {
     expect((await platform.send('dispose')).result).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 5));
     expect(log).toContain('dispose');
+    host.dispose();
+  });
+
+  it('keeps match-seven scores nonnegative in frames and observations, like the platform', async () => {
+    expect(floorScores({ tick: 6, scores: [-1, 2] })).toEqual({ tick: 6, scores: [0, 2] });
+    expect(floorScores([{ scores: [-1, 0] }, { scores: [3, -1] }])).toEqual([
+      { scores: [0, 0] },
+      { scores: [3, 0] },
+    ]);
+    expect(
+      floorScores({
+        advanced: 6,
+        frame: { tick: 12, scores: [-1, 1] },
+        observations: [{ scores: [-1, 1], self: { id: 0 } }, { scores: [1, -1] }],
+      }),
+    ).toEqual({
+      advanced: 6,
+      frame: { tick: 12, scores: [0, 1] },
+      observations: [{ scores: [0, 1], self: { id: 0 } }, { scores: [0, 1] }],
+    });
+    expect(floorScores(true)).toBe(true);
+    const { platform, host } = setup();
+    const { result } = await platform.send('reset', { seed: 8, mode: 'match-seven' });
+    expect(result.scores).toEqual([0, 0]);
     host.dispose();
   });
 });

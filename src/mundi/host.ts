@@ -81,6 +81,28 @@ const fail = (message: string): never => {
   throw new Error(message);
 };
 
+/**
+ * MUNDI's seven-score match (`match-seven`) keeps interim scores nonnegative in
+ * every frame and observation (the platform's SevenScore, applied by its game
+ * hosts); round-end scoring already clears penalty debt. Presentation of the
+ * protocol only: the simulation and its recorded actions are unchanged.
+ */
+export function floorScores(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(floorScores);
+  const record = value as Record<string, unknown>;
+  if (record.frame && typeof record.frame === 'object') {
+    const frame = floorScores(record.frame) as { scores: number[] };
+    const observations = Array.isArray(record.observations)
+      ? record.observations.map((o) => ({ ...(o as object), scores: [...frame.scores] }))
+      : undefined;
+    return { ...record, frame, ...(observations ? { observations } : {}) };
+  }
+  return Array.isArray(record.scores)
+    ? { ...record, scores: (record.scores as number[]).map((score) => Math.max(0, score)) }
+    : value;
+}
+
 export class MundiHost {
   readonly manifest: Manifest;
   private port: HostPort | null = null;
@@ -88,6 +110,7 @@ export class MundiHost {
   private working = false;
   private idle: (() => void) | null = null;
   private disposed = false;
+  private seven = false;
 
   constructor(
     private readonly runtime: AgentRuntime,
@@ -191,7 +214,7 @@ export class MundiHost {
     this.working = true;
     try {
       const result = await this.command(method, params);
-      reply(result);
+      reply(this.seven ? floorScores(result) : result);
       if (method === 'dispose') this.dispose();
     } catch (error) {
       this.view.playback('paused');
@@ -226,6 +249,7 @@ export class MundiHost {
           fail('Invalid characters');
         this.view.playback('idle');
         this.pacer.reset();
+        this.seven = mode === 'match-seven';
         const frame = this.runtime.reset({
           seed: seed as number,
           mode: mode === 'round' ? 'round' : 'match',

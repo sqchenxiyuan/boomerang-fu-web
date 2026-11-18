@@ -75,6 +75,24 @@ vec2 sCells(vec2 p) {
     }
   return vec2(sqrt(d2) - sqrt(d1), id);
 }
+// Factors are chosen as they should look on screen; colour maths here is linear.
+float sT(float display) {
+  return pow(display, 2.2);
+}
+// Ordered 4x4 dither threshold in [0, 1) for an integer cell.
+float sBayer2(vec2 a) {
+  a = floor(a);
+  return fract(a.x * 0.5 + a.y * a.y * 0.75);
+}
+float sBayer4(vec2 a) {
+  return sBayer2(0.5 * a) * 0.25 + sBayer2(a);
+}
+// The voxel a fragment belongs to: faces sit exactly on cell borders, so step half
+// a cell inwards along the face normal before rounding down.
+vec3 sVoxel(vec3 position, float size) {
+  vec3 normal = normalize(cross(dFdx(position), dFdy(position)));
+  return floor((position - normal * size * 0.5) / size);
+}
 `;
 
 const VERTEX_DECL = /* glsl */ `
@@ -96,23 +114,81 @@ const VERTEX_BODY = /* glsl */ `
 
 const GROUND_FRAGMENT = /* glsl */ `
 #include <color_fragment>
-{
+if (uSurfPixel > 0.0) {
+  // Pixel art: every decision is made per voxel, with a few discrete tones and
+  // hand-placed looking accent pixels instead of gradients.
   float px = uSurfPixel;
+  vec3 voxel = sVoxel(vSurfWorld, px);
+  vec3 wp = (voxel + 0.5) * px;
+  vec2 cell = voxel.xz;
+  vec2 p = wp.xz;
+  float n1 = sNoise(p * 0.32);
+  float n2 = sNoise(p * 1.2 + 17.3);
+  float h = sHash(cell + 41.0);
+  float pick = sHash(cell + 97.0);
+  // Per-voxel speckle that never repeats (the old 16-cell shade texture tiled visibly).
+  float roll = sHash(cell + voxel.y * 7.7 + 3.0);
+  float speckle = roll < 0.08 ? 0.85 : (roll < 0.26 ? 0.92 : (roll > 0.92 ? 1.03 : 0.97));
+  vec3 c = diffuseColor.rgb * sT(speckle);
+  if (uSurfPart < 0.5) {
+    // Three-tone clumps about a metre across, dithered where they meet.
+    float lump = sNoise(p * 1.1 + 5.0) + (sBayer4(cell) - 0.5) * 0.16;
+    float clump = sT((lump > 0.62 ? 1.06 : (lump < 0.38 ? 0.94 : 1.0)) * (1.0 + (n1 - 0.5) * 0.08));
+    if (uSurfKind < 0.5) {
+      // Grass: clumps, darker tufts and the odd flower.
+      c *= clump;
+      if (h > 0.995)
+        c = pick < 0.45 ? vec3(0.91, 0.68, 0.1) : (pick < 0.8 ? vec3(0.85, 0.27, 0.37) : vec3(0.93, 0.91, 0.79));
+      else if (h > 0.94) c *= sT(0.86);
+    } else if (uSurfKind < 1.5) {
+      // Wood: three-voxel planks with one-voxel seams and joints.
+      vec3 lp = (sVoxel(vSurfLocal, px) + 0.5) * px;
+      float u = lp.z / 0.3;
+      float id = floor(u);
+      float along = lp.x + sHash(vec2(id, 3.0)) * 4.0;
+      float seg = floor(along / 2.4);
+      float fa = fract(along / 2.4) * 2.4;
+      c *= sT(0.93 + sHash(vec2(id, seg) + 5.0) * 0.12);
+      if (fract(u) < 0.34 || fa < px) c *= sT(0.78);
+      else if (h > 0.9) c *= sT(0.93);
+    } else if (uSurfKind < 2.5) {
+      // Ice: clumps and bright glint pixels.
+      c *= clump;
+      if (h > 0.97) c = mix(c, vec3(0.9, 0.97, 1.0), 0.7);
+    } else if (uSurfKind < 3.5) {
+      // Stone: flagstones in four shades with one-voxel grout.
+      vec2 stones = sCells(p / 0.85);
+      c *= sT((0.94 + floor(stones.y * 4.0) * 0.03) * (n1 > 0.62 ? 1.03 : 1.0));
+      if (stones.x < 0.1) c *= sT(0.8);
+      else if (h > 0.96) c *= sT(0.92);
+    } else {
+      // Sand: clumps, one-voxel wind ripples and pebbles.
+      c *= clump;
+      if (fract(dot(p, vec2(0.6, 0.8)) / 0.7 + n2 * 1.6) < 0.16) c *= sT(0.92);
+      if (h > 0.985) c *= sT(0.85);
+    }
+  } else {
+    // Side wall: a turf row with its shadow and the odd drip, then rows of earth
+    // that darken towards the water, with scattered darker voxels.
+    float y = wp.y;
+    c *= sT(mix(1.02, 0.84, clamp(-y / 0.65, 0.0, 1.0)));
+    if (sHash(cell + voxel.y * 13.1) > 0.9) c *= sT(0.92);
+    if (uSurfLipOn > 0.5) {
+      if (y > -px) c = uSurfLip * sT(speckle);
+      else if (y > -2.0 * px) c = sHash(cell + 5.0) > 0.78 ? uSurfLip * sT(0.95) : c * sT(0.88);
+    }
+  }
+  diffuseColor.rgb = c;
+} else {
   vec3 wp = vSurfWorld;
   vec3 lp = vSurfLocal;
-  if (px > 0.0) {
-    wp = (floor(wp / px) + 0.5) * px;
-    lp = (floor(lp / px) + 0.5) * px;
-  }
-  // Hair-line details only exist in the smooth style; voxels carry their own speckle.
-  float fineK = 1.0 - step(0.0001, px);
   vec2 p = wp.xz;
   float n1 = sNoise(p * 0.32);
   float n2 = sNoise(p * 1.2 + 17.3);
   vec3 c = diffuseColor.rgb;
   if (uSurfPart < 0.5) {
     float n3 = sNoise(p * 5.0 + 3.1);
-    float tone = 1.0 + (n1 - 0.5) * 0.2 + (n2 - 0.5) * 0.1 + (n3 - 0.5) * 0.06 * fineK;
+    float tone = 1.0 + (n1 - 0.5) * 0.2 + (n2 - 0.5) * 0.1 + (n3 - 0.5) * 0.06;
     if (uSurfKind < 0.5) {
       // Grass: broad sunlit patches and a sprinkle of light and dark blades.
       c *= tone;
@@ -122,7 +198,7 @@ const GROUND_FRAGMENT = /* glsl */ `
       vec2 offset = vec2(sHash(cell + 7.0), sHash(cell + 13.0)) - 0.5;
       float h = sHash(cell + 41.0);
       float blade = (1.0 - smoothstep(0.18, 0.3, length(fract(g) - 0.5 - offset * 0.4)))
-        * step(0.84, h) * fineK;
+        * step(0.84, h);
       c *= 1.0 + blade * (h > 0.93 ? 0.12 : -0.1);
     } else if (uSurfKind < 1.5) {
       // Wood: planks along local x, staggered end joints, grain and seams.
@@ -136,23 +212,23 @@ const GROUND_FRAGMENT = /* glsl */ `
       float seam = smoothstep(0.0, 0.08, fu) * smoothstep(1.0, 0.92, fu)
         * smoothstep(0.0, 0.03, fa) * smoothstep(2.4, 2.37, fa);
       float grain = sNoise(vec2(lp.x * 1.1, lp.z * 18.0) + id * 7.0);
-      c *= (0.9 + plank * 0.2) * (0.95 + grain * 0.1 * fineK) * mix(1.0, 0.7 + 0.3 * seam, fineK);
+      c *= (0.9 + plank * 0.2) * (0.95 + grain * 0.1) * (0.7 + 0.3 * seam);
     } else if (uSurfKind < 2.5) {
       // Ice: long glints and pale hairline cracks.
       c *= 1.0 + (n2 - 0.5) * 0.08;
       float glint = sNoise(vec2(dot(p, vec2(0.8, 0.6)) * 0.7, dot(p, vec2(-0.6, 0.8)) * 6.0));
       c += smoothstep(0.68, 0.9, glint) * 0.12;
       float crack = 1.0 - smoothstep(0.0, 0.025, abs(n2 - 0.5));
-      c = mix(c, vec3(0.93, 0.98, 1.0), crack * 0.45 * fineK);
+      c = mix(c, vec3(0.93, 0.98, 1.0), crack * 0.45);
     } else if (uSurfKind < 3.5) {
       // Stone: irregular flagstones, each with its own shade, and soft grout lines.
       vec2 stones = sCells(p / 0.85);
-      c *= (1.0 + (n1 - 0.5) * 0.12 + (n3 - 0.5) * 0.05 * fineK) * (0.93 + stones.y * 0.14);
-      c *= 1.0 - (1.0 - smoothstep(0.04, 0.11, stones.x)) * 0.14 * fineK;
+      c *= (1.0 + (n1 - 0.5) * 0.12 + (n3 - 0.5) * 0.05) * (0.93 + stones.y * 0.14);
+      c *= 1.0 - (1.0 - smoothstep(0.04, 0.11, stones.x)) * 0.14;
     } else {
       // Sand: soft dunes and wind ripples.
-      c *= 1.0 + (n1 - 0.5) * 0.12 + (n2 - 0.5) * 0.06 + (n3 - 0.5) * 0.05 * fineK;
-      c *= 1.0 + sin(dot(p, vec2(0.6, 0.8)) * 7.0 + n2 * 6.0) * 0.025 * fineK;
+      c *= 1.0 + (n1 - 0.5) * 0.12 + (n2 - 0.5) * 0.06 + (n3 - 0.5) * 0.05;
+      c *= 1.0 + sin(dot(p, vec2(0.6, 0.8)) * 7.0 + n2 * 6.0) * 0.025;
     }
   } else {
     // Side wall: a turf lip on top, darker towards the water, faint strata.
@@ -192,11 +268,12 @@ export class GroundMaterial extends THREE.MeshStandardMaterial {
         '#include <common>',
         `#include <common>\n${COMMON}\nuniform float uSurfKind;\nuniform float uSurfPart;\nuniform vec3 uSurfLip;\nuniform float uSurfLipOn;`,
       )
+      .replace('#include <map_fragment>', 'if (uSurfPixel <= 0.0) {\n#include <map_fragment>\n}')
       .replace('#include <color_fragment>', GROUND_FRAGMENT);
   }
 
   override customProgramCacheKey(): string {
-    return 'surface-ground-1';
+    return 'surface-ground-3';
   }
 }
 
@@ -220,50 +297,78 @@ export function groundMaterial(color: string, surface: GroundSurface): GroundMat
 const SHORE_MIN = -1,
   SHORE_RANGE = 8;
 
+const SHORE_SAMPLE = /* glsl */ `
+uniform sampler2D uShore;
+uniform vec4 uShoreBox;
+uniform float uShoreOn;
+// Distance to the nearest shore in world units: positive over open water.
+float shoreDistance(vec2 p) {
+  if (uShoreOn < 0.5) return 9.0;
+  vec2 uv = (p - uShoreBox.xy) / uShoreBox.zw;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 9.0;
+  return texture2D(uShore, uv).r * ${SHORE_RANGE.toFixed(1)} + (${SHORE_MIN.toFixed(1)});
+}
+`;
+
 const WATER_FRAGMENT = /* glsl */ `
 #include <color_fragment>
 float waterFoam = 0.0;
 vec3 waterTilt = vec3(0.0);
 {
-  float px = uSurfPixel;
-  vec2 p = vSurfWorld.xz;
-  if (px > 0.0) p = (floor(p / px) + 0.5) * px;
-  float fineK = 1.0 - step(0.0001, px);
-  float t = uSurfTime;
-  // Distance to the nearest shore: positive over open water.
-  float d = 9.0;
-  if (uShoreOn > 0.5) {
-    vec2 uv = (p - uShoreBox.xy) / uShoreBox.zw;
-    if (uv.x >= 0.0 && uv.y >= 0.0 && uv.x <= 1.0 && uv.y <= 1.0)
-      d = texture2D(uShore, uv).r * ${SHORE_RANGE.toFixed(1)} + (${SHORE_MIN.toFixed(1)});
-  }
   vec3 base = diffuseColor.rgb;
-  float shallow = 1.0 - smoothstep(0.0, 3.0, d);
-  vec3 c = mix(base * vec3(0.74, 0.88, 1.0), mix(base, vec3(0.6, 0.9, 0.84), 0.12) * 1.02, shallow);
-  // Two drifting ripple layers and a few sun sparkles.
-  vec2 q1 = p * 0.85 + vec2(t * 0.11, t * 0.04);
-  vec2 q2 = p * 1.6 + vec2(-t * 0.08, t * 0.1) + 11.0;
-  float r1 = sNoise(q1);
-  float r = (r1 + sNoise(q2)) * 0.5;
-  // Soft light and dark swells (banded in pixel style); thin iso-lines read as worms.
-  float swell = px > 0.0 ? floor(r * 4.0) / 3.0 - 0.5 : r - 0.5;
-  c *= 1.0 + swell * 0.12;
-  float spark = sNoise(p * 3.6 + vec2(t * 0.5, -t * 0.3));
-  c += (px > 0.0 ? step(0.93, spark) : smoothstep(0.9, 0.97, spark)) * 0.07;
-  // Shore foam: a broken band hugging the land and one wave rolling outwards.
-  float fn = sNoise(p * 2.3 + vec2(t * 0.2, 0.0));
-  float hug = 1.0 - smoothstep(0.04, 0.12 + fn * 0.1, d);
-  float phase = fract(t * 0.18);
-  float fade = (1.0 - phase) * (1.0 - phase);
-  float wave = (1.0 - smoothstep(0.0, 0.05 + 0.03 * fn, abs(d - 0.14 - phase * 0.7 + (fn - 0.5) * 0.12)))
-    * fade * step(0.35, fn);
-  waterFoam = clamp(max(hug, wave * 0.65), 0.0, 1.0) * step(-0.05, d) * uShoreOn;
-  if (px > 0.0) waterFoam = step(0.45, waterFoam);
-  c = mix(c, vec3(0.95, 0.99, 1.0), waterFoam * 0.92);
-  diffuseColor.rgb = c;
-  float gx = sNoise(q1 + vec2(0.35, 0.0)) - r1;
-  float gz = sNoise(q1 + vec2(0.0, 0.35)) - r1;
-  waterTilt = vec3(-gx, 0.0, -gz) * 0.12 * fineK * (1.0 - waterFoam);
+  vec3 deep = base * vec3(0.74, 0.88, 1.0);
+  float t = uSurfTime;
+  if (uSurfPixel > 0.0) {
+    // Pixel art water: two-voxel pixels, three dithered tones, a stepped clock.
+    float wpx = uSurfPixel * 2.0;
+    vec2 cell = floor(vSurfWorld.xz / wpx);
+    vec2 p = (cell + 0.5) * wpx;
+    float ts = floor(t * 4.0) / 4.0;
+    float d = shoreDistance(p);
+    float k = d / wpx;
+    float swell = sNoise(p * 0.6 + vec2(ts * 0.3, ts * 0.12));
+    // Bands: shallow ring by the shore, then mid and deep; dithering only blurs the
+    // seams by about one pixel, the swell makes the deep patches drift.
+    float v = smoothstep(0.0, 2.8, d) * 0.85 + (swell - 0.5) * 0.25 + (sBayer4(cell) - 0.5) * 0.1;
+    vec3 c = v < 0.22 ? mix(base, vec3(0.6, 0.9, 0.84), 0.12) : (v < 0.6 ? base : deep);
+    // Matte pixels catch more light than the old glossy plane; match its depth.
+    c *= sT(0.88 + sHash(cell) * 0.05);
+    // Glints: short dashes that drift sideways and re-roll every two seconds.
+    float x = cell.x + floor(ts * 2.0);
+    float dash = step(0.92, sHash(vec2(floor(x / 3.0), cell.y) + floor(ts / 2.0) * 7.31))
+      * step(mod(x, 3.0), 1.0) * step(1.5, k);
+    c = mix(c, mix(base, vec3(1.0), 0.55), dash * 0.85);
+    // Foam: a solid first ring with rare gaps, and a broken ring stepping outwards.
+    float hug = step(k, 1.0) * step(0.15, sHash(cell + floor(ts) * 3.1));
+    float ring = 1.0 + floor(fract(t * 0.25) * 4.0);
+    float wave = step(abs(floor(k) - ring), 0.0) * step(ring, 3.0) * step(0.52, sNoise(p * 1.5 + 3.0));
+    waterFoam = max(hug, wave) * step(-0.05, d) * uShoreOn;
+    diffuseColor.rgb = mix(c, vec3(0.95, 0.99, 1.0), waterFoam);
+  } else {
+    vec2 p = vSurfWorld.xz;
+    float d = shoreDistance(p);
+    float shallow = 1.0 - smoothstep(0.0, 3.0, d);
+    vec3 c = mix(deep, mix(base, vec3(0.6, 0.9, 0.84), 0.12) * 1.02, shallow);
+    // Two drifting ripple layers make soft swells; a few sun sparkles.
+    vec2 q1 = p * 0.85 + vec2(t * 0.11, t * 0.04);
+    vec2 q2 = p * 1.6 + vec2(-t * 0.08, t * 0.1) + 11.0;
+    float r1 = sNoise(q1);
+    float r = (r1 + sNoise(q2)) * 0.5;
+    c *= 1.0 + (r - 0.5) * 0.12;
+    c += smoothstep(0.9, 0.97, sNoise(p * 3.6 + vec2(t * 0.5, -t * 0.3))) * 0.07;
+    // Shore foam: a broken band hugging the land and one wave rolling outwards.
+    float fn = sNoise(p * 2.3 + vec2(t * 0.2, 0.0));
+    float hug = 1.0 - smoothstep(0.04, 0.12 + fn * 0.1, d);
+    float phase = fract(t * 0.18);
+    float fade = (1.0 - phase) * (1.0 - phase);
+    float wave = (1.0 - smoothstep(0.0, 0.05 + 0.03 * fn, abs(d - 0.14 - phase * 0.7 + (fn - 0.5) * 0.12)))
+      * fade * step(0.35, fn);
+    waterFoam = clamp(max(hug, wave * 0.65), 0.0, 1.0) * step(-0.05, d) * uShoreOn;
+    diffuseColor.rgb = mix(c, vec3(0.95, 0.99, 1.0), waterFoam * 0.92);
+    float gx = sNoise(q1 + vec2(0.35, 0.0)) - r1;
+    float gz = sNoise(q1 + vec2(0.0, 0.35)) - r1;
+    waterTilt = vec3(-gx, 0.0, -gz) * 0.12 * (1.0 - waterFoam);
+  }
 }
 `;
 
@@ -290,14 +395,11 @@ export class WaterMaterial extends THREE.MeshStandardMaterial {
       .replace('#include <common>', `#include <common>\n${VERTEX_DECL}`)
       .replace('#include <project_vertex>', VERTEX_BODY);
     shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        `#include <common>\n${COMMON}\nuniform sampler2D uShore;\nuniform vec4 uShoreBox;\nuniform float uShoreOn;`,
-      )
+      .replace('#include <common>', `#include <common>\n${COMMON}\n${SHORE_SAMPLE}`)
       .replace('#include <color_fragment>', WATER_FRAGMENT)
       .replace(
         '#include <roughnessmap_fragment>',
-        '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.85, waterFoam);',
+        '#include <roughnessmap_fragment>\nroughnessFactor = uSurfPixel > 0.0 ? 0.92 : mix(roughnessFactor, 0.85, waterFoam);',
       )
       .replace(
         '#include <normal_fragment_maps>',
@@ -306,7 +408,7 @@ export class WaterMaterial extends THREE.MeshStandardMaterial {
   }
 
   override customProgramCacheKey(): string {
-    return 'surface-water-1';
+    return 'surface-water-2';
   }
 
   /** Install (or refresh) the shore distance field. */

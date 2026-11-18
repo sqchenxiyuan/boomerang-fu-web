@@ -186,9 +186,10 @@ describe('surface materials', () => {
     for (const marker of ['waterFoam', 'waterTilt', 'uShoreBox'])
       expect(waterShader.fragmentShader).toContain(marker);
     // Each patch anchors on a chunk name; a renamed chunk would silently drop it.
-    expect(waterShader.fragmentShader).toContain(
-      'roughnessFactor = mix(roughnessFactor, 0.85, waterFoam)',
-    );
+    expect(waterShader.fragmentShader).toContain('mix(roughnessFactor, 0.85, waterFoam)');
+    // Pixel style has its own branches: per-voxel decisions and dithered water.
+    expect(waterShader.fragmentShader).toContain('sBayer4(cell)');
+    expect(shader.fragmentShader).toContain('sVoxel(vSurfWorld, px)');
     expect(waterShader.fragmentShader).toContain('normal = normalize(normal + (viewMatrix');
     expect(waterShader.vertexShader).toContain('vSurfWorld = (modelMatrix * surfWorld).xyz');
   });

@@ -397,7 +397,15 @@ export class AgentRuntime {
 }
 
 function settledLeader(state: GameState): number | null {
-  if (state.pendingWinnerId !== undefined) return state.pendingWinnerId;
+  if (state.pendingWinnerId !== undefined) {
+    const pending = state.actors.find((actor) => actor.id === state.pendingWinnerId);
+    if (
+      pending &&
+      (state.tieBreaker || pending.score >= state.options.scoreGoal) &&
+      state.actors.every((actor) => actor.id === pending.id || actor.score < pending.score)
+    )
+      return pending.id;
+  }
   const scores = state.actors.map((actor) => actor.score);
   const best = Math.max(...scores);
   if (best < state.options.scoreGoal) return null;

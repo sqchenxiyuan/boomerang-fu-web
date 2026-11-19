@@ -17,6 +17,7 @@ import type {
   GameState,
   KillerType,
   Obstacle,
+  Phase,
   PowerupKind,
 } from '../core/types';
 import { heldDiscs } from './inventory';
@@ -27,6 +28,7 @@ import { freeze, slowMo } from './clock';
 import { getStunned, startPushback, stopAiming, stopLunge } from './actors';
 import { dropDisc, startFreeform, startThrow, bounceDisc } from './projectiles';
 import { dcos, dsin } from '../core/dmath';
+import { stopShrinkingBoundary } from './boundary';
 
 /*
  * Combat triggers from the reference CombatWorld: melee/disarm polygons, blocks,
@@ -149,25 +151,52 @@ function scoreDeath(state: GameState, victim: Actor, killerId: number, cause: De
     killer.kills++;
     if (scoring === 'kills') {
       killer.score++;
-      const goal = state.options.scoreGoal;
-      const alive = state.actors.filter((actor) => actor.alive);
-      // GameManager.AddPlayerKill: a tie-breaker kill, or an unopposed goal, ends the match.
-      const contested = alive.some(
-        (other) => other.id !== killer.id && other.score + (alive.length - 1) >= goal,
-      );
-      if (
-        state.tieBreaker ||
-        (killer.score >= goal &&
+      if (state.tieBreaker) {
+        // OriginalFfaScore / OriginalFfaRound: the first tie-breaker kill ends the
+        // match at once (15:14); later damage in the same tick is ignored.
+        state.pendingWinnerId = killer.id;
+        state.winnerId = killer.id;
+        state.matchWinnerId = killer.id;
+        state.phase = 'matchEnd';
+        state.phaseTime = 0;
+        state.roundFinishTimer = null;
+        stopShrinkingBoundary(state);
+      } else {
+        // A pending winner who has been caught up with is no longer settled.
+        if (state.pendingWinnerId !== undefined && state.pendingWinnerId !== killer.id) {
+          const pending = state.actors.find((actor) => actor.id === state.pendingWinnerId);
+          if (!pending || killer.score >= pending.score) state.pendingWinnerId = undefined;
+        }
+        const goal = state.options.scoreGoal;
+        const alive = state.actors.filter((actor) => actor.alive);
+        const leads = state.actors.every(
+          (actor) => actor.id === killer.id || actor.score < killer.score,
+        );
+        // GameManager.AddPlayerKill: an unopposed goal, held alone, ends the match.
+        const contested = alive.some(
+          (other) => other.id !== killer.id && other.score + (alive.length - 1) >= goal,
+        );
+        if (
+          leads &&
+          killer.score >= goal &&
           !contested &&
           killer.alive &&
           (killer.burnTime ?? 0) <= 0 &&
-          (killer.frozenTime ?? 0) <= 0)
-      )
-        state.pendingWinnerId ??= killer.id;
+          (killer.frozenTime ?? 0) <= 0
+        )
+          state.pendingWinnerId ??= killer.id;
+      }
     }
   } else if (scoring === 'kills' && cause !== 'fall' && !state.tieBreaker) {
     victim.suicides = (victim.suicides ?? 0) + 1;
     victim.score--;
+    // A suicide during the round-end delay takes back a goal that was already met.
+    if (
+      state.pendingWinnerId === victim.id &&
+      (victim.score < state.options.scoreGoal ||
+        state.actors.some((other) => other.id !== victim.id && other.score >= victim.score))
+    )
+      state.pendingWinnerId = undefined;
   }
   const records =
     cause === 'weapon' ||
@@ -202,7 +231,8 @@ export function damageActor(
   direction: Vec2,
   cause: DeathCause = 'weapon',
 ): 'ignored' | 'shield' | 'killed' {
-  if (!actor.alive) return 'ignored';
+  // Nothing more happens to anyone once the round or match has been decided.
+  if (!actor.alive || state.phase === 'roundEnd' || state.phase === 'matchEnd') return 'ignored';
   const environmental =
     cause === 'fall' ||
     cause === 'boundary' ||
@@ -277,6 +307,16 @@ export function damageActor(
     direction: { ...deathDirection },
     variant,
   });
+  // A tie-breaker kill ended the match inside scoreDeath: announce it now.
+  // (TypeScript keeps the narrowing from the guard above; scoreDeath may have changed it.)
+  if ((state.phase as Phase) === 'matchEnd' && state.matchWinnerId !== null) {
+    const winner = state.actors.find((candidate) => candidate.id === state.matchWinnerId);
+    state.events.push({
+      type: 'win',
+      position: { ...(winner?.position ?? actor.position) },
+      actorId: state.matchWinnerId,
+    });
+  }
   return 'killed';
 }
 

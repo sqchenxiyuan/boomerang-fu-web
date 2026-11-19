@@ -35,8 +35,17 @@ function resolveKillMatch(state: GameState): Actor | undefined {
       actor.score = 0;
     }
   }
-  if (state.pendingWinnerId !== undefined)
-    return state.actors.find((actor) => actor.id === state.pendingWinnerId);
+  // A pending winner must still hold the goal (or the tie-breaker) alone.
+  if (state.pendingWinnerId !== undefined) {
+    const pending = state.actors.find((actor) => actor.id === state.pendingWinnerId);
+    if (
+      pending &&
+      (state.tieBreaker || pending.score >= state.options.scoreGoal) &&
+      state.actors.every((actor) => actor.id === pending.id || actor.score < pending.score)
+    )
+      return pending;
+    state.pendingWinnerId = undefined;
+  }
   const goal = state.options.scoreGoal;
   const reached = state.actors.filter((actor) => actor.score >= goal);
   if (!reached.length) return undefined;
@@ -165,6 +174,8 @@ export class Game {
     tickStatusEffects(state, dt);
     tickEnvironmentContacts(state, dt);
     tickPowerups(state, this.random, dt);
+    // A tie-breaker kill ends the match mid-step; nothing after it may run.
+    if (state.phase !== 'playing') return;
     const survivors = state.actors.filter((a) => a.alive);
     const newEvents = state.events.slice(eventStart);
     const decided = state.pendingWinnerId !== undefined;

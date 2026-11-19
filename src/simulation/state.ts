@@ -179,18 +179,23 @@ export function resetRound(state: GameState): void {
   state.clock = createClock();
   state.weaponsGranted = false;
   state.winnerId = null;
+  state.pendingWinnerId = undefined;
   state.discs = [];
   state.pickups = [];
   state.zones = [];
   state.decoys = [];
   state.pickupTimer = 2.5;
+  // A tie-breaker round is fought only by the players tied for the lead.
+  const lead = state.tieBreaker ? Math.max(...state.actors.map((actor) => actor.score)) : -Infinity;
   for (const actor of state.actors) {
     const fresh = makeActor(actor.id, actor.controller, actor.humanIndex);
     const sourcePosition = state.arena.spawns[actor.id % state.arena.spawns.length];
     const position = state.arena.floors
       ? depenetrate(state.arena, sourcePosition, RULES.playerRadius)
       : sourcePosition;
+    const contender = !state.tieBreaker || actor.score >= lead;
     Object.assign(actor, fresh, {
+      alive: contender,
       score: actor.score,
       kills: actor.kills,
       suicides: actor.suicides ?? 0,

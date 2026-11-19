@@ -19,7 +19,7 @@ import { createCharacter, updateCharacter } from './characters';
 import { THROW_FOLLOW } from './character-motion';
 import type { CharacterView } from './characters';
 import { voxelizeMesh, voxelizeStatic, voxelizeTree } from './voxelize';
-import { setSurfacePixel, setSurfaceTime } from './surfaces';
+import { pixelOverlayGeometry, setSurfacePixel, setSurfaceTime } from './surfaces';
 import type { PortalFx } from './portal-visuals';
 
 export type VisualStyle = 'standard' | 'pixel';
@@ -136,6 +136,25 @@ function pixelateArena(view: ArenaView, arena: Arena, aspect: number): void {
     });
   }
   voxelizeTree(view.root, ARENA_VOXEL, (object) => exclude.has(object));
+  // Flat overlays (ice) become whole cells of the same grid, so their outline steps too.
+  const overlays: THREE.Mesh[] = [];
+  view.root.traverse((object) => {
+    if (object instanceof THREE.Mesh && object.userData.pixelOverlay) overlays.push(object);
+  });
+  for (const mesh of overlays) {
+    const geometry = pixelOverlayGeometry(mesh, ARENA_VOXEL);
+    if (!geometry) continue;
+    mesh.geometry.dispose();
+    mesh.geometry = geometry;
+  }
+  // Round portal pads: eight-sided rings, like the effect rings.
+  for (const group of view.portals.values()) {
+    const ring = group.children[0];
+    if (group.userData.gate || !(ring instanceof THREE.Mesh)) continue;
+    const { innerRadius, outerRadius } = (ring.geometry as THREE.RingGeometry).parameters;
+    ring.geometry.dispose();
+    ring.geometry = new THREE.RingGeometry(innerRadius, outerRadius, 8);
+  }
 }
 
 function disposeVisual(root: THREE.Object3D): void {
@@ -174,9 +193,9 @@ function createPickup(pickup: Pickup, pixel = false): THREE.Group {
     pickup.kind === 'shield' ? 5 : pickup.kind === 'haste' ? 3 : 8,
   );
   place(icon, 0, 0.95, 0, book);
-  group.add(book, shadow(0.5, 0.12));
+  group.add(book, shadow(0.5, 0.12, pixel ? 8 : 24));
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.4, 0.47, 28),
+    new THREE.RingGeometry(0.4, 0.47, pixel ? 8 : 28),
     new THREE.MeshBasicMaterial({
       color,
       transparent: true,
@@ -321,7 +340,12 @@ export class GameRenderer {
     for (const actor of state.actors) {
       const view = createCharacter(actor);
       // Hands, feet, held boomerangs and death props; the agent body is already blocks.
-      if (this.pixel) voxelizeTree(view.root, PART_VOXEL);
+      if (this.pixel) {
+        voxelizeTree(view.root, PART_VOXEL);
+        // The blob shadow is not a voxel model; give it eight sides like the rings.
+        view.shadow.geometry.dispose();
+        view.shadow.geometry = new THREE.CircleGeometry(0.66, 8);
+      }
       this.characters.set(actor.id, view);
       this.scene.add(view.root);
     }
@@ -506,7 +530,7 @@ export class GameRenderer {
         object = this.discPool.pop();
         if (!object) {
           object = new THREE.Group();
-          object.add(makeBoomerang(), shadow(0.4, 0.13));
+          object.add(makeBoomerang(), shadow(0.4, 0.13, this.pixel ? 8 : 24));
           if (this.pixel) voxelizeTree(object, PART_VOXEL);
         }
         object.visible = true;

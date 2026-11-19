@@ -293,6 +293,179 @@ export function groundMaterial(color: string, surface: GroundSurface): GroundMat
   return cached;
 }
 
+/* ------------------------------------------------------------------ */
+/* Ice overlays                                                        */
+/* ------------------------------------------------------------------ */
+
+const ICE_VERTEX_DECL = /* glsl */ `
+attribute float aIceEdge;
+varying float vIceEdge;
+`;
+
+const ICE_FRAGMENT = /* glsl */ `
+#include <color_fragment>
+{
+  vec3 base = diffuseColor.rgb;
+  vec2 p = vSurfWorld.xz;
+  if (uSurfPixel > 0.0) {
+    // Per voxel: frozen slabs in three tones, one-voxel white cracks, sparse
+    // diagonal glints and a bright one-voxel rim along the edge of the ice.
+    float px = uSurfPixel;
+    vec2 cell = floor(p / px);
+    vec2 c = (cell + 0.5) * px;
+    vec2 slabs = sCells(c / 1.3);
+    vec3 col = base * sT(slabs.y < 0.33 ? 0.93 : (slabs.y < 0.66 ? 1.0 : 1.05));
+    col *= sHash(cell + 7.7) < 0.08 ? sT(1.07) : 1.0;
+    float crack = step(slabs.x, 0.07);
+    float streak = step(mod(cell.x + cell.y, 19.0), 1.0) * step(0.5, sNoise(c * 0.6));
+    float rim = step(0.5, vIceEdge);
+    col = mix(col, vec3(1.0), max(max(crack * 0.5, streak * 0.65), rim * 0.6));
+    diffuseColor.rgb = col;
+    diffuseColor.a = mix(diffuseColor.a, 0.95, max(rim, crack));
+  } else {
+    // Slabs with soft seams, glossy diagonal streaks and frost.
+    vec2 slabs = sCells(p / 1.3);
+    vec3 col = base * (0.95 + slabs.y * 0.09);
+    float crack = 1.0 - smoothstep(0.02, 0.06, slabs.x);
+    float band = fract((p.x + p.y) * 0.32 + sNoise(p * 0.4) * 0.35);
+    float streak = smoothstep(0.0, 0.03, band) * (1.0 - smoothstep(0.05, 0.11, band));
+    float frost = smoothstep(0.62, 0.9, sNoise(p * 2.2 + 4.0));
+    col = mix(col, vec3(1.0), clamp(crack * 0.45 + streak * 0.4 + frost * 0.18, 0.0, 1.0));
+    diffuseColor.rgb = col;
+    diffuseColor.a = mix(diffuseColor.a, 0.9, crack * 0.6 + streak * 0.3);
+  }
+}
+`;
+
+/** Slippery ice laid over the ground: slabs, cracks and glints; per voxel in the pixel style. */
+export class IceMaterial extends THREE.MeshStandardMaterial {
+  override onBeforeCompile(shader: THREE.WebGLProgramParametersWithUniforms): void {
+    shader.uniforms.uSurfPixel = surfaceUniforms.uSurfPixel;
+    shader.uniforms.uSurfTime = surfaceUniforms.uSurfTime;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\n${VERTEX_DECL}\n${ICE_VERTEX_DECL}`)
+      .replace('#include <project_vertex>', `${VERTEX_BODY}\nvIceEdge = aIceEdge;`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${COMMON}\nvarying float vIceEdge;`)
+      .replace('#include <color_fragment>', ICE_FRAGMENT);
+  }
+
+  override customProgramCacheKey(): string {
+    return 'surface-ice-1';
+  }
+}
+
+/** Ice colour and the overlay material; geometry needs an `aIceEdge` attribute. */
+export function iceMaterial(): IceMaterial {
+  return new IceMaterial({
+    // Opaque enough to stay blue over yellow-green grass instead of turning mint.
+    color: '#a6d9f2',
+    roughness: 0.12,
+    metalness: 0.05,
+    transparent: true,
+    opacity: 0.86,
+    depthWrite: false,
+  });
+}
+
+/** Mark every vertex as interior (the smooth style has no voxel rim). */
+export function withIceEdge(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  geometry.setAttribute(
+    'aIceEdge',
+    new THREE.BufferAttribute(new Float32Array(geometry.getAttribute('position').count), 1),
+  );
+  return geometry;
+}
+
+/**
+ * Pixel style: replace a flat overlay with whole cells of the world voxel grid
+ * whose centres it covers, so its outline steps like the voxel ground under
+ * it. Cells on the border carry `aIceEdge = 1`. Returns geometry in the mesh's
+ * own frame, or null when nothing is covered.
+ */
+export function pixelOverlayGeometry(mesh: THREE.Mesh, cell: number): THREE.BufferGeometry | null {
+  mesh.updateWorldMatrix(true, false);
+  const source = mesh.geometry as THREE.BufferGeometry;
+  const position = source.getAttribute('position');
+  const index = source.getIndex();
+  const count = index ? index.count : position.count;
+  const vertex = new THREE.Vector3();
+  const world: number[] = [];
+  let y = 0;
+  for (let i = 0; i < count; i++) {
+    vertex.fromBufferAttribute(position, index ? index.getX(i) : i).applyMatrix4(mesh.matrixWorld);
+    world.push(vertex.x, vertex.z);
+    y = vertex.y;
+  }
+  if (world.length < 6) return null;
+  let minX = Infinity,
+    minZ = Infinity,
+    maxX = -Infinity,
+    maxZ = -Infinity;
+  for (let i = 0; i < world.length; i += 2) {
+    minX = Math.min(minX, world[i]);
+    maxX = Math.max(maxX, world[i]);
+    minZ = Math.min(minZ, world[i + 1]);
+    maxZ = Math.max(maxZ, world[i + 1]);
+  }
+  const x0 = Math.floor(minX / cell),
+    z0 = Math.floor(minZ / cell);
+  const columns = Math.ceil(maxX / cell) - x0,
+    rows = Math.ceil(maxZ / cell) - z0;
+  const inside = new Uint8Array(columns * rows);
+  const triangles = world.length / 6;
+  for (let t = 0; t < triangles; t++) {
+    const [ax, az, bx, bz, cx, cz] = world.slice(t * 6, t * 6 + 6);
+    const area = (bx - ax) * (cz - az) - (bz - az) * (cx - ax);
+    if (Math.abs(area) < 1e-12) continue;
+    const c0 = Math.max(0, Math.floor(Math.min(ax, bx, cx) / cell) - x0),
+      c1 = Math.min(columns - 1, Math.ceil(Math.max(ax, bx, cx) / cell) - x0),
+      r0 = Math.max(0, Math.floor(Math.min(az, bz, cz) / cell) - z0),
+      r1 = Math.min(rows - 1, Math.ceil(Math.max(az, bz, cz) / cell) - z0);
+    for (let r = r0; r <= r1; r++)
+      for (let c = c0; c <= c1; c++) {
+        const px = (x0 + c + 0.5) * cell,
+          pz = (z0 + r + 0.5) * cell;
+        const w0 = ((bx - px) * (cz - pz) - (bz - pz) * (cx - px)) / area;
+        const w1 = ((cx - px) * (az - pz) - (cz - pz) * (ax - px)) / area;
+        if (w0 >= 0 && w1 >= 0 && w0 + w1 <= 1) inside[r * columns + c] = 1;
+      }
+  }
+  const at = (c: number, r: number) =>
+    c >= 0 && r >= 0 && c < columns && r < rows && inside[r * columns + c] === 1;
+  const positions: number[] = [],
+    edges: number[] = [];
+  const quad = (c: number, r: number, width: number, edge: number) => {
+    const ax = (x0 + c) * cell,
+      bx = (x0 + c + width) * cell,
+      az = (z0 + r) * cell,
+      bz = (z0 + r + 1) * cell;
+    positions.push(ax, y, az, ax, y, bz, bx, y, bz, ax, y, az, bx, y, bz, bx, y, az);
+    for (let i = 0; i < 6; i++) edges.push(edge);
+  };
+  for (let r = 0; r < rows; r++) {
+    let run = -1;
+    for (let c = 0; c <= columns; c++) {
+      const filled = at(c, r);
+      const edge = filled && !(at(c - 1, r) && at(c + 1, r) && at(c, r - 1) && at(c, r + 1));
+      if (filled && !edge) {
+        if (run < 0) run = c;
+        continue;
+      }
+      if (run >= 0) quad(run, r, c - run, 0);
+      run = -1;
+      if (edge) quad(c, r, 1, 1);
+    }
+  }
+  if (!positions.length) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('aIceEdge', new THREE.Float32BufferAttribute(edges, 1));
+  geometry.applyMatrix4(mesh.matrixWorld.clone().invert());
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 /** Signed distances are stored as bytes over this range (world units). */
 const SHORE_MIN = -1,
   SHORE_RANGE = 8;
@@ -335,8 +508,9 @@ vec3 waterTilt = vec3(0.0);
     c *= sT(0.88 + sHash(cell) * 0.05);
     // Glints: short dashes that drift sideways and re-roll every two seconds.
     float x = cell.x + floor(ts * 2.0);
-    float dash = step(0.92, sHash(vec2(floor(x / 3.0), cell.y) + floor(ts / 2.0) * 7.31))
-      * step(mod(x, 3.0), 1.0) * step(1.5, k);
+    // Sparse, and only away from the shallow band: dense dashes read as snow from afar.
+    float dash = step(0.965, sHash(vec2(floor(x / 3.0), cell.y) + floor(ts / 2.0) * 7.31))
+      * step(mod(x, 3.0), 1.0) * step(1.5, k) * step(0.45, v);
     c = mix(c, mix(base, vec3(1.0), 0.55), dash * 0.85);
     // Foam: a solid first ring with rare gaps, and a broken ring stepping outwards.
     float hug = step(k, 1.0) * step(0.15, sHash(cell + floor(ts) * 3.1));

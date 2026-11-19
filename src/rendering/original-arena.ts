@@ -6,16 +6,32 @@ import { box, cylinder, material, place, sphere } from './palette';
 import { contourShapes, extrudeContours, rectanglePath } from './polygon-geometry';
 import { mergeStaticMeshes } from './batches';
 import { OriginalPlantsView } from './original-plants';
-import { createGateFx, portalTone, type PortalFx } from './portal-visuals';
+import {
+  createGateFx,
+  createSwitchFx,
+  portalTone,
+  type PortalFx,
+  type SwitchFx,
+} from './portal-visuals';
+import { actorColor } from '../agents/registry';
 import {
   groundMaterial,
+  iceMaterial,
+  withIceEdge,
   shoreDistances,
   shoreSignature,
   WaterMaterial,
   type GroundKind,
 } from './surfaces';
 
-const warningColor = new THREE.Color('#f0a267');
+/** Source FloorHazard flash: red, reaching half strength by the end of the warning. */
+const warningColor = new THREE.Color('#ff1a33');
+const SWITCH_READY = '#8fd3af',
+  SWITCH_SPENT = '#e1b36d',
+  SWITCH_FLASH = 0.75;
+const scratchColor = new THREE.Color();
+const mechanismActorColor = (ownerId: number | undefined): string =>
+  ownerId === undefined || ownerId < 0 ? '#ffffff' : actorColor(ownerId);
 
 function syncPose(
   group: THREE.Group,
@@ -389,17 +405,22 @@ export function createOriginalArenaView(arena: Arena): ArenaView {
   for (const surface of arena.surfaces ?? []) {
     const geometry = new THREE.ShapeGeometry(contourShapes(surface.paths));
     geometry.rotateX(-Math.PI / 2);
+    const ice = surface.kind === 'ice';
     const mesh = new THREE.Mesh(
-      geometry,
-      new THREE.MeshStandardMaterial({
-        color: surface.kind === 'ice' ? '#91d9e7' : '#5eaac1',
-        roughness: 0.15,
-        metalness: 0.06,
-        transparent: true,
-        opacity: surface.kind === 'ice' ? 0.55 : 0.9,
-        depthWrite: false,
-      }),
+      ice ? withIceEdge(geometry) : geometry,
+      ice
+        ? iceMaterial()
+        : new THREE.MeshStandardMaterial({
+            color: '#5eaac1',
+            roughness: 0.15,
+            metalness: 0.06,
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false,
+          }),
     );
+    // The pixel style swaps ice for whole voxel cells (see pixelOverlayGeometry).
+    if (ice) mesh.userData.pixelOverlay = true;
     mesh.name = `surface:${surface.id}`;
     mesh.rotation.y = -(surface.angle ?? 0);
     mesh.position.set(
@@ -419,11 +440,17 @@ export function createOriginalArenaView(arena: Arena): ArenaView {
     const lever = new THREE.Group();
     lever.position.y = 0.12;
     place(cylinder(0.055, 0.075, 0.48, '#8b7556', 6), 0, 0.23, 0, lever);
-    const knob = box(0.26, 0.15, 0.2, '#e1b36d');
+    // Its own lit material: the knob glows while usable and flashes when hit.
+    const knob = new THREE.Mesh(
+      new THREE.BoxGeometry(0.26, 0.15, 0.2),
+      new THREE.MeshStandardMaterial({ color: SWITCH_READY, roughness: 0.5, flatShading: true }),
+    );
+    knob.castShadow = knob.receiveShadow = true;
     place(knob, 0, 0.48, 0, lever);
     group.add(lever);
     group.userData.lever = lever;
     group.userData.knob = knob;
+    group.userData.switchFx = createSwitchFx(group, mechanism.id, SWITCH_READY);
     mechanisms.set(mechanism.id, group);
     root.add(group);
   }
@@ -467,7 +494,9 @@ export function updateOriginalArena(view: ArenaView, arena: Arena, time: number,
     group.position.z -= jitter;
     const top = group.userData.topMaterial as THREE.MeshStandardMaterial;
     const base = group.userData.baseColor as THREE.Color;
-    top.color.copy(base).lerp(warningColor, warning * (0.25 + Math.sin(time * 15) * 0.12));
+    // Trap tiles build up late (t³), falling tiles steadily, as in the source.
+    const ramp = mechanism?.kind === 'trapFloor' ? warning ** 3 : warning;
+    top.color.copy(base).lerp(warningColor, ramp * (0.5 + Math.sin(time * 15) * 0.08));
   }
   for (const obstacle of arena.obstacles) {
     const group = view.obstacles.get(obstacle.id);
@@ -502,8 +531,24 @@ export function updateOriginalArena(view: ArenaView, arena: Arena, time: number,
       (heightDelta(mechanism, alpha, mechanisms) ?? 0);
     const lever = group.userData.lever as THREE.Group;
     lever.rotation.x = mechanism.active ? -0.6 : 0.6;
-    const knob = group.userData.knob as THREE.Mesh;
-    knob.material = material(mechanism.active ? '#8fd3af' : '#e1b36d');
+    const knob = group.userData.knob as THREE.Mesh<
+      THREE.BufferGeometry,
+      THREE.MeshStandardMaterial
+    >;
+    // Source Switch.FlashColor: the activator's colour, easing back over 0.75 s.
+    const age = 1 - Math.max(0, Math.min(1, (mechanism.flashTime ?? 0) / SWITCH_FLASH));
+    const flash = mechanism.flashTime ? (1 - age) ** 2 : 0;
+    const ready = mechanism.active !== false;
+    const idle = ready ? SWITCH_READY : SWITCH_SPENT;
+    const activator = mechanismActorColor(mechanism.ownerId);
+    knob.material.color.set(idle);
+    knob.material.emissive.set(idle).lerp(scratchColor.set(activator), flash);
+    knob.material.emissiveIntensity = (ready ? 0.45 : 0.08) + flash * 0.9;
+    const fx = group.userData.switchFx as SwitchFx;
+    fx.flash.value = flash;
+    fx.pool.visible = ready || flash > 0;
+    const glow = (fx.pool.material.uniforms.uColor.value as THREE.Color).copy(fx.tone);
+    if (flash > 0) glow.lerp(portalTone(activator), flash);
   }
 }
 

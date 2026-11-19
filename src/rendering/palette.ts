@@ -77,9 +77,9 @@ function boomerangShape(): THREE.BufferGeometry {
   return geometry;
 }
 
-export function shadow(radius: number, opacity = 0.16): THREE.Mesh {
+export function shadow(radius: number, opacity = 0.16, segments = 24): THREE.Mesh {
   const object = new THREE.Mesh(
-    new THREE.CircleGeometry(radius, 24),
+    new THREE.CircleGeometry(radius, segments),
     new THREE.MeshBasicMaterial({
       color: '#173e35',
       transparent: true,

@@ -153,6 +153,7 @@ uniform mat4 modelMatrix;
 uniform float uSpan;   // half length of a gate's threshold (0 for a round pad)
 uniform float uInner;  // radius of a pad's swirl (0 for a gate)
 uniform float uExtent; // where the light has faded out
+uniform float uGain;   // overall strength
 varying vec2 vPos;
 varying vec3 vWorld;
 void main() {
@@ -174,13 +175,13 @@ void main() {
   // Rings of light rolling outwards.
   float ring = smoothstep(0.8, 1.0, fract(d * 1.8 - t * 0.7)) * exp(-d * 1.6) * step(0.001, d);
   // A bright line right under a gate's doorway.
-  float threshold = uInner > 0.0 ? 0.0 : (1.0 - smoothstep(0.0, 0.12, abs(p.y))) * step(abs(p.x), uSpan);
+  float threshold = uInner > 0.0 || uSpan <= 0.0 ? 0.0 : (1.0 - smoothstep(0.0, 0.12, abs(p.y))) * step(abs(p.x), uSpan);
   // A pad swirls inside its ring.
   float inside = uInner > 0.0 ? 1.0 - smoothstep(uInner - 0.04, uInner, radius) : 0.0;
   float swirl = 0.5 + 0.5 * sin(atan(p.y, p.x) * 3.0 + radius * 7.0 - t * 3.5);
   float light = (glow * 0.72 + ring * 0.45 + threshold * 0.4) * (1.0 + uFlash * 0.8);
   light += inside * (0.22 + swirl * 0.3 + uFlash * 0.4);
-  light *= 1.0 - smoothstep(uExtent * 0.7, uExtent, d);
+  light *= (1.0 - smoothstep(uExtent * 0.7, uExtent, d)) * uGain;
   float white = clamp(ring * 0.55 + threshold * 0.45 + swirl * inside * 0.35, 0.0, 1.0);
   if (px > 0.0) {
     // Solid bands and a crisp white ring, no gradients.
@@ -334,6 +335,7 @@ function makePool(
       uSpan: { value: span },
       uInner: { value: inner },
       uExtent: { value: extent },
+      uGain: { value: 1 },
     }),
   );
   pool.name = 'portal-pool';
@@ -454,6 +456,26 @@ export function createGateFx(root: THREE.Object3D, spec: GateFxSpec): PortalFx {
   motes.position.z = spec.front;
   root.add(pool, halo, membrane, motes);
   return { flash, membrane, halo, pool, motes };
+}
+
+export interface SwitchFx {
+  flash: { value: number };
+  pool: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
+  /** The resting colour; the pool's own colour moves towards the activator's on a flash. */
+  tone: THREE.Color;
+}
+
+/**
+ * A soft glow on the floor around a wall switch, rings rolling outwards, so a
+ * usable lever reads from a distance.
+ */
+export function createSwitchFx(root: THREE.Object3D, id: string, colorValue: string): SwitchFx {
+  const tone = portalTone(colorValue);
+  const flash = { value: 0 };
+  const pool = makePool(tone.clone(), flash, 0, 1.25, 1.25, 0, 0, 1.15);
+  pool.name = `switch-glow:${id}`;
+  root.add(pool);
+  return { flash, pool, tone };
 }
 
 /** Floor pool with a swirl and spiralling motes for a round pad of the given radius. */

@@ -1,6 +1,6 @@
 {
  "format": "map-audit-v1",
- "simulationVersion": "0.10.0",
+ "simulationVersion": "0.10.2",
  "mapDataVersion": "2f74e5c3393ef5555a3f91e461dd581fab65bad2154870d91503698649600e44",
  "rounds": 6,
  "maps": {

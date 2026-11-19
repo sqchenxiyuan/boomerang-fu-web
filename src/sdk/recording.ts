@@ -8,7 +8,7 @@ import { defaultOptions } from '../simulation/state';
 import { validateReplayState } from './replay-validation';
 
 export const REPLAY_VERSION = 1;
-export const SIMULATION_VERSION = '0.10.1';
+export const SIMULATION_VERSION = '0.10.2';
 export const MAP_DATA_VERSION = '2f74e5c3393ef5555a3f91e461dd581fab65bad2154870d91503698649600e44';
 export const MAX_REPLAY_TICKS = 60 * 60 * 30;
 export const MAX_REPLAY_BYTES = 64 * 1024 * 1024;

@@ -2,7 +2,7 @@
 
 MUNDI 平台接 Godot 版 Boomerang Fu 时，用的是 `arkena.game.v1` 协议。本地 CLI 也走同一套接口，以无头方式运行 Godot，让 `decide(observation, memory)` 策略对打。Web 版现在实现了同一套接口：观察字段、动作字段、单位、决策节奏、按住和松开的语义、策略沙箱限制都一致。同一个策略文件可以不改一行，在两边运行。
 
-两边是不同的引擎。Web 版的物理参数参照 Godot 参考值，但浮点结果不逐位相同，所以成绩和录像不能跨引擎混用。引擎标识是 `boomerang-garden-web-0.10.0-agent.1`，按这个标识隔离。
+两边是不同的引擎。Web 版的物理参数参照 Godot 参考值，但浮点结果不逐位相同，所以成绩和录像不能跨引擎混用。引擎标识是 `boomerang-garden-web-0.10.2-agent.1`，按这个标识隔离。
 
 ## 快速开始
 
@@ -72,7 +72,7 @@ npm run agent -- contract                         # 输出 JSON 契约，可直�
 `serve` 在标准输入输出上提供 JSON 行接口。第一行是 hello，之后每行一个请求：
 
 ```json
-{"hello":"mundi.local.v1","protocol":"arkena.game.v1","engine":"boomerang-garden-web-0.10.0-agent.1","tickHz":60,"decisionTicks":6}
+{"hello":"mundi.local.v1","protocol":"arkena.game.v1","engine":"boomerang-garden-web-0.10.2-agent.1","tickHz":60,"decisionTicks":6}
 {"id":1,"method":"reset","params":{"seed":42,"mode":"round","characters":["Banana","Coffee"]}}
 {"id":2,"method":"advance","params":{"actions":[{"moveX":1},{"throw":true}]}}
 {"id":3,"method":"step","params":{"actions":[{},{}],"frames":3}}

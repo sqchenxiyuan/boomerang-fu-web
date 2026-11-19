@@ -61,10 +61,10 @@ npm run dev
 npm run build:sdk
 npm run verify:sdk
 # 在另一个项目安装；也可以使用绝对路径
-npm install ./dist-sdk/boomerang-garden-sdk-0.10.0.tgz
+npm install ./dist-sdk/boomerang-garden-sdk-0.10.2.tgz
 ```
 
-交付的是本地 ESM 包 `@boomerang-garden/sdk@0.10.0`，未发布 npm。`MAPS`、`ORIGINAL_MAPS`、`CUSTOM_MAPS` 提供可选目录；原版地图 ID 以 `original-` 开头。
+交付的是本地 ESM 包 `@boomerang-garden/sdk@0.10.2`，未发布 npm。`MAPS`、`ORIGINAL_MAPS`、`CUSTOM_MAPS` 提供可选目录；原版地图 ID 以 `original-` 开头。
 
 ```js
 import { createBrowserGame } from '@boomerang-garden/sdk/browser';

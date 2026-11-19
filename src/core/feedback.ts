@@ -1,39 +1,41 @@
 import type { Actor, GameState } from './types';
 import { dsin } from './dmath';
+import { text } from './i18n';
 
 /** Shared copy for the full application and the embeddable SDK HUD. */
 export function eliminationLabel(actor: Actor): string {
+  const copy = text();
   if (actor.alive)
     return actor.fall
       ? actor.fall.elapsed <= 0.33 && (actor.fallsSaved ?? 0) === 0 && actor.dashCooldown <= 0
-        ? '下落中 · 冲刺自救'
-        : '正在下落'
+        ? copy.fallingSave
+        : copy.falling
       : '';
-  if (actor.death?.cause === 'fire') return '火焰出局';
-  if (actor.death?.cause === 'telefrag') return '被传送撞击';
-  if (actor.death?.cause === 'crush') return '被机关挤压';
+  if (actor.death?.cause === 'fire') return copy.outFire;
+  if (actor.death?.cause === 'telefrag') return copy.outTelefrag;
+  if (actor.death?.cause === 'crush') return copy.outCrush;
   switch (actor.death?.variant) {
     case 'slice':
-      return '被切片';
+      return copy.outSliced;
     case 'squash':
-      return '爆炸出局';
+      return copy.outExplosion;
     case 'water':
-      return '落水出局';
+      return copy.outWater;
     case 'cliff':
-      return '坠落出局';
+      return copy.outCliff;
     case 'burst':
-      return '界外出局';
+      return copy.outBoundary;
     default:
-      return '已出局';
+      return copy.out;
   }
 }
 
 export function boundaryNotice(state: GameState): string {
   if (state.phase !== 'playing') return '';
   const outside = state.actors.filter((actor) => actor.alive && actor.outOfBounds);
-  if (outside.length) return '界外倒计时 · 沿箭头返回安全区';
-  if (state.boundary.phase === 'shrinking') return '决胜缩圈 · 前往箭头指向的场地';
-  if (state.boundary.phase === 'settled') return '决胜时刻 · 留在边界内';
+  if (outside.length) return text().boundaryOutside;
+  if (state.boundary.phase === 'shrinking') return text().boundaryShrinking;
+  if (state.boundary.phase === 'settled') return text().boundarySettled;
   return '';
 }
 

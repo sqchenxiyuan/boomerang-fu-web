@@ -29,6 +29,7 @@ function fakeView() {
     playback: (state) => void playback.push(state),
     audio: () => ({ phase: 'ready', enabled: true }),
     appearance: (players) => void log.push(`appearance:${JSON.stringify(players)}`),
+    settings: (settings) => void log.push(`settings:${JSON.stringify(settings)}`),
     settle: async () => void log.push('settle'),
     dispose: () => void log.push('dispose'),
   };
@@ -85,6 +86,7 @@ describe('MUNDI embed host (arkena.game.v1)', () => {
       engineId: ENGINE_ID,
       tickHz: 60,
       directRunner: true,
+      settings: { locale: ['zh', 'en'] },
       pacedStep: true,
       observations: true,
       stepObservations: true,
@@ -253,6 +255,10 @@ describe('MUNDI embed host (arkena.game.v1)', () => {
       true,
     );
     expect(log.at(-1)).toBe('appearance:[null,{"name":"小绿"}]');
+    // Display settings: the language the platform shows the game in.
+    expect((await platform.send('settings', { locale: 'en' })).result).toBe(true);
+    expect(log.at(-1)).toBe('settings:{"locale":"en"}');
+    expect((await platform.send('settings', { locale: 'fr' })).error).toMatch(/locale/);
     expect((await platform.send('audio')).result).toEqual({ phase: 'ready', enabled: true });
     expect((await platform.send('dispose')).result).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 5));

@@ -13,6 +13,8 @@ import { ReplayTimeline } from './replay-timeline';
 import type { ReplayTimelineSnapshot } from './replay-timeline';
 import { FixedLoop } from '../platform/loop';
 import { transitionPresentation } from '../core/presentation';
+import { presentationText } from '../core/presentation-text';
+import { text } from '../core/i18n';
 import { boundaryNotice, eliminationLabel } from '../core/feedback';
 import { mapInfo } from '../core/arena';
 import { actorName } from '../agents/registry';
@@ -296,10 +298,10 @@ export class BrowserGame {
         setText(
           this.center,
           paused && !this.preview
-            ? '已暂停'
+            ? text().paused
             : state.phase === 'matchEnd'
-              ? `${actorName(state.matchWinnerId ?? 0)}获胜！`
-              : presentation.label,
+              ? text().matchWinner(actorName(state.matchWinnerId ?? 0))
+              : presentationText(state, presentation).label,
         );
       }
       this.frames++;

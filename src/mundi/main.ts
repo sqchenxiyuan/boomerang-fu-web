@@ -3,6 +3,8 @@ import { AgentRuntime } from '../agent/runtime';
 import { assignAgents, actorIdentity } from '../agents/registry';
 import { VOXEL_GRID, cleanName, dominantHex, voxelize, type AgentLook } from '../agents/look';
 import { boundaryNotice } from '../core/feedback';
+import { htmlLang, setLocale, text, type Locale } from '../core/i18n';
+import { presentationText } from '../core/presentation-text';
 import { transitionPresentation } from '../core/presentation';
 import type { GameState } from '../core/types';
 import { AudioEngine } from '../platform/audio';
@@ -64,12 +66,12 @@ const BFAudio = {
   async capture({
     signal,
   }: { signal?: AbortSignal; waitForReady?: boolean; monitor?: boolean } = {}) {
-    if (capture) throw new Error('已有音频录制正在进行');
-    if (signal?.aborted) throw new Error('声音准备已取消');
+    if (capture) throw new Error(text().audioBusy);
+    if (signal?.aborted) throw new Error(text().audioCancelled);
     setSound(true);
     reportAudio();
     const tap = audio.capture();
-    if (!tap) throw new Error('游戏声音未就绪，无法录制有声视频');
+    if (!tap) throw new Error(text().audioUnavailable);
     const output = {
       stream: tap.stream,
       release: () => {
@@ -135,6 +137,13 @@ async function lookFrom(entry: unknown, index: number): Promise<AgentLook | null
     updated: 0,
   };
 }
+function applyLocale(locale: Locale): void {
+  setLocale(locale);
+  document.documentElement.lang = htmlLang(locale);
+  root.setAttribute('aria-label', text().gameLabel);
+  renderer.canvas.setAttribute('aria-label', text().arenaLabel);
+  if (!status.hidden) status.textContent = text().loading;
+}
 let appearanceRevision = 0;
 function setAppearance(players: unknown): void {
   if (!Array.isArray(players) || players.length !== 2) throw new Error('Invalid appearance');
@@ -168,12 +177,12 @@ function drawHud(state: GameState): void {
     element.style.setProperty('--player', identity.color);
     element.classList.toggle('out', !!actor && !actor.alive);
   });
-  setText(hud.round, `第 ${state.round} 回合`);
+  setText(hud.round, text().round(state.round));
   const presentation = transitionPresentation(state);
   const center =
     state.phase === 'matchEnd' && state.matchWinnerId != null
-      ? `${actorIdentity(state.matchWinnerId).name}获胜！`
-      : presentation.label;
+      ? text().matchWinner(actorIdentity(state.matchWinnerId).name)
+      : presentationText(state, presentation).label;
   setText(hud.center, center);
   hud.center.hidden = !center;
   const notice = boundaryNotice(state);
@@ -239,6 +248,10 @@ const view: HostView = {
   },
   audio: () => BFAudio.toggle(),
   appearance: setAppearance,
+  settings(settings) {
+    // Chinese until the platform says otherwise; the next HUD frame picks it up.
+    if (settings.locale) applyLocale(settings.locale);
+  },
   async settle() {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     await new Promise((resolve) => setTimeout(resolve, 750));

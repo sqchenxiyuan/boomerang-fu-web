@@ -2,6 +2,14 @@ import { AGENT_PROTOCOL, CHARACTERS, TICK_HZ } from '../agent/contract';
 import type { AgentFrame, AgentObservation } from '../agent/contract';
 import { PRESENT_MAX_FRAMES, type AgentRuntime } from '../agent/runtime';
 import type { FramePacer } from './pacer';
+import { text, type Locale } from '../core/i18n';
+
+/** Languages the embedded game can display; the platform picks one with `settings`. */
+export const DISPLAY_LOCALES: readonly Locale[] = ['zh', 'en'];
+/** Display-only settings from the platform (not part of the result or the recording). */
+export interface DisplaySettings {
+  locale?: Locale;
+}
 
 /*
  * Game side of the MUNDI `arkena.game.v1` bridge for the web engine. The
@@ -47,6 +55,8 @@ export interface HostView {
   audio(): AudioStatus;
   /** Display-only appearance for each player (not part of the result). */
   appearance(players: unknown): void;
+  /** Display-only settings such as the language (not part of the result). */
+  settings(settings: DisplaySettings): void;
   /** After the ending: let the last frames reach the screen and linger. */
   settle(): Promise<void>;
   dispose(): void;
@@ -68,6 +78,8 @@ export interface Manifest {
   stepObservations: boolean;
   presentEnding: boolean;
   appearance: boolean;
+  /** Web extension: what `settings` accepts, so a platform can feature-detect it. */
+  settings: { locale: readonly Locale[] };
 }
 interface Request {
   id?: unknown;
@@ -129,6 +141,7 @@ export class MundiHost {
       stepObservations: true,
       presentEnding: true,
       appearance: true,
+      settings: { locale: DISPLAY_LOCALES },
     };
   }
 
@@ -205,6 +218,14 @@ export class MundiHost {
     if (method === 'appearance') {
       try {
         this.view.appearance(params.players);
+        return reply(true);
+      } catch (error) {
+        return replyError(error);
+      }
+    }
+    if (method === 'settings') {
+      try {
+        this.view.settings(displaySettings(params));
         return reply(true);
       } catch (error) {
         return replyError(error);
@@ -333,7 +354,7 @@ export class MundiHost {
     let frames = 0;
     while (frames < PRESENT_MAX_FRAMES) {
       const due = await this.pacer.next(Math.min(6, PRESENT_MAX_FRAMES - frames), 1);
-      if (!due) fail('收尾录制已暂停，请重新生成完整视频');
+      if (!due) fail(text().endingPaused);
       const step = this.runtime.present(due);
       this.view.advanced();
       frames += due;
@@ -353,4 +374,15 @@ export class MundiHost {
     this.view.dispose();
     this.runtime.dispose();
   }
+}
+
+/** Validate `settings`: unknown keys are ignored, a bad value is an error. */
+export function displaySettings(params: Record<string, unknown> | undefined): DisplaySettings {
+  const settings: DisplaySettings = {};
+  const locale = params?.locale;
+  if (locale !== undefined) {
+    if (!DISPLAY_LOCALES.includes(locale as Locale)) throw new Error('Unsupported locale');
+    settings.locale = locale as Locale;
+  }
+  return settings;
 }

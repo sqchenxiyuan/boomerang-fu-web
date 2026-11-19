@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { GameState } from '../core/types';
 import { boundaryWarning } from '../core/feedback';
+import { text } from '../core/i18n';
 import { RULES } from '../core/config';
 
 const vertex = `varying vec2 uvLocal; void main(){uvLocal=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
@@ -184,7 +185,7 @@ export class BoundaryView {
         Math.cos(angle) * (RULES.playerRadius + 0.55),
       );
       (view.arrow.material as THREE.Material).opacity = 0.3 + warning.pulse * 0.7;
-      const label = `返回 ${warning.seconds.toFixed(1)}s`;
+      const label = text().returnIn(warning.seconds.toFixed(1));
       if (view.text !== label) {
         view.text = label;
         const ctx = view.canvas.getContext('2d')!;

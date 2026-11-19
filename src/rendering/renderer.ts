@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { POWERUPS, RULES } from '../core/config';
 import { introPose, transitionPresentation } from '../core/presentation';
 import { lerpV } from '../core/math';
+import { text } from '../core/i18n';
 import type { Arena, GameEvent, GameState, Pickup } from '../core/types';
 import { createArenaView } from './arena-view';
 import type { ArenaView } from './arena-view';
@@ -257,7 +258,7 @@ export class GameRenderer {
     });
     this.canvas = this.renderer.domElement;
     this.canvas.className = 'game-canvas';
-    this.canvas.setAttribute('aria-label', '回旋花园三维竞技场');
+    this.canvas.setAttribute('aria-label', text().arenaLabel);
     this.canvas.tabIndex = 0;
     container.appendChild(this.canvas);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));

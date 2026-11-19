@@ -6,6 +6,7 @@ import { box, cylinder, material, place, sphere } from './palette';
 import { contourShapes, extrudeContours, rectanglePath } from './polygon-geometry';
 import { mergeStaticMeshes } from './batches';
 import { OriginalPlantsView } from './original-plants';
+import { createGateFx, portalTone, type PortalFx } from './portal-visuals';
 import {
   groundMaterial,
   shoreDistances,
@@ -294,6 +295,25 @@ function makeOriginalObstacle(obstacle: Obstacle, style: ReturnType<typeof style
   return root;
 }
 
+/** Glowing caps in the portal's colour: lit, so the voxel style converts them too. */
+const crystals = new Map<string, THREE.MeshStandardMaterial>();
+function crystal(color: string): THREE.MeshStandardMaterial {
+  let shared = crystals.get(color);
+  if (!shared) {
+    const tone = portalTone(color);
+    shared = new THREE.MeshStandardMaterial({
+      color: tone,
+      emissive: tone,
+      emissiveIntensity: 0.35,
+      roughness: 0.45,
+      flatShading: true,
+    });
+    shared.userData.shared = true;
+    crystals.set(color, shared);
+  }
+  return shared;
+}
+
 function makeGate(portal: Portal): THREE.Group {
   const root = new THREE.Group();
   root.name = `gate:${portal.id}`;
@@ -301,52 +321,31 @@ function makeGate(portal: Portal): THREE.Group {
   const depth = Math.max(0.12, Math.min(0.45, (portal.half?.y ?? 0.12) * 2));
   const height = Math.max(0.5, portal.height ?? Math.max(1.4, Math.min(2.6, width * 1.12)));
   const post = Math.min(0.22, width * 0.14);
+  const cap = crystal(portal.color);
   for (const x of [-width / 2 - post / 2, width / 2 + post / 2]) {
     place(box(post, height + post, depth + 0.12, '#8299a6'), x, (height + post) / 2, 0, root);
-    place(box(post + 0.14, 0.16, depth + 0.24, '#c3cfca'), x, height + post * 0.5, 0, root);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(post + 0.14, 0.16, depth + 0.24), cap);
+    top.castShadow = top.receiveShadow = true;
+    place(top, x, height + post * 0.5, 0, root);
   }
   place(box(width + post * 2, post, depth + 0.12, '#a5b9be'), 0, height, 0, root);
+  // Keystone: the colour reads from above even when the doorway faces sideways.
+  const key = new THREE.Mesh(new THREE.BoxGeometry(post * 1.5, post * 1.1, depth + 0.2), cap);
+  key.castShadow = key.receiveShadow = true;
+  place(key, 0, height + post * 0.45, 0, root);
   place(box(width + post * 2 + 0.1, 0.12, depth + 0.3, '#a8bfc1'), 0, 0.02, 0, root);
-  const surface = new THREE.Mesh(
-    new THREE.PlaneGeometry(width, height - 0.08),
-    new THREE.ShaderMaterial({
-      uniforms: {
-        color: { value: new THREE.Color(portal.color) },
-        time: { value: 0 },
-        flash: { value: 0 },
-      },
-      vertexShader:
-        'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-      fragmentShader: `varying vec2 vUv;uniform vec3 color;uniform float time,flash;
-      void main(){float bands=.5+.5*sin(vUv.y*24.0-vUv.x*8.0+time*3.0);
-        float rim=pow(abs(vUv.x-.5)*2.0,6.0);vec3 c=mix(color,vec3(1.0),flash*.65+rim*.25);
-        gl_FragColor=vec4(c,.43+bands*.1+rim*.27);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-      }`,
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }),
-  );
-  surface.position.y = height / 2;
-  surface.material.forceSinglePass = true;
-  root.add(surface);
-  const glow = new THREE.Mesh(
-    new THREE.PlaneGeometry(width + 0.4, depth + 0.9),
-    new THREE.MeshBasicMaterial({
-      color: portal.color,
-      transparent: true,
-      opacity: 0.2,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }),
-  );
-  glow.rotation.x = -Math.PI / 2;
-  glow.position.y = 0.03 - (portal.baseHeight ?? 0);
-  root.add(glow);
-  root.userData.gateSurface = surface;
-  root.userData.gateGlow = glow;
+  const fx = createGateFx(root, {
+    id: portal.id,
+    color: portal.color,
+    width,
+    frameHalf: width / 2 + post + 0.07,
+    top: height + post * 0.5 + 0.08,
+    floor: -(portal.baseHeight ?? 0),
+    doorTop: height - post / 2 + 0.02,
+    front: -depth / 2,
+  });
+  root.userData.portalFx = fx;
+  root.userData.gateSurface = fx.membrane;
   root.userData.flashUntil = -1;
   root.userData.gate = true;
   return root;
@@ -491,15 +490,8 @@ export function updateOriginalArena(view: ArenaView, arena: Arena, time: number,
       alpha,
     );
     group.position.y = (portal.baseHeight ?? 0) + (heightDelta(mechanism, alpha, mechanisms) ?? 0);
-    const surface = group.userData.gateSurface as THREE.Mesh<
-      THREE.PlaneGeometry,
-      THREE.ShaderMaterial
-    >;
-    surface.material.uniforms.time.value = time;
-    surface.material.uniforms.flash.value = Math.max(
-      0,
-      (Number(group.userData.flashUntil) - time) / 0.5,
-    );
+    const fx = group.userData.portalFx as PortalFx;
+    fx.flash.value = Math.max(0, (Number(group.userData.flashUntil) - time) / 0.5);
   }
   for (const mechanism of mechanisms.values()) {
     const group = view.mechanisms.get(mechanism.id);
@@ -596,7 +588,7 @@ export function mergeOriginalStatics(view: ArenaView, arena: Arena): number {
 
 export function flashOriginalGate(view: ArenaView, point: Vec2, time: number): void {
   for (const group of view.portals.values()) {
-    if (!group.userData.gate) continue;
+    if (!group.userData.portalFx) continue;
     if (Math.hypot(point.x - group.position.x, point.y - group.position.z) < 2)
       group.userData.flashUntil = time + 0.5;
   }

@@ -404,11 +404,11 @@ describe('original dynamic presentation', () => {
     expect(surface.geometry.parameters.height).toBeGreaterThan(1);
     flashOriginalGate(view, { x: 2, y: 1 }, 5);
     updateOriginalArena(view, state, 5.25);
-    expect(surface.material.uniforms.flash.value).toBeCloseTo(0.5);
+    expect(surface.material.uniforms.uFlash.value).toBeCloseTo(0.5);
     updateOriginalArena(view, state, 5.25);
-    expect(surface.material.uniforms.flash.value).toBeCloseTo(0.5);
+    expect(surface.material.uniforms.uFlash.value).toBeCloseTo(0.5);
     updateOriginalArena(view, state, 6);
-    expect(surface.material.uniforms.flash.value).toBe(0);
+    expect(surface.material.uniforms.uFlash.value).toBe(0);
     dispose(view.root);
   });
   it('keeps attached props, gates and switches with falling ancestors without duplicating XY motion', () => {

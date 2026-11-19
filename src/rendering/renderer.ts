@@ -20,6 +20,7 @@ import { THROW_FOLLOW } from './character-motion';
 import type { CharacterView } from './characters';
 import { voxelizeMesh, voxelizeStatic, voxelizeTree } from './voxelize';
 import { setSurfacePixel, setSurfaceTime } from './surfaces';
+import type { PortalFx } from './portal-visuals';
 
 export type VisualStyle = 'standard' | 'pixel';
 /** Voxel edge in world units: scenery, and small props (hands, discs, pickups). */
@@ -150,7 +151,7 @@ function disposeVisual(root: THREE.Object3D): void {
       object.material.map?.dispose();
       object.material.dispose();
     }
-    if (object instanceof THREE.Line) {
+    if (object instanceof THREE.Line || object instanceof THREE.Points) {
       object.geometry.dispose();
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       for (const mat of materials) if (!mat.userData.shared) mat.dispose();
@@ -558,6 +559,12 @@ export class GameRenderer {
       if (group.userData.gate) continue;
       group.children[0].rotation.z = simulationTime * 0.7 + id.length;
       group.children[0].scale.setScalar(1 + Math.sin(simulationTime * 3) * 0.045);
+      const fx = group.userData.portalFx as PortalFx | undefined;
+      if (fx)
+        fx.flash.value = Math.max(
+          0,
+          (Number(group.userData.flashUntil ?? 0) - simulationTime) / 0.5,
+        );
     }
     setSurfaceTime(simulationTime);
     this.boundary.update(state, menu);

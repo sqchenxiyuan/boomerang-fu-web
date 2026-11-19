@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createPadFx } from './portal-visuals';
 import { Random } from '../core/math';
 import { mapInfo } from '../core/arena';
 import { onGround } from '../core/collision';
@@ -337,18 +338,7 @@ export function createArenaView(arena: Arena): ArenaView {
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.04;
     group.add(ring);
-    const core = new THREE.Mesh(
-      new THREE.CircleGeometry(portal.radius * 0.62, 32),
-      new THREE.MeshBasicMaterial({
-        color: portal.color,
-        transparent: true,
-        opacity: 0.28,
-        depthWrite: false,
-      }),
-    );
-    core.rotation.x = -Math.PI / 2;
-    core.position.y = 0.045;
-    group.add(core);
+    group.userData.portalFx = createPadFx(group, portal.id, portal.color, portal.radius);
     for (let i = 0; i < 4; i++) {
       const angle = (i * Math.PI) / 2;
       const marker = cylinder(0.09, 0.14, 0.34, portal.color, 4);

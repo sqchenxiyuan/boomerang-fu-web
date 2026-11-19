@@ -42,21 +42,24 @@ const SPECIAL = [
 
 describe('deterministic trigonometry', () => {
   it('stays within 1 ulp of the engine on game-scale inputs', () => {
+    // ~400k comparisons: check in plain loops and assert once. One expect() per
+    // sample took 2.4 s here and over 5 s on a busy CI runner (test timeout).
+    const misses: string[] = [];
+    const check = (label: string, ours: number, engine: number) => {
+      if (ulps(ours, engine) > 1 && misses.length < 10)
+        misses.push(`${label}: ${ours} vs ${engine} (${ulps(ours, engine)} ulp)`);
+    };
     for (const x of [...samples(100000, 40), ...samples(20000, 1e5), ...SPECIAL]) {
-      expect(ulps(dsin(x), Math.sin(x)), `sin ${x}`).toBeLessThanOrEqual(1);
-      expect(ulps(dcos(x), Math.cos(x)), `cos ${x}`).toBeLessThanOrEqual(1);
-      expect(ulps(datan(x), Math.atan(x)), `atan ${x}`).toBeLessThanOrEqual(1);
+      check(`sin ${x}`, dsin(x), Math.sin(x));
+      check(`cos ${x}`, dcos(x), Math.cos(x));
+      check(`atan ${x}`, datan(x), Math.atan(x));
     }
     const ys = samples(50000, 30),
       xs = samples(50001, 30).slice(1);
-    ys.forEach((y, i) =>
-      expect(
-        ulps(datan2(y, xs[i]), Math.atan2(y, xs[i])),
-        `atan2 ${y},${xs[i]}`,
-      ).toBeLessThanOrEqual(1),
-    );
+    ys.forEach((y, i) => check(`atan2 ${y},${xs[i]}`, datan2(y, xs[i]), Math.atan2(y, xs[i])));
     for (const x of [...samples(50000, 1), -1, 1, 0.5, -0.5, 0.49999999, 1e-20])
-      expect(ulps(dacos(x), Math.acos(x)), `acos ${x}`).toBeLessThanOrEqual(1);
+      check(`acos ${x}`, dacos(x), Math.acos(x));
+    expect(misses).toEqual([]);
   });
 
   it('handles IEEE edge cases like the platform libm', () => {
